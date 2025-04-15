@@ -1,16 +1,36 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useAuth } from '@/context/AuthContext';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
-import OpenAI from 'openai';
+import Link from 'next/link';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { format } from 'date-fns';
+
+// Helper function to calculate days between two dates
+function getDayCountInRange(startDate, endDate) {
+  if (!startDate || !endDate) return 1;
+  
+  try {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    // Make sure both dates are valid
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return 1;
+    
+    // Add 1 because the range is inclusive of both start and end dates
+    return Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1);
+  } catch (error) {
+    console.error('Error calculating day count:', error);
+    return 1;
+  }
+}
 
 export default function OptimizePage() {
-  const { user, isDispatcher, signOut } = useAuth();
   const router = useRouter();
+  const supabase = createClientComponentClient();
   
   // State variables
+  const [user, setUser] = useState(null);
   const [upcomingTrips, setUpcomingTrips] = useState([]);
   const [availableDrivers, setAvailableDrivers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -18,154 +38,215 @@ export default function OptimizePage() {
   const [optimizationResult, setOptimizationResult] = useState(null);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow.toISOString().split('T')[0];
+  
+  // Date range state
+  const [startDate, setStartDate] = useState(() => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
   });
   
-  // OpenAI API configuration
-  const [apiKey, setApiKey] = useState('');
-  const [apiKeyError, setApiKeyError] = useState('');
-  
+  const [endDate, setEndDate] = useState(() => {
+    const nextWeek = new Date();
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    return nextWeek.toISOString().split('T')[0];
+  });
+
+  // Check auth
   useEffect(() => {
-    // Get API key from localStorage or environment variable
-    const savedApiKey = typeof window !== 'undefined' ? localStorage.getItem('openai_api_key') : null;
-    if (savedApiKey) {
-      setApiKey(savedApiKey);
-    }
-  }, []);
-  
-  // Save API key to localStorage
-  const handleSaveApiKey = () => {
-    if (apiKey.trim()) {
-      localStorage.setItem('openai_api_key', apiKey);
-      setApiKeyError('');
-      setSuccessMessage('API key saved. It is stored only in your browser.');
-      setTimeout(() => setSuccessMessage(''), 3000);
-    } else {
-      setApiKeyError('Please enter a valid API key');
-    }
-  };
+    const checkAuth = async () => {
+      try {
+        // Check if user is logged in
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error("Session error:", sessionError);
+          return;
+        }
+        
+        if (!session) {
+          console.log("No session found, redirecting to login");
+          router.push('/login');
+          return;
+        }
+        
+        setUser(session.user);
+        fetchData();
+      } catch (error) {
+        console.error("Auth check error:", error);
+      }
+    };
+    
+    checkAuth();
+  }, [supabase, router]);
 
+  // Fetch data when date range changes
   useEffect(() => {
-    if (!user) {
-      router.push('/login');
-      return;
+    if (user) {
+      fetchData();
     }
-    
-    // Ensure user has dispatcher role
-    if (!isDispatcher()) {
-      signOut();
-      router.push('/login?error=Access denied. This application is only for dispatchers.');
-      return;
-    }
+  }, [startDate, endDate, user]);
 
-    // Fetch data when selected date changes
-    fetchTripsAndDrivers();
+  // Main data fetching function
+  const fetchData = async () => {
+    if (!user) return;
     
-  }, [user, router, isDispatcher, signOut, selectedDate]);
-
-  // Fetch upcoming trips and available drivers
-  const fetchTripsAndDrivers = async () => {
     setLoading(true);
     setError('');
     
     try {
-      // Fetch upcoming trips for the selected date
-      const startOfDay = new Date(selectedDate);
-      startOfDay.setHours(0, 0, 0, 0);
+      // Date range for query
+      const startOfRange = new Date(startDate);
+      startOfRange.setHours(0, 0, 0, 0);
       
-      const endOfDay = new Date(selectedDate);
-      endOfDay.setHours(23, 59, 59, 999);
+      const endOfRange = new Date(endDate);
+      endOfRange.setHours(23, 59, 59, 999);
       
-      // Format dates for Supabase
-      const startDateStr = startOfDay.toISOString();
-      const endDateStr = endOfDay.toISOString();
+      // Validate date range
+      if (startOfRange > endOfRange) {
+        setError('Start date must be before end date');
+        setLoading(false);
+        return;
+      }
       
-      // Fetch upcoming trips
+      // Format for Supabase
+      const startDateStr = startOfRange.toISOString();
+      const endDateStr = endOfRange.toISOString();
+      
+      // Fetch trips for selected date
       const { data: trips, error: tripsError } = await supabase
         .from('trips')
-        .select(`
-          id,
-          client_id,
-          driver_id,
-          pickup_location,
-          dropoff_location,
-          scheduled_time,
-          estimated_duration,
-          status,
-          users:client_id(first_name, last_name, phone_number)
-        `)
-        .gte('scheduled_time', startDateStr)
-        .lt('scheduled_time', endDateStr)
+        .select('*')
+        .gte('pickup_time', startDateStr)
+        .lt('pickup_time', endDateStr)
         .in('status', ['upcoming', 'pending'])
-        .order('scheduled_time', { ascending: true });
-        
+        .order('pickup_time', { ascending: true });
+      
       if (tripsError) throw tripsError;
       
-      // Fetch all drivers
-      const { data: drivers, error: driversError } = await supabase
-        .from('users')
-        .select(`
-          id, 
-          first_name, 
-          last_name,
-          phone_number,
-          driver_details(*)
-        `)
-        .eq('role', 'driver')
-        .not('driver_details.status', 'eq', 'inactive');
+      console.log("Fetched trips:", trips?.length || 0);
+      
+      // First, fetch all client data at once to improve performance - get ALL profiles
+      let allProfiles = [];
+      try {
+        // Only select fields that actually exist in the profiles table
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, role, phone_number');
+          
+        if (error) {
+          console.log('Error details:', JSON.stringify(error));
+          console.error('Error fetching profiles:', error?.message || 'Unknown error');
+        } else {
+          allProfiles = data || [];
+          console.log(`Fetched ${allProfiles.length} profiles`);
+        }
+      } catch (err) {
+        console.error('Exception fetching profiles:', err);
+        // Continue with empty profiles array
+      }
+
+      // Create a map of clients by ID for fast lookup
+      const clientsMap = {};
+      if (allProfiles) {
+        allProfiles.forEach(client => {
+          clientsMap[client.id] = client;
+        });
+      }
+      
+      // For any missing users, try to supplement with basic info from the trips themselves
+      const userIds = trips.map(trip => trip.user_id).filter(id => id && !clientsMap[id]);
+      
+      if (userIds.length > 0) {
+        // Create placeholder profiles for users that don't have a profile record
+        userIds.forEach(userId => {
+          if (userId) {
+            clientsMap[userId] = {
+              id: userId,
+              first_name: "Client",
+              last_name: userId.substring(0, 8),
+              email: null
+            };
+          }
+        });
+      }
+      
+      // Process trips
+      const processedTrips = (trips || []).map(trip => {
+        const pickupDate = trip.pickup_time ? new Date(trip.pickup_time) : null;
         
+        // Get client info from the map
+        let clientName = 'Unknown Client';
+        const clientData = clientsMap[trip.user_id];
+        
+        if (clientData) {
+          if (clientData.first_name || clientData.last_name) {
+            clientName = `${clientData.first_name || ''} ${clientData.last_name || ''}`.trim();
+          } else if (clientData.email) {
+            clientName = clientData.email;
+          }
+        } else if (trip.user_id) {
+          // If we can't find the client but have a user ID, use that as a fallback
+          clientName = `Client ${trip.user_id.substring(0, 8)}`;
+        }
+        
+        // Use date-fns for consistent formatting across server and client
+        const formattedTime = pickupDate ? format(pickupDate, 'h:mm a') : 'No time';
+        const formattedDate = pickupDate ? format(pickupDate, 'MM/dd/yyyy') : 'No date';
+        
+        return {
+          ...trip,
+          client_name: clientName,
+          client_data: clientData || null,
+          formatted_time: formattedTime,
+          formatted_date: formattedDate,
+          pickup_location: trip.pickup_address,
+          dropoff_location: trip.destination_address,
+          scheduled_time: trip.pickup_time
+        };
+      });
+
+      setUpcomingTrips(processedTrips);
+      
+      // Fetch drivers
+      const { data: drivers, error: driversError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('role', 'driver');
+      
       if (driversError) throw driversError;
       
-      // Process the data
-      const processedTrips = trips.map(trip => ({
-        ...trip,
-        client_name: trip.users ? `${trip.users.first_name} ${trip.users.last_name}` : 'Unknown',
-        client_phone: trip.users?.phone_number,
-        // Format the scheduled time for display
-        formatted_time: new Date(trip.scheduled_time).toLocaleTimeString([], { 
-          hour: '2-digit', 
-          minute: '2-digit' 
-        }),
-      }));
+      console.log("Fetched drivers:", drivers?.length || 0);
       
-      const processedDrivers = drivers.filter(driver => driver.driver_details).map(driver => ({
+      // Process drivers
+      const processedDrivers = (drivers || []).map((driver, index) => ({
         id: driver.id,
-        name: `${driver.first_name} ${driver.last_name}`,
-        phone: driver.phone_number,
-        status: driver.driver_details?.status || 'unknown',
-        vehicle: driver.driver_details?.vehicle_info,
-        rating: driver.driver_details?.rating || 0,
-        // Check if driver is already assigned to any of the fetched trips
-        assigned: trips.some(trip => trip.driver_id === driver.id)
+        name: `${driver.first_name || ''} ${driver.last_name || ''}`.trim() || 'Driver ' + driver.id?.substring(0, 6),
+        phone: driver.phone_number || 'No phone',
+        status: 'available',
+        vehicle: 'Standard Vehicle',
+        rating: 4.5, // Fixed rating for consistency
+        assigned: false,
+        // Add an index to ensure stable ordering
+        index: index
       }));
       
-      setUpcomingTrips(processedTrips);
       setAvailableDrivers(processedDrivers);
     } catch (error) {
-      console.error('Error fetching data:', error);
-      setError('Failed to load trips and drivers');
+      console.error("Data fetching error:", error);
+      setError(`Error loading data: ${error.message}`);
     } finally {
       setLoading(false);
     }
   };
 
-  // Run optimization using OpenAI
-  const runOptimization = async () => {
-    if (!apiKey) {
-      setApiKeyError('Please enter your OpenAI API key');
-      return;
-    }
-    
+  // Run optimization
+  const runOptimization = () => {
     if (upcomingTrips.length === 0) {
       setError('No upcoming trips to optimize');
       return;
     }
     
-    const availableDriversCount = availableDrivers.filter(d => !d.assigned).length;
-    if (availableDriversCount === 0) {
+    if (availableDrivers.length === 0) {
       setError('No available drivers for optimization');
       return;
     }
@@ -175,134 +256,148 @@ export default function OptimizePage() {
     setOptimizationResult(null);
     
     try {
-      const openai = new OpenAI({
-        apiKey: apiKey,
-        dangerouslyAllowBrowser: true // Note: In production, API calls should be made server-side
-      });
+      // Simple optimization logic
+      const unassignedTrips = upcomingTrips.filter(trip => !trip.driver_name);
+      const availableDriversList = [...availableDrivers];
       
-      // Prepare the data for the AI
-      const tripsData = upcomingTrips.map(trip => ({
-        id: trip.id,
-        pickup: trip.pickup_location,
-        dropoff: trip.dropoff_location,
-        time: trip.scheduled_time,
-        duration: trip.estimated_duration || 30, // Default 30 minutes if not specified
-        current_driver_id: trip.driver_id || null
-      }));
-      
-      const driversData = availableDrivers
-        .filter(driver => driver.status === 'available' || driver.status === 'off_duty')
-        .map(driver => ({
-          id: driver.id,
-          name: driver.name,
-          rating: driver.rating,
-          currently_assigned: driver.assigned
-        }));
-      
-      // Prepare the prompt for the AI
-      const prompt = `
-You are an expert trip dispatcher AI that optimizes driver assignments and schedules.
-
-DATE: ${new Date(selectedDate).toDateString()}
-
-UPCOMING TRIPS (${tripsData.length}):
-${JSON.stringify(tripsData, null, 2)}
-
-AVAILABLE DRIVERS (${driversData.length}):
-${JSON.stringify(driversData, null, 2)}
-
-Your task:
-1. Analyze the upcoming trips and available drivers
-2. Optimize driver assignments to minimize travel time and maximize efficiency
-3. Suggest minor adjustments to trip schedules (within 15 minutes) to improve overall efficiency
-4. Consider driver ratings when making assignments
-5. If a trip already has a driver assigned, evaluate if it's optimal or suggest a reassignment
-
-Return your response as a JSON object with the following structure:
-{
-  "assignments": [
-    {
-      "trip_id": "123",
-      "driver_id": "456",
-      "original_time": "2023-05-01T14:30:00Z",
-      "suggested_time": "2023-05-01T14:35:00Z", 
-      "reasoning": "This driver is closest to the pickup location and has a high rating."
-    }
-  ],
-  "explanation": "Overall explanation of the optimization strategy."
-}
-`;
-
-      const response = await openai.chat.completions.create({
-        model: "gpt-4-turbo",
-        messages: [
-          {
-            role: "system",
-            content: "You are a trip optimization assistant that helps dispatchers allocate drivers efficiently."
-          },
-          {
-            role: "user",
-            content: prompt
+      // Group trips by date
+      const tripsByDate = {};
+      unassignedTrips.forEach(trip => {
+        if (trip.pickup_time) {
+          // Get just the date part for grouping
+          const tripDate = new Date(trip.pickup_time).toISOString().split('T')[0];
+          
+          if (!tripsByDate[tripDate]) {
+            tripsByDate[tripDate] = [];
           }
-        ],
-        response_format: { type: "json_object" }
+          
+          tripsByDate[tripDate].push(trip);
+        }
       });
       
-      // Parse the AI response
-      const responseText = response.choices[0].message.content;
-      const optimizationData = JSON.parse(responseText);
+      // Create assignments
+      const assignments = [];
+      const driverAssignmentCounts = {};
       
-      // Enhance the optimization result with human-readable names
-      const enhancedAssignments = optimizationData.assignments.map(assignment => {
-        const trip = upcomingTrips.find(t => t.id === assignment.trip_id);
-        const driver = availableDrivers.find(d => d.id === assignment.driver_id);
+      // Track driver assignments per day to avoid overbooking
+      const driverDailyAssignments = {};
+      
+      // Initialize driver counts
+      availableDriversList.forEach(driver => {
+        driverAssignmentCounts[driver.id] = 0;
+        driverDailyAssignments[driver.id] = {};
+      });
+      
+      // Sort dates to process in chronological order
+      const sortedDates = Object.keys(tripsByDate).sort();
+      
+      // Process each date
+      sortedDates.forEach(date => {
+        const tripsOnThisDate = tripsByDate[date];
         
-        return {
-          ...assignment,
-          trip_info: trip ? {
-            pickup: trip.pickup_location,
-            dropoff: trip.dropoff_location,
-            client: trip.client_name
-          } : null,
-          driver_name: driver ? driver.name : 'Unknown Driver',
-          original_time_formatted: assignment.original_time ? 
-            new Date(assignment.original_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 
-            'N/A',
-          suggested_time_formatted: assignment.suggested_time ? 
-            new Date(assignment.suggested_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 
-            'N/A',
-          time_difference: calculateTimeDifference(assignment.original_time, assignment.suggested_time)
-        };
+        // Sort trips by time
+        tripsOnThisDate.sort((a, b) => new Date(a.pickup_time) - new Date(b.pickup_time));
+        
+        // Process each trip for this date
+        tripsOnThisDate.forEach(trip => {
+          // Find available drivers for this date with fewest assignments
+          const availableForDate = availableDriversList
+            .filter(driver => {
+              // Limit to 5 trips per driver per day
+              return !driverDailyAssignments[driver.id][date] || driverDailyAssignments[driver.id][date] < 5;
+            })
+            .sort((a, b) => {
+              // First by daily assignments
+              const aDailyCount = driverDailyAssignments[a.id][date] || 0;
+              const bDailyCount = driverDailyAssignments[b.id][date] || 0;
+              if (aDailyCount !== bDailyCount) return aDailyCount - bDailyCount;
+              
+              // Then by total assignments across all days
+              return driverAssignmentCounts[a.id] - driverAssignmentCounts[b.id];
+            });
+          
+          // If no drivers available for this date, use any driver
+          let driver;
+          if (availableForDate.length > 0) {
+            driver = availableForDate[0]; // Get driver with fewest assignments
+          } else {
+            driver = availableDriversList[0]; // Fallback
+          }
+          
+          // Update assignment counts
+          driverAssignmentCounts[driver.id] = (driverAssignmentCounts[driver.id] || 0) + 1;
+          driverDailyAssignments[driver.id][date] = (driverDailyAssignments[driver.id][date] || 0) + 1;
+          
+          // Time adjustments to avoid overlapping trips
+          const originalTime = new Date(trip.scheduled_time);
+          const suggestedTime = new Date(originalTime);
+          
+          // Adjust time based on how many trips this driver already has on this day
+          // Each trip adjusts by 30 minutes to avoid overlaps
+          const driverDailyCount = driverDailyAssignments[driver.id][date];
+          let timeAdjustment = 0;
+          
+          if (driverDailyCount > 1) {
+            // Stagger trips by adding 30 minute blocks
+            timeAdjustment = (driverDailyCount - 1) * 30;
+            suggestedTime.setMinutes(originalTime.getMinutes() + timeAdjustment);
+          }
+          
+          // Format dates consistently with date-fns
+          const formattedDate = format(new Date(date), 'MM/dd/yyyy');
+          const originalTimeFormatted = format(originalTime, 'h:mm a');
+          const suggestedTimeFormatted = format(suggestedTime, 'h:mm a');
+          
+          assignments.push({
+            trip_id: trip.id,
+            driver_id: driver.id,
+            original_time: originalTime.toISOString(),
+            suggested_time: suggestedTime.toISOString(),
+            trip_date: date,
+            reasoning: `${driver.name} has ${driverDailyCount} trips on ${formattedDate}. ${
+              timeAdjustment > 0 ? `Adjusted time by +${timeAdjustment} minutes to avoid overlap.` : 'No time adjustment needed.'
+            }`,
+            trip_info: {
+              pickup: trip.pickup_location,
+              dropoff: trip.dropoff_location,
+              client: trip.client_name, // This is now the full name from the processed trip
+              date: formattedDate
+            },
+            driver_name: driver.name,
+            original_time_formatted: originalTimeFormatted,
+            suggested_time_formatted: suggestedTimeFormatted,
+            time_difference: timeAdjustment === 0 ? 'No change' : `+${timeAdjustment} min later`
+          });
+        });
       });
+      
+      // Sort assignments by date and time
+      assignments.sort((a, b) => {
+        if (a.trip_date !== b.trip_date) {
+          return a.trip_date.localeCompare(b.trip_date);
+        }
+        return new Date(a.original_time) - new Date(b.original_time);
+      });
+      
+      // Generate optimization summary
+      const dateCount = sortedDates.length;
+      const daysLabel = dateCount === 1 ? 'day' : 'days';
       
       setOptimizationResult({
-        ...optimizationData,
-        assignments: enhancedAssignments
+        assignments,
+        explanation: `Optimized ${assignments.length} trip assignments across ${dateCount} ${daysLabel} with ${availableDriversList.length} drivers. Drivers were assigned to minimize overlapping schedules and balance workload.`
       });
-      
     } catch (error) {
-      console.error('Optimization error:', error);
+      console.error("Optimization error:", error);
       setError(`Optimization failed: ${error.message}`);
     } finally {
       setOptimizing(false);
     }
   };
-  
-  // Calculate time difference between original and suggested times
-  const calculateTimeDifference = (originalTime, suggestedTime) => {
-    if (!originalTime || !suggestedTime) return 'No change';
-    
-    const original = new Date(originalTime);
-    const suggested = new Date(suggestedTime);
-    const diffMinutes = Math.round((suggested - original) / (60 * 1000));
-    
-    if (diffMinutes === 0) return 'No change';
-    return diffMinutes > 0 ? `+${diffMinutes} min later` : `${diffMinutes} min earlier`;
-  };
-  
-  // Apply the optimization results
+
+  // Apply optimization
   const applyOptimization = async () => {
-    if (!optimizationResult || !optimizationResult.assignments) {
+    if (!optimizationResult?.assignments?.length) {
       setError('No optimization results to apply');
       return;
     }
@@ -311,224 +406,175 @@ Return your response as a JSON object with the following structure:
     setError('');
     
     try {
-      // Process each assignment sequentially
+      // Update each trip one by one
       for (const assignment of optimizationResult.assignments) {
-        // Update driver assignment
-        const { error: assignError } = await supabase
+        const { error: updateError } = await supabase
           .from('trips')
-          .update({ 
-            driver_id: assignment.driver_id,
-            scheduled_time: assignment.suggested_time || assignment.original_time,
-            // If trip was pending and now has a driver, change status to upcoming
+          .update({
+            driver_name: assignment.driver_name,
+            pickup_time: assignment.suggested_time,
             status: 'upcoming'
           })
           .eq('id', assignment.trip_id);
-          
-        if (assignError) throw assignError;
+        
+        if (updateError) throw updateError;
       }
       
       setSuccessMessage('Optimization applied successfully!');
-      
-      // Refresh the data
-      await fetchTripsAndDrivers();
-      
-      // Clear the optimization result
       setOptimizationResult(null);
-      
+      fetchData(); // Refresh data
     } catch (error) {
-      console.error('Error applying optimization:', error);
-      setError('Failed to apply optimization');
+      console.error("Apply optimization error:", error);
+      setError(`Failed to apply optimization: ${error.message}`);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-brand-background">
       {/* Header */}
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900">Trip Optimization</h1>
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-            >
-              Back to Dashboard
-            </button>
-          </div>
+      <header className="bg-brand-card shadow">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+          <h1 className="text-2xl font-bold">Trip Optimization</h1>
+          <Link href="/dashboard" className="px-4 py-2 bg-brand-accent text-brand-buttonText rounded hover:opacity-90">
+            Back to Dashboard
+          </Link>
         </div>
       </header>
 
       {/* Main content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* OpenAI API Key Section */}
-        <div className="bg-white shadow rounded-lg p-6 mb-8">
-          <h2 className="text-xl font-semibold mb-4">OpenAI API Configuration</h2>
-          <div className="mb-4">
-            <p className="text-sm text-gray-600 mb-4">
-              This feature uses OpenAI's API to optimize trip scheduling and driver assignment. 
-              You need to provide your OpenAI API key. The key is stored only in your browser.
-            </p>
-            <div className="flex">
-              <input
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="Enter your OpenAI API key"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              />
-              <button
-                onClick={handleSaveApiKey}
-                className="px-4 py-2 bg-blue-600 text-white rounded-r-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                Save Key
-              </button>
-            </div>
-            {apiKeyError && <p className="mt-2 text-sm text-red-600">{apiKeyError}</p>}
-            {successMessage && <p className="mt-2 text-sm text-green-600">{successMessage}</p>}
+      <main className="max-w-7xl mx-auto px-4 py-8">
+        {/* Messages */}
+        {error && (
+          <div className="mb-6 bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded">
+            <p className="font-bold">Error</p>
+            <p>{error}</p>
           </div>
-        </div>
+        )}
         
+        {successMessage && (
+          <div className="mb-6 bg-green-50 border-l-4 border-green-500 text-green-700 p-4 rounded">
+            <p className="font-bold">Success</p>
+            <p>{successMessage}</p>
+          </div>
+        )}
+        
+        {/* Layout grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Filters and Controls */}
+          {/* Left Column - Controls */}
           <div className="lg:col-span-1">
-            <div className="bg-white shadow rounded-lg p-6 mb-6">
+            <div className="bg-brand-card shadow rounded-lg p-6 mb-6 border border-brand-border">
               <h2 className="text-lg font-semibold mb-4">Optimization Controls</h2>
               
               <div className="mb-4">
-                <label htmlFor="date-select" className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Date to Optimize
-                </label>
-                <input
-                  type="date"
-                  id="date-select"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="start-date" className="block text-sm font-medium mb-2">
+                      Start Date
+                    </label>
+                    <input
+                      type="date"
+                      id="start-date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="block w-full px-3 py-2 border border-brand-border rounded bg-brand-background"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="end-date" className="block text-sm font-medium mb-2">
+                      End Date
+                    </label>
+                    <input
+                      type="date"
+                      id="end-date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="block w-full px-3 py-2 border border-brand-border rounded bg-brand-background"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs opacity-70 mt-1 text-center">
+                  {format(new Date(startDate), 'MM/dd/yyyy')} - {format(new Date(endDate), 'MM/dd/yyyy')}
+                </p>
               </div>
               
               <div className="mb-4">
-                <p className="text-sm text-gray-600">
+                <p className="text-sm">
                   <span className="font-medium">Trips to optimize:</span> {upcomingTrips.length}
                 </p>
-                <p className="text-sm text-gray-600">
-                  <span className="font-medium">Available drivers:</span> {availableDrivers.filter(d => !d.assigned).length}
+                <p className="text-sm">
+                  <span className="font-medium">Available drivers:</span> {availableDrivers.length}
+                </p>
+                <p className="text-sm">
+                  <span className="font-medium">Date range:</span> {getDayCountInRange(startDate, endDate)} days
                 </p>
               </div>
               
               <button
                 onClick={runOptimization}
-                disabled={optimizing || loading || !apiKey}
-                className="w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 mb-2"
+                disabled={optimizing || loading}
+                className="w-full px-4 py-2 bg-brand-accent text-brand-buttonText rounded hover:opacity-90 disabled:opacity-50 mb-2"
               >
-                {optimizing ? 'Optimizing...' : 'Run AI Optimization'}
+                {optimizing ? 'Optimizing...' : 'Run Optimization'}
               </button>
               
               {optimizationResult && (
                 <button
                   onClick={applyOptimization}
                   disabled={loading}
-                  className="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
+                  className="w-full px-4 py-2 bg-green-600 text-white rounded hover:opacity-90 disabled:opacity-50"
                 >
                   Apply Optimization
                 </button>
               )}
-              
-              {error && (
-                <div className="mt-4 bg-red-50 border-l-4 border-red-400 p-4">
-                  <p className="text-sm text-red-700">{error}</p>
-                </div>
-              )}
-            </div>
-            
-            {/* Driver List */}
-            <div className="bg-white shadow rounded-lg p-6">
-              <h2 className="text-lg font-semibold mb-4">Available Drivers</h2>
-              {loading ? (
-                <div className="animate-pulse">
-                  {[1, 2, 3].map(i => (
-                    <div key={i} className="h-14 bg-gray-200 rounded mb-2"></div>
-                  ))}
-                </div>
-              ) : availableDrivers.length === 0 ? (
-                <p className="text-gray-500 text-center">No drivers available</p>
-              ) : (
-                <div className="overflow-y-auto max-h-96">
-                  {availableDrivers.map(driver => (
-                    <div key={driver.id} className="mb-3 p-3 border rounded-lg bg-gray-50">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <p className="font-medium text-gray-900">{driver.name}</p>
-                          <div className="text-sm text-gray-500">{driver.vehicle}</div>
-                        </div>
-                        <span className={`px-2 py-1 text-xs rounded-full font-medium
-                          ${driver.assigned 
-                            ? 'bg-blue-100 text-blue-800' 
-                            : driver.status === 'available'
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-gray-100 text-gray-800'}`}>
-                          {driver.assigned ? 'Assigned' : driver.status}
-                        </span>
-                      </div>
-                      <div className="mt-1 flex items-center">
-                        <span className="text-yellow-500 mr-1">★</span>
-                        <span className="text-sm">{driver.rating.toFixed(1)}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
           
-          {/* Right Column - Trips and Optimization Results */}
+          {/* Right Column - Results */}
           <div className="lg:col-span-2">
             {/* Upcoming Trips */}
-            <div className="bg-white shadow rounded-lg p-6 mb-6">
-              <h2 className="text-lg font-semibold mb-4">Upcoming Trips ({selectedDate})</h2>
+            <div className="bg-brand-card shadow rounded-lg p-6 mb-6 border border-brand-border">
+              <h2 className="text-lg font-semibold mb-4">
+                Upcoming Trips {startDate === endDate ? 
+                  `(${format(new Date(startDate), 'MM/dd/yyyy')})` : 
+                  `(${format(new Date(startDate), 'MM/dd/yyyy')} - ${format(new Date(endDate), 'MM/dd/yyyy')})`}
+              </h2>
+              
               {loading ? (
                 <div className="animate-pulse space-y-4">
-                  {[1, 2, 3, 4].map(i => (
-                    <div key={i} className="h-24 bg-gray-200 rounded"></div>
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="h-20 bg-brand-border/20 rounded"></div>
                   ))}
                 </div>
               ) : upcomingTrips.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">No upcoming trips found for this date</p>
+                <p className="text-center opacity-70 py-4">No upcoming trips found for this date</p>
               ) : (
-                <div className="overflow-y-auto max-h-96">
+                <div className="space-y-3">
                   {upcomingTrips.map(trip => (
-                    <div key={trip.id} className="mb-4 p-4 border rounded-lg hover:bg-gray-50">
-                      <div className="flex justify-between items-start">
+                    <div key={trip.id} className="p-3 border border-brand-border rounded-lg bg-brand-background">
+                      <div className="flex justify-between">
                         <div>
-                          <p className="font-medium text-gray-900">{trip.client_name}</p>
-                          <div className="text-sm text-gray-500">
-                            <div className="flex items-center mt-1">
-                              <span className="h-2 w-2 rounded-full bg-green-500 inline-block mr-2"></span>
-                              {trip.pickup_location}
-                            </div>
-                            <div className="flex items-center mt-1">
-                              <span className="h-2 w-2 rounded-full bg-red-500 inline-block mr-2"></span>
-                              {trip.dropoff_location}
-                            </div>
+                          <div className="flex items-center">
+                            <p className="font-medium text-brand-accent">{trip.client_name}</p>
+                            <span className="ml-2 text-xs px-2 py-0.5 bg-brand-accent/10 rounded">
+                              Client
+                            </span>
                           </div>
+                          <p className="text-sm opacity-70 mt-1">{trip.pickup_location} → {trip.dropoff_location}</p>
                         </div>
                         <div className="text-right">
-                          <div className="text-sm font-semibold">{trip.formatted_time}</div>
-                          <span className={`mt-1 inline-block px-2 py-1 text-xs rounded-full
-                            ${trip.status === 'upcoming' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                          <p className="font-medium">{trip.formatted_date}, {trip.formatted_time}</p>
+                          <p className="text-xs bg-brand-accent/10 text-brand-accent px-2 py-0.5 rounded inline-block mt-1">
                             {trip.status}
-                          </span>
+                          </p>
                         </div>
                       </div>
-                      <div className="mt-2 flex items-center text-sm">
-                        <span className="font-medium mr-2">Driver:</span>
-                        {trip.driver_id ? (
-                          <span>{availableDrivers.find(d => d.id === trip.driver_id)?.name || 'Assigned Driver'}</span>
-                        ) : (
-                          <span className="text-gray-500">Unassigned</span>
-                        )}
+                      <div className="mt-2 text-sm flex justify-between">
+                        <span><span className="font-medium">Driver:</span> {trip.driver_name || 'Unassigned'}</span>
+                        <span className="text-xs px-2 py-1 bg-brand-border/10 rounded inline-block">
+                          ID: {trip.id.substring(0, 8)}
+                        </span>
                       </div>
                     </div>
                   ))}
@@ -538,58 +584,65 @@ Return your response as a JSON object with the following structure:
             
             {/* Optimization Results */}
             {optimizationResult && (
-              <div className="bg-white shadow rounded-lg p-6">
+              <div className="bg-brand-card shadow rounded-lg p-6 border border-brand-border">
                 <h2 className="text-lg font-semibold mb-4">Optimization Results</h2>
-                <div className="mb-4 p-4 bg-indigo-50 rounded-lg">
-                  <h3 className="font-medium text-indigo-800 mb-2">AI Strategy</h3>
-                  <p className="text-sm text-indigo-700">{optimizationResult.explanation}</p>
+                
+                <div className="p-4 bg-brand-accent/10 rounded-lg mb-4">
+                  <p className="text-sm">{optimizationResult.explanation}</p>
                 </div>
                 
-                <h3 className="font-medium text-gray-900 mb-2">Suggested Assignments</h3>
-                <div className="overflow-y-auto max-h-96">
-                  {optimizationResult.assignments.map((assignment, index) => (
-                    <div key={index} className="mb-4 p-4 border rounded-lg bg-gray-50">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <h4 className="font-medium text-gray-900">Trip Details</h4>
-                          {assignment.trip_info && (
-                            <div className="mt-1 text-sm">
-                              <p><span className="font-medium">Client:</span> {assignment.trip_info.client}</p>
-                              <p className="mt-1">
-                                <span className="font-medium">Pickup:</span> {assignment.trip_info.pickup}
-                              </p>
-                              <p className="mt-1">
-                                <span className="font-medium">Dropoff:</span> {assignment.trip_info.dropoff}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                        
-                        <div>
-                          <h4 className="font-medium text-gray-900">Assignment</h4>
-                          <div className="mt-1 text-sm">
-                            <p><span className="font-medium">Driver:</span> {assignment.driver_name}</p>
-                            <p className="mt-1">
-                              <span className="font-medium">Original Time:</span> {assignment.original_time_formatted}
-                            </p>
-                            <p className="mt-1">
-                              <span className="font-medium">Suggested Time:</span> {assignment.suggested_time_formatted}
-                              {assignment.time_difference !== 'No change' && (
-                                <span className={`ml-2 px-1.5 py-0.5 text-xs rounded ${
-                                  assignment.time_difference.includes('earlier') ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
-                                }`}>
-                                  {assignment.time_difference}
-                                </span>
-                              )}
-                            </p>
+                <div>
+                  {/* Group assignments by date */}
+                  {(() => {
+                    // Get unique dates from assignments
+                    const dates = [...new Set(optimizationResult.assignments.map(a => a.trip_date))].sort();
+                    
+                    return dates.map(date => {
+                      const assignmentsForDate = optimizationResult.assignments.filter(a => a.trip_date === date);
+                      
+                      return (
+                        <div key={date} className="mb-6">
+                          <h3 className="font-medium text-lg mb-2 border-b border-brand-border pb-1">
+                            {format(new Date(date), 'EEE, MMM d, yyyy')}
+                            <span className="ml-2 text-sm opacity-70">({assignmentsForDate.length} trips)</span>
+                          </h3>
+                          
+                          <div className="space-y-3">
+                            {assignmentsForDate.map((assignment, i) => (
+                              <div key={i} className="p-4 border border-brand-border rounded-lg bg-brand-background">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div>
+                                    <h4 className="font-medium">Trip</h4>
+                                    <div className="flex items-center">
+                                      <p className="text-sm font-medium text-brand-accent">{assignment.trip_info.client}</p>
+                                      <span className="ml-2 text-xs px-1.5 py-0.5 bg-brand-accent/10 rounded">
+                                        Client
+                                      </span>
+                                    </div>
+                                    <p className="text-sm opacity-70 mt-1">{assignment.trip_info.pickup} → {assignment.trip_info.dropoff}</p>
+                                    <p className="text-xs opacity-70 mt-1">ID: {assignment.trip_id.substring(0, 8)}</p>
+                                  </div>
+                                  <div>
+                                    <h4 className="font-medium">Assignment</h4>
+                                    <p className="text-sm">Driver: {assignment.driver_name}</p>
+                                    <p className="text-sm">
+                                      Time: {assignment.suggested_time_formatted}
+                                      {assignment.time_difference !== 'No change' && (
+                                        <span className="ml-2 px-1.5 py-0.5 text-xs rounded bg-brand-accent/10 text-brand-accent">
+                                          {assignment.time_difference}
+                                        </span>
+                                      )}
+                                    </p>
+                                    <p className="text-xs opacity-70 mt-1">{assignment.reasoning}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
-                      </div>
-                      <div className="mt-3 text-sm">
-                        <p className="text-gray-600"><span className="font-medium">Reasoning:</span> {assignment.reasoning}</p>
-                      </div>
-                    </div>
-                  ))}
+                      );
+                    });
+                  })()}
                 </div>
               </div>
             )}

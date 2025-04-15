@@ -36,7 +36,7 @@ export function AuthProvider({ children }) {
     useEffect(() => {
         const setupAuthChangeHandler = async() => {
             const { data: { subscription } } = supabase.auth.onAuthStateChange(async(event, session) => {
-                if (session ? .user) {
+                if (session?.user) {
                     setUser(session.user);
                     // Fetch user profile with role information
                     const profile = await fetchUserProfile(session.user.id);
@@ -50,7 +50,7 @@ export function AuthProvider({ children }) {
 
             // Initial session check
             const { data: { session } } = await supabase.auth.getSession();
-            if (session ? .user) {
+            if (session?.user) {
                 setUser(session.user);
                 // Fetch user profile with role information
                 const profile = await fetchUserProfile(session.user.id);
@@ -75,7 +75,7 @@ export function AuthProvider({ children }) {
             }
 
             // If sign in succeeds, check the user's role
-            if (data ? .user) {
+            if (data?.user) {
                 console.log('User signed in successfully, checking profile');
                 const profile = await fetchUserProfile(data.user.id);
 
@@ -123,7 +123,7 @@ export function AuthProvider({ children }) {
         isDispatcher: () => true, // Temporarily always return true
     };
 
-    return <AuthContext.Provider value = { value } > { children } < /AuthContext.Provider>;
+    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
