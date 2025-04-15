@@ -1,10 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/context/AuthContext';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -12,9 +11,9 @@ export default function Login() {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const supabase = createClientComponentClient();
 
   // Check URL parameters for error or success messages
   useEffect(() => {
@@ -38,45 +37,53 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const { error } = await signIn(email, password);
+      console.log('Attempting login with:', { email });
+      
+      // Sign in with Supabase directly
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
       
       if (error) {
-        setError(error.message);
-        return;
+        throw error;
       }
-
+      
+      console.log('Login successful, session:', data.session ? 'exists' : 'none');
+      
+      // Let the middleware handle the redirect
       router.push('/dashboard');
     } catch (err) {
-      setError('An unexpected error occurred');
-      console.error(err);
+      setError(err.message || 'Invalid email or password');
+      console.error('Login error:', err);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-6 bg-background">
-      <div className="w-full max-w-md p-8 space-y-8 bg-background rounded-lg shadow-md">
+    <div className="flex min-h-screen flex-col items-center justify-center p-6 bg-brand-background">
+      <div className="w-full max-w-md p-8 space-y-8 bg-brand-card rounded-lg shadow-md border border-brand-border">
         <div className="text-center">
-          <h1 className="text-3xl font-bold">Compassionate Rides</h1>
+          <h1 className="text-3xl font-bold text-brand-accent">Compassionate Rides</h1>
           <h2 className="text-xl font-semibold mt-2">Dispatcher Login</h2>
         </div>
 
         {error && (
-          <div className="bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-400 px-4 py-3 rounded relative" role="alert">
+          <div className="bg-brand-cancelled/10 border border-brand-cancelled/30 text-brand-cancelled px-4 py-3 rounded relative" role="alert">
             <span className="block sm:inline">{error}</span>
           </div>
         )}
         
         {successMessage && (
-          <div className="bg-green-100 dark:bg-green-900/30 border border-green-400 dark:border-green-700 text-green-700 dark:text-green-400 px-4 py-3 rounded relative" role="alert">
+          <div className="bg-brand-completed/10 border border-brand-completed/30 text-brand-completed px-4 py-3 rounded relative" role="alert">
             <span className="block sm:inline">{successMessage}</span>
           </div>
         )}
 
         <form className="space-y-6" onSubmit={handleLogin}>
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-foreground">
+            <label htmlFor="email" className="block text-sm font-medium">
               Email
             </label>
             <input
@@ -85,13 +92,13 @@ export default function Login() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 bg-white dark:bg-gray-800 text-foreground"
+              className="mt-1 block w-full rounded-md border border-brand-border px-3 py-2 shadow-sm bg-brand-background focus:border-brand-accent focus:outline-none focus:ring-brand-accent"
               placeholder="your@email.com"
             />
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-foreground">
+            <label htmlFor="password" className="block text-sm font-medium">
               Password
             </label>
             <input
@@ -100,7 +107,7 @@ export default function Login() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 bg-white dark:bg-gray-800 text-foreground"
+              className="mt-1 block w-full rounded-md border border-brand-border px-3 py-2 shadow-sm bg-brand-background focus:border-brand-accent focus:outline-none focus:ring-brand-accent"
               placeholder="••••••••"
             />
           </div>
@@ -109,7 +116,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="flex w-full justify-center rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex w-full justify-center rounded-md border border-transparent bg-brand-accent py-2 px-4 text-sm font-medium text-brand-buttonText shadow-sm hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-brand-accent focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Signing in...' : 'Sign in'}
             </button>
@@ -117,9 +124,9 @@ export default function Login() {
         </form>
 
         <div className="text-center mt-4">
-          <p className="text-sm text-foreground/70">
+          <p className="text-sm opacity-80">
             Don't have an account?{' '}
-            <Link href="/signup" className="font-medium text-blue-600 hover:text-blue-500">
+            <Link href="/signup" className="font-medium text-brand-accent hover:opacity-90 transition-opacity">
               Sign up
             </Link>
           </p>

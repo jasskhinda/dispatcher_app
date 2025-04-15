@@ -65,15 +65,15 @@ export default function Signup() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-6 bg-background">
-      <div className="w-full max-w-md p-8 space-y-8 bg-background rounded-lg shadow-md">
+    <div className="flex min-h-screen flex-col items-center justify-center p-6 bg-brand-background">
+      <div className="w-full max-w-md p-8 space-y-8 bg-brand-card rounded-lg shadow-md border border-brand-border">
         <div className="text-center">
-          <h1 className="text-3xl font-bold">Compassionate Rides</h1>
+          <h1 className="text-3xl font-bold text-brand-accent">Compassionate Rides</h1>
           <h2 className="text-xl font-semibold mt-2">Dispatcher Sign Up</h2>
         </div>
 
         {error && (
-          <div className="bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-400 px-4 py-3 rounded relative" role="alert">
+          <div className="bg-brand-cancelled/10 border border-brand-cancelled/30 text-brand-cancelled px-4 py-3 rounded relative" role="alert">
             <span className="block sm:inline">{error}</span>
           </div>
         )}
@@ -81,7 +81,7 @@ export default function Signup() {
         <form className="space-y-6" onSubmit={handleSignup}>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label htmlFor="firstName" className="block text-sm font-medium text-foreground">
+              <label htmlFor="firstName" className="block text-sm font-medium">
                 First Name
               </label>
               <input
@@ -90,11 +90,11 @@ export default function Signup() {
                 required
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 bg-white dark:bg-gray-800 text-foreground"
+                className="mt-1 block w-full rounded-md border border-brand-border px-3 py-2 shadow-sm bg-brand-background focus:border-brand-accent focus:outline-none focus:ring-brand-accent"
               />
             </div>
             <div>
-              <label htmlFor="lastName" className="block text-sm font-medium text-foreground">
+              <label htmlFor="lastName" className="block text-sm font-medium">
                 Last Name
               </label>
               <input
@@ -103,13 +103,13 @@ export default function Signup() {
                 required
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 bg-white dark:bg-gray-800 text-foreground"
+                className="mt-1 block w-full rounded-md border border-brand-border px-3 py-2 shadow-sm bg-brand-background focus:border-brand-accent focus:outline-none focus:ring-brand-accent"
               />
             </div>
           </div>
 
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-foreground">
+            <label htmlFor="email" className="block text-sm font-medium">
               Email
             </label>
             <input
@@ -118,12 +118,12 @@ export default function Signup() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 bg-white dark:bg-gray-800 text-foreground"
+              className="mt-1 block w-full rounded-md border border-brand-border px-3 py-2 shadow-sm bg-brand-background focus:border-brand-accent focus:outline-none focus:ring-brand-accent"
             />
           </div>
 
           <div>
-            <label htmlFor="phoneNumber" className="block text-sm font-medium text-foreground">
+            <label htmlFor="phoneNumber" className="block text-sm font-medium">
               Phone Number
             </label>
             <input
@@ -132,12 +132,12 @@ export default function Signup() {
               required
               value={phoneNumber}
               onChange={(e) => setPhoneNumber(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 bg-white dark:bg-gray-800 text-foreground"
+              className="mt-1 block w-full rounded-md border border-brand-border px-3 py-2 shadow-sm bg-brand-background focus:border-brand-accent focus:outline-none focus:ring-brand-accent"
             />
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-foreground">
+            <label htmlFor="password" className="block text-sm font-medium">
               Password
             </label>
             <input
@@ -146,7 +146,7 @@ export default function Signup() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 bg-white dark:bg-gray-800 text-foreground"
+              className="mt-1 block w-full rounded-md border border-brand-border px-3 py-2 shadow-sm bg-brand-background focus:border-brand-accent focus:outline-none focus:ring-brand-accent"
               placeholder="••••••••"
               minLength={6}
             />
@@ -156,7 +156,7 @@ export default function Signup() {
             <button
               type="submit"
               disabled={loading}
-              className="flex w-full justify-center rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex w-full justify-center rounded-md border border-transparent bg-brand-accent py-2 px-4 text-sm font-medium text-brand-buttonText shadow-sm hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-brand-accent focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Creating account...' : 'Sign up'}
             </button>
@@ -164,9 +164,9 @@ export default function Signup() {
         </form>
 
         <div className="text-center mt-4">
-          <p className="text-sm text-foreground/70">
+          <p className="text-sm opacity-80">
             Already have an account?{' '}
-            <Link href="/login" className="font-medium text-blue-600 hover:text-blue-500">
+            <Link href="/login" className="font-medium text-brand-accent hover:opacity-90 transition-opacity">
               Sign in
             </Link>
           </p>

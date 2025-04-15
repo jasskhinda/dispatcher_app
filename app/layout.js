@@ -16,13 +16,16 @@ const geistMono = Geist_Mono({
 export const metadata = {
   title: "Compassionate Rides Dispatcher",
   description: "Dispatch application for Compassionate Rides",
+  icons: {
+    icon: '/favicon.png',
+  },
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen`}
       >
         <ThemeProvider>
           <AuthProvider>

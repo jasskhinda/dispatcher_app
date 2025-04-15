@@ -9,12 +9,8 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    // Redirect to login after a brief delay
-    const timer = setTimeout(() => {
-      router.push('/login');
-    }, 3000);
-
-    return () => clearTimeout(timer);
+    // Redirect to login immediately
+    router.push('/login');
   }, [router]);
 
   return (
@@ -25,7 +21,7 @@ export default function Home() {
         
         <div className="flex flex-col items-center justify-center space-y-6">
           <p className="text-lg">Welcome to the Compassionate Rides dispatcher portal.</p>
-          <p>You'll be redirected to login in a moment...</p>
+          <p>Redirecting to login...</p>
           
           <div className="flex space-x-4 mt-8">
             <Link href="/login" className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">

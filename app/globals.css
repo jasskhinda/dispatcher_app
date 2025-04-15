@@ -3,18 +3,48 @@
 @tailwind utilities;
 
 :root {
+  /* Default base colors */
   --background: 0 0% 100%;
   --foreground: 0 0% 9%;
+  
+  /* Brand colors - Light Theme */
+  --brand-background: 0 0% 100%; /* #FFFFFF */
+  --brand-text: 187 30% 26%; /* #2E4F54 */
+  --brand-accent: 180 50% 65%; /* #7CCFD0 */
+  --brand-button-text: 0 0% 100%; /* #FFFFFF */
+  --brand-card: 210 17% 98%; /* #F8F9FA */
+  --brand-border: 196 17% 89%; /* #DDE5E7 */
+  
+  /* Status colors - Light Theme */
+  --brand-pending: 39 100% 50%; /* Amber */
+  --brand-upcoming: 180 50% 65%; /* Brand accent blue */
+  --brand-in-progress: 262 83% 58%; /* Purple */
+  --brand-completed: 142 71% 45%; /* Green */
+  --brand-cancelled: 0 84% 60%; /* Red */
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: 0 0% 4%;
-    --foreground: 0 0% 93%;
-  }
+.dark, [data-theme="dark"] {
+  /* Default base colors */
+  --background: 0 0% 4%;
+  --foreground: 0 0% 93%;
+  
+  /* Brand colors - Dark Theme */
+  --brand-background: 187 25% 15%; /* #1C2C2F */
+  --brand-text: 180 56% 92%; /* #E0F4F5 */
+  --brand-accent: 180 50% 65%; /* #7CCFD0 */
+  --brand-button-text: 187 25% 15%; /* #1C2C2F */
+  --brand-card: 187 25% 19%; /* #24393C */
+  --brand-border: 187 23% 32%; /* #3F5E63 */
+  
+  /* Status colors - Dark Theme (adjusted for dark mode visibility) */
+  --brand-pending: 39 100% 60%; /* Amber - brighter */
+  --brand-upcoming: 180 50% 65%; /* Brand accent blue */
+  --brand-in-progress: 262 83% 68%; /* Purple - brighter */
+  --brand-completed: 142 71% 55%; /* Green - brighter */
+  --brand-cancelled: 0 84% 70%; /* Red - brighter */
 }
 
 body {
-  background-color: hsl(var(--background));
-  color: hsl(var(--foreground));
+  background-color: hsl(var(--brand-background));
+  color: hsl(var(--brand-text));
 }
