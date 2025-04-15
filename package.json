@@ -9,10 +9,14 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@react-google-maps/api": "^2.20.6",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/supabase-js": "^2.49.4",
+    "date-fns": "^4.1.0",
     "next": "15.3.0",
+    "openai": "^4.94.0",
     "react": "^19.0.0",
+    "react-big-calendar": "^1.18.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {

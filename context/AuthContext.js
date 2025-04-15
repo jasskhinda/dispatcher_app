@@ -7,35 +7,116 @@ const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Fetch user profile data including role
+  const fetchUserProfile = async (userId) => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        console.error('Error fetching user profile:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in fetchUserProfile:', error);
+      return null;
+    }
+  };
+
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const setupAuthChangeHandler = async () => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (session?.user) {
+          setUser(session.user);
+          // Fetch user profile with role information
+          const profile = await fetchUserProfile(session.user.id);
+          setUserProfile(profile);
+        } else {
+          setUser(null);
+          setUserProfile(null);
+        }
+        setLoading(false);
+      });
+
+      // Initial session check
+      const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         setUser(session.user);
-      } else {
-        setUser(null);
+        // Fetch user profile with role information
+        const profile = await fetchUserProfile(session.user.id);
+        setUserProfile(profile);
       }
       setLoading(false);
-    });
 
-    // Initial session check
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setUser(session.user);
-      }
-      setLoading(false);
-    });
+      return () => subscription.unsubscribe();
+    };
 
-    return () => subscription.unsubscribe();
+    setupAuthChangeHandler();
   }, []);
+
+  // Custom sign in function that verifies the user's role
+  const signInWithRole = async (email, password, requiredRole = 'dispatcher') => {
+    try {
+      // First attempt to sign in with credentials
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      
+      if (error) {
+        return { error };
+      }
+
+      // If sign in succeeds, check the user's role
+      if (data?.user) {
+        const profile = await fetchUserProfile(data.user.id);
+        
+        if (!profile) {
+          // Profile doesn't exist
+          await supabase.auth.signOut(); // Sign out immediately
+          return { 
+            error: { 
+              message: 'User profile not found. Please contact support.' 
+            } 
+          };
+        }
+        
+        if (profile.role !== requiredRole) {
+          // User doesn't have the required role
+          await supabase.auth.signOut(); // Sign out immediately
+          return { 
+            error: { 
+              message: `Access denied. This application is only for ${requiredRole}s.` 
+            } 
+          };
+        }
+        
+        // Set the profile in state
+        setUserProfile(profile);
+        return data;
+      }
+      
+      return { error: { message: 'Unknown error during authentication' } };
+    } catch (err) {
+      console.error('Error in signInWithRole:', err);
+      return { error: { message: 'An unexpected error occurred' } };
+    }
+  };
 
   const value = {
     user,
+    userProfile,
     loading,
     signUp: (email, password) => supabase.auth.signUp({ email, password }),
-    signIn: (email, password) => supabase.auth.signInWithPassword({ email, password }),
+    signIn: (email, password) => signInWithRole(email, password, 'dispatcher'),
     signOut: () => supabase.auth.signOut(),
+    hasRole: (role) => userProfile?.role === role,
+    isDispatcher: () => userProfile?.role === 'dispatcher',
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
