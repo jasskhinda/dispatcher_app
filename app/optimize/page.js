@@ -94,6 +94,9 @@ export default function OptimizePage() {
     setError('');
     
     try {
+      // Reset success message when fetching new data
+      setSuccessMessage('');
+      
       // Date range for query
       const startOfRange = new Date(startDate);
       startOfRange.setHours(0, 0, 0, 0);
@@ -163,8 +166,7 @@ export default function OptimizePage() {
             clientsMap[userId] = {
               id: userId,
               first_name: "Client",
-              last_name: userId.substring(0, 8),
-              email: null
+              last_name: userId.substring(0, 8)
             };
           }
         });
@@ -181,8 +183,9 @@ export default function OptimizePage() {
         if (clientData) {
           if (clientData.first_name || clientData.last_name) {
             clientName = `${clientData.first_name || ''} ${clientData.last_name || ''}`.trim();
-          } else if (clientData.email) {
-            clientName = clientData.email;
+          } else if (clientData.id) {
+            // Use ID as fallback if no name is available
+            clientName = `Client ${clientData.id.substring(0, 8)}`;
           }
         } else if (trip.user_id) {
           // If we can't find the client but have a user ID, use that as a fallback
@@ -207,10 +210,10 @@ export default function OptimizePage() {
 
       setUpcomingTrips(processedTrips);
       
-      // Fetch drivers
+      // Fetch drivers with only necessary fields
       const { data: drivers, error: driversError } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, first_name, last_name, role, phone_number')
         .eq('role', 'driver');
       
       if (driversError) throw driversError;
