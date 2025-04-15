@@ -1,303 +1,207 @@
-'use client';
+import { redirect } from 'next/navigation';
+import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 
-import { useEffect, useState } from 'react';
-import { useAuth } from '@/context/AuthContext';
-import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
-
-export default function InvoiceDetails({ params }) {
-  const invoiceId = params.id;
-  const { user, isDispatcher, signOut } = useAuth();
-  const router = useRouter();
-  
-  const [invoice, setInvoice] = useState(null);
-  const [trip, setTrip] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [updating, setUpdating] = useState(false);
-
-  useEffect(() => {
-    if (!user) {
-      router.push('/login');
-      return;
-    }
+// This is a Server Component
+export default async function InvoiceDetailPage({ params }) {
+    const { id } = params;
     
-    // Ensure user has dispatcher role
-    if (!isDispatcher()) {
-      signOut();
-      router.push('/login?error=Access denied. This application is only for dispatchers.');
-      return;
-    }
+    try {
+        // Create server component client
+        const supabase = createServerComponentClient({ cookies });
 
-    async function fetchInvoiceDetails() {
-      try {
-        // Fetch the invoice with trip details
-        const { data, error } = await supabase
-          .from('invoices')
-          .select(`
-            *,
-            trip:trip_id(*)
-          `)
-          .eq('id', invoiceId)
-          .single();
+        // This will refresh the session if needed
+        const { data: { session } } = await supabase.auth.getSession();
 
-        if (error) throw error;
-        
-        if (!data) {
-          setError('Invoice not found');
-          return;
+        // Redirect to login if there's no session
+        if (!session) {
+            redirect('/login');
         }
 
-        setInvoice(data);
-        setTrip(data.trip);
-        
-      } catch (error) {
-        console.error('Error fetching invoice:', error);
-        setError('Failed to load invoice details');
-      } finally {
-        setLoading(false);
-      }
-    }
+        // Get user profile
+        let userProfile = null;
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', session.user.id)
+                .single();
 
-    fetchInvoiceDetails();
-  }, [user, router, invoiceId, isDispatcher, signOut]);
+            if (error) {
+                userProfile = {
+                    id: session.user.id,
+                    email: session.user.email,
+                    role: 'dispatcher'
+                };
+            } else {
+                userProfile = data;
+            }
+        } catch (error) {
+            console.error('Error fetching user profile:', error);
+            userProfile = {
+                id: session.user.id,
+                email: session.user.email,
+                role: 'dispatcher'
+            };
+        }
 
-  const handleUpdatePaymentStatus = async (newStatus) => {
-    setUpdating(true);
-    try {
-      const { error } = await supabase
-        .from('invoices')
-        .update({ payment_status: newStatus })
-        .eq('id', invoiceId);
+        // Fetch the invoice
+        const { data: invoice, error: invoiceError } = await supabase
+            .from('invoices')
+            .select('*')
+            .eq('id', id)
+            .single();
 
-      if (error) throw error;
-      
-      // Update local state
-      setInvoice({
-        ...invoice,
-        payment_status: newStatus
-      });
-      
+        if (invoiceError) {
+            console.error('Error fetching invoice:', invoiceError);
+            return (
+                <div className="p-6">
+                    <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded" role="alert">
+                        <p className="font-bold">Error</p>
+                        <p>This invoice could not be found or you don't have permission to view it.</p>
+                    </div>
+                    <div className="mt-4">
+                        <a href="/invoices" className="text-brand-accent hover:underline">
+                            &larr; Back to invoices
+                        </a>
+                    </div>
+                </div>
+            );
+        }
+
+        // Get the client information
+        const { data: client, error: clientError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', invoice.user_id)
+            .single();
+
+        if (clientError) {
+            console.error('Error fetching client:', clientError);
+        }
+
+        // Get associated trip if there is one
+        let trip = null;
+        if (invoice.trip_id) {
+            const { data: tripData, error: tripError } = await supabase
+                .from('trips')
+                .select('*')
+                .eq('id', invoice.trip_id)
+                .single();
+
+            if (tripError) {
+                console.error('Error fetching trip:', tripError);
+            } else {
+                trip = tripData;
+            }
+        }
+
+        // Simple rendering of invoice details
+        return (
+            <div className="max-w-4xl mx-auto p-6">
+                <div className="bg-brand-card shadow rounded-lg overflow-hidden border border-brand-border p-6">
+                    <div className="flex justify-between mb-6">
+                        <h1 className="text-2xl font-bold">Invoice #{invoice.invoice_number}</h1>
+                        <div className="text-right">
+                            <div className="mb-1">
+                                <span className={`px-3 py-1 text-sm rounded-full ${
+                                    invoice.status === 'paid' 
+                                        ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' 
+                                        : invoice.status === 'cancelled' 
+                                        ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' 
+                                        : 'bg-brand-pending/20 text-brand-pending'
+                                }`}>
+                                    {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
+                                </span>
+                            </div>
+                            <div className="text-sm opacity-75">
+                                {new Date(invoice.created_at).toLocaleDateString()}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div>
+                            <h2 className="text-lg font-semibold mb-2">Client</h2>
+                            {client ? (
+                                <div>
+                                    <p className="font-medium">
+                                        {client.full_name || `${client.first_name || ''} ${client.last_name || ''}`.trim() || 'Unnamed Client'}
+                                    </p>
+                                    <p>{client.email}</p>
+                                    <p>{client.phone_number || 'No phone number'}</p>
+                                </div>
+                            ) : (
+                                <p className="opacity-75">Client information not available</p>
+                            )}
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-semibold mb-2">Invoice Details</h2>
+                            <p><span className="font-medium">Issue Date:</span> {invoice.issue_date ? new Date(invoice.issue_date).toLocaleDateString() : 'N/A'}</p>
+                            <p><span className="font-medium">Due Date:</span> {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : 'N/A'}</p>
+                            <p><span className="font-medium">Amount:</span> ${parseFloat(invoice.amount).toFixed(2)}</p>
+                            {invoice.payment_date && (
+                                <p><span className="font-medium">Payment Date:</span> {new Date(invoice.payment_date).toLocaleDateString()}</p>
+                            )}
+                            {invoice.payment_method && (
+                                <p><span className="font-medium">Payment Method:</span> {invoice.payment_method}</p>
+                            )}
+                        </div>
+                    </div>
+
+                    {trip && (
+                        <div className="mb-6">
+                            <h2 className="text-lg font-semibold mb-2">Associated Trip</h2>
+                            <div className="bg-brand-background p-4 rounded border border-brand-border">
+                                <p><span className="font-medium">Pickup:</span> {trip.pickup_address}</p>
+                                <p><span className="font-medium">Destination:</span> {trip.destination_address}</p>
+                                <p><span className="font-medium">Date:</span> {new Date(trip.pickup_time).toLocaleDateString()}</p>
+                                <p><span className="font-medium">Time:</span> {new Date(trip.pickup_time).toLocaleTimeString()}</p>
+                                <p><span className="font-medium">Status:</span> {trip.status}</p>
+                                <div className="mt-2">
+                                    <a href={`/trips/${trip.id}`} className="text-brand-accent hover:underline">
+                                        View trip details
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {invoice.notes && (
+                        <div className="mb-6">
+                            <h2 className="text-lg font-semibold mb-2">Notes</h2>
+                            <p className="whitespace-pre-line">{invoice.notes}</p>
+                        </div>
+                    )}
+
+                    <div className="mt-8 flex justify-between">
+                        <a href="/invoices" className="inline-flex items-center text-brand-accent hover:underline">
+                            &larr; Back to invoices
+                        </a>
+                        
+                        <div>
+                            <button 
+                                className="px-4 py-2 mr-2 border border-brand-border text-sm rounded-md hover:bg-brand-border/20"
+                                onClick={() => alert('Edit functionality would go here')}
+                            >
+                                Edit Invoice
+                            </button>
+                            
+                            {invoice.status !== 'paid' && (
+                                <button 
+                                    className="px-4 py-2 bg-brand-accent text-white text-sm rounded-md hover:opacity-90"
+                                    onClick={() => alert('Mark as paid functionality would go here')}
+                                >
+                                    Mark as Paid
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
     } catch (error) {
-      console.error('Error updating payment status:', error);
-      setError('Failed to update payment status');
-    } finally {
-      setUpdating(false);
+        console.error('Error in invoice detail page:', error);
+        redirect('/login?error=server_error');
     }
-  };
-
-  const handleSendInvoice = async () => {
-    setUpdating(true);
-    try {
-      const { error } = await supabase
-        .from('invoices')
-        .update({ status: 'sent' })
-        .eq('id', invoiceId);
-
-      if (error) throw error;
-      
-      // Update local state
-      setInvoice({
-        ...invoice,
-        status: 'sent'
-      });
-      
-    } catch (error) {
-      console.error('Error sending invoice:', error);
-      setError('Failed to update invoice status');
-    } finally {
-      setUpdating(false);
-    }
-  };
-
-  if (!user) {
-    return null; // Will redirect in useEffect
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Header */}
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900">Invoice Details</h1>
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-            >
-              Back to Dashboard
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Main content */}
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {loading ? (
-          <div className="bg-white shadow rounded-lg p-6 text-center">
-            <div className="w-12 h-12 border-t-4 border-b-4 border-blue-500 rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading invoice details...</p>
-          </div>
-        ) : error ? (
-          <div className="bg-white shadow rounded-lg p-6">
-            <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
-              <div className="flex">
-                <div className="ml-3">
-                  <p className="text-sm text-red-700">{error}</p>
-                </div>
-              </div>
-            </div>
-            <div className="flex justify-center">
-              <button
-                onClick={() => router.push('/dashboard')}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-              >
-                Return to Dashboard
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="bg-white shadow rounded-lg overflow-hidden">
-            {/* Invoice header */}
-            <div className="px-6 py-5 border-b border-gray-200 flex justify-between items-center">
-              <div>
-                <h3 className="text-lg font-medium text-gray-900">
-                  Invoice #{invoice.id}
-                </h3>
-                <p className="text-sm text-gray-500 mt-1">
-                  Created on {new Date(invoice.created_at).toLocaleDateString()}
-                </p>
-              </div>
-              <div className="flex items-center">
-                <span className={`mr-4 px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                  ${invoice.status === 'issued' ? 'bg-blue-100 text-blue-800' : 
-                    invoice.status === 'sent' ? 'bg-purple-100 text-purple-800' : 
-                    'bg-gray-100 text-gray-800'}`}>
-                  Status: {invoice.status || 'issued'}
-                </span>
-                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                  ${invoice.payment_status === 'paid' ? 'bg-green-100 text-green-800' : 
-                    invoice.payment_status === 'partial' ? 'bg-yellow-100 text-yellow-800' : 
-                    invoice.payment_status === 'overdue' ? 'bg-red-100 text-red-800' : 
-                    'bg-gray-100 text-gray-800'}`}>
-                  Payment: {invoice.payment_status || 'unpaid'}
-                </span>
-              </div>
-            </div>
-
-            {/* Invoice content */}
-            <div className="p-6">
-              {/* Trip details section */}
-              <div className="mb-8">
-                <h4 className="text-base font-medium text-gray-900 mb-4">Trip Details</h4>
-                <div className="bg-gray-50 p-4 rounded-md">
-                  <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
-                    <dt className="text-sm font-medium text-gray-500">Trip ID</dt>
-                    <dd className="text-sm text-gray-900">{trip.id}</dd>
-                    
-                    <dt className="text-sm font-medium text-gray-500">Client</dt>
-                    <dd className="text-sm text-gray-900">{trip.client_name}</dd>
-                    
-                    <dt className="text-sm font-medium text-gray-500">Date</dt>
-                    <dd className="text-sm text-gray-900">{new Date(trip.created_at).toLocaleDateString()}</dd>
-                    
-                    <dt className="text-sm font-medium text-gray-500">Pickup</dt>
-                    <dd className="text-sm text-gray-900">{trip.pickup_location}</dd>
-                    
-                    <dt className="text-sm font-medium text-gray-500">Dropoff</dt>
-                    <dd className="text-sm text-gray-900">{trip.dropoff_location}</dd>
-                  </dl>
-                </div>
-              </div>
-
-              {/* Invoice details section */}
-              <div className="mb-8">
-                <h4 className="text-base font-medium text-gray-900 mb-4">Invoice Details</h4>
-                <div className="bg-gray-50 p-4 rounded-md">
-                  <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
-                    <dt className="text-sm font-medium text-gray-500">Amount</dt>
-                    <dd className="text-sm text-gray-900">${invoice.amount?.toFixed(2)}</dd>
-                    
-                    <dt className="text-sm font-medium text-gray-500">Due Date</dt>
-                    <dd className="text-sm text-gray-900">{new Date(invoice.due_date).toLocaleDateString()}</dd>
-                    
-                    <dt className="text-sm font-medium text-gray-500">Invoice Status</dt>
-                    <dd className="text-sm text-gray-900">{invoice.status}</dd>
-                    
-                    <dt className="text-sm font-medium text-gray-500">Payment Status</dt>
-                    <dd className="text-sm text-gray-900">{invoice.payment_status}</dd>
-                  </dl>
-                </div>
-              </div>
-
-              {/* Notes section */}
-              {invoice.notes && (
-                <div className="mb-8">
-                  <h4 className="text-base font-medium text-gray-900 mb-2">Notes</h4>
-                  <div className="bg-gray-50 p-4 rounded-md">
-                    <p className="text-sm text-gray-700">{invoice.notes}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Actions section */}
-              <div className="mt-8 border-t border-gray-200 pt-6 flex justify-between">
-                <div>
-                  <h4 className="text-base font-medium text-gray-900 mb-4">Update Payment Status</h4>
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => handleUpdatePaymentStatus('unpaid')}
-                      disabled={updating || invoice.payment_status === 'unpaid'}
-                      className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-                    >
-                      Unpaid
-                    </button>
-                    <button
-                      onClick={() => handleUpdatePaymentStatus('partial')}
-                      disabled={updating || invoice.payment_status === 'partial'}
-                      className="inline-flex items-center px-3 py-2 border border-yellow-300 text-sm leading-4 font-medium rounded-md text-yellow-700 bg-yellow-50 hover:bg-yellow-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 disabled:opacity-50"
-                    >
-                      Partial
-                    </button>
-                    <button
-                      onClick={() => handleUpdatePaymentStatus('paid')}
-                      disabled={updating || invoice.payment_status === 'paid'}
-                      className="inline-flex items-center px-3 py-2 border border-green-300 text-sm leading-4 font-medium rounded-md text-green-700 bg-green-50 hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
-                    >
-                      Paid
-                    </button>
-                    <button
-                      onClick={() => handleUpdatePaymentStatus('overdue')}
-                      disabled={updating || invoice.payment_status === 'overdue'}
-                      className="inline-flex items-center px-3 py-2 border border-red-300 text-sm leading-4 font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
-                    >
-                      Overdue
-                    </button>
-                  </div>
-                </div>
-                
-                <div className="flex items-end">
-                  {invoice.status === 'issued' && (
-                    <button
-                      onClick={handleSendInvoice}
-                      disabled={updating}
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-                    >
-                      {updating ? 'Updating...' : 'Mark as Sent'}
-                    </button>
-                  )}
-                  <button
-                    onClick={() => window.print()}
-                    className="ml-3 inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                  >
-                    Print Invoice
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </main>
-    </div>
-  );
 }

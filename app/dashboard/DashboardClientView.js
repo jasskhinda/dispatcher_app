@@ -207,14 +207,7 @@ export default function DashboardClientView({ user, userProfile, trips: initialT
               <h3 className="font-semibold text-brand-accent mb-2">Financial Overview</h3>
               <p className="text-sm mb-4">Track payments, manage invoices, and view financial reports</p>
               <button 
-                onClick={() => {
-                  // This could be updated to point to a dedicated financial dashboard in the future
-                  const completedTripsTab = document.querySelector('[id="status-filter"]');
-                  if (completedTripsTab) {
-                    completedTripsTab.value = 'completed';
-                    completedTripsTab.dispatchEvent(new Event('change'));
-                  }
-                }}
+                onClick={() => router.push('/invoices')}
                 className="w-full text-center px-4 py-2 bg-brand-accent text-brand-buttonText rounded hover:opacity-90 transition-opacity"
               >
                 View Invoices
@@ -229,18 +222,25 @@ export default function DashboardClientView({ user, userProfile, trips: initialT
             <h3 className="text-lg font-medium">All Trips</h3>
             <div className="flex items-center">
               <label htmlFor="status-filter" className="mr-2 text-sm">Filter by status:</label>
-              <select
-                id="status-filter"
-                value={statusFilter}
-                onChange={handleStatusFilterChange}
-                className="block w-40 pl-3 pr-10 py-2 text-sm border border-brand-border rounded-md bg-brand-background focus:outline-none focus:ring-brand-accent focus:border-brand-accent"
-              >
+              <div className="relative">
+                <select
+                  id="status-filter"
+                  value={statusFilter}
+                  onChange={handleStatusFilterChange}
+                  className="block w-40 pl-3 pr-10 py-2 text-sm border border-brand-border rounded-md bg-brand-background focus:outline-none focus:ring-brand-accent focus:border-brand-accent appearance-none"
+                >
                 {statusOptions.map(status => (
                   <option key={status} value={status}>
                     {status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
                   </option>
                 ))}
-              </select>
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-brand-text">
+                  <svg className="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                  </svg>
+                </div>
+              </div>
             </div>
           </div>
           
@@ -347,7 +347,7 @@ export default function DashboardClientView({ user, userProfile, trips: initialT
                         )}
                         {trip.status === 'completed' && !trip.has_invoice && (
                           <button
-                            onClick={() => router.push(`/invoices/create?tripId=${trip.id}`)}
+                            onClick={() => router.push(`/invoices/new?trip_id=${trip.id}`)}
                             className="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded bg-brand-accent text-brand-buttonText hover:opacity-90 transition-opacity focus:outline-none focus:ring-1 focus:ring-brand-accent"
                           >
                             Create Invoice

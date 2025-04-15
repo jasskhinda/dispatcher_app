@@ -1,6 +1,6 @@
 import Header from '@/app/components/Header';
 
-export default function InvoiceCreateLayout({ children }) {
+export default function InvoicesLayout({ children }) {
     return (
         <div className="flex flex-col min-h-screen">
             <Header />

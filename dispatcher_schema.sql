@@ -4,6 +4,52 @@
 -- This script adds policies that allow dispatchers to see and manage all trips and profiles
 -- It assumes the basic schema from the booking app is already created
 
+-- Create invoices table if it doesn't exist
+CREATE TABLE IF NOT EXISTS invoices (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES auth.users(id) NOT NULL,
+  trip_id UUID REFERENCES trips(id),
+  invoice_number TEXT NOT NULL,
+  amount DECIMAL(10,2) NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending', -- pending, paid, cancelled
+  issue_date TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  due_date TIMESTAMP WITH TIME ZONE,
+  payment_date TIMESTAMP WITH TIME ZONE,
+  payment_method TEXT,
+  notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+-- Enable RLS on invoices
+ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
+
+-- Policies for invoices
+-- Users can view their own invoices
+CREATE POLICY "Users can view their own invoices" 
+ON invoices FOR SELECT 
+USING (auth.uid() = user_id);
+
+-- Dispatchers can view all invoices
+CREATE POLICY "Dispatchers can view all invoices" 
+ON invoices FOR SELECT 
+USING ((SELECT role FROM profiles WHERE id = auth.uid()) = 'dispatcher');
+
+-- Dispatchers can create invoices
+CREATE POLICY "Dispatchers can create invoices" 
+ON invoices FOR INSERT 
+WITH CHECK ((SELECT role FROM profiles WHERE id = auth.uid()) = 'dispatcher');
+
+-- Dispatchers can update invoices
+CREATE POLICY "Dispatchers can update invoices" 
+ON invoices FOR UPDATE 
+USING ((SELECT role FROM profiles WHERE id = auth.uid()) = 'dispatcher');
+
+-- Dispatchers can delete invoices
+CREATE POLICY "Dispatchers can delete invoices" 
+ON invoices FOR DELETE 
+USING ((SELECT role FROM profiles WHERE id = auth.uid()) = 'dispatcher');
+
 -- Add a dispatcher profile for testing (modify email as needed)
 INSERT INTO profiles (id, first_name, last_name, role)
 SELECT 
