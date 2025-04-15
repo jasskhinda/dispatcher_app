@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase';
 export default function DashboardClientView({ user, userProfile, trips: initialTrips }) {
   const router = useRouter();
   // Define statusFilter first
-  const [statusFilter, setStatusFilter] = useState('pending');  // Default to pending trips
+  const [statusFilter, setStatusFilter] = useState('all');  // Default to all trips
   
   // If we have initialTrips, filter out any with missing required fields
   // Note: the real schema uses pickup_address and destination_address but we mapped them in page.js
@@ -16,9 +16,7 @@ export default function DashboardClientView({ user, userProfile, trips: initialT
   ) : [];
   
   const [trips, setTrips] = useState(validTrips || []);
-  const [filteredTrips, setFilteredTrips] = useState(
-    validTrips.filter(trip => trip.status === 'pending') // Default to pending trips
-  );
+  const [filteredTrips, setFilteredTrips] = useState(validTrips || []); // Default to all trips
   const [loading, setLoading] = useState(false);
   const [approving, setApproving] = useState(null);
   
@@ -100,10 +98,10 @@ export default function DashboardClientView({ user, userProfile, trips: initialT
             <button 
               onClick={() => {
                 setStatusFilter('pending');
+                setFilteredTrips(trips.filter(trip => trip.status === 'pending'));
                 const filterEl = document.querySelector('[id="status-filter"]');
                 if (filterEl) {
                   filterEl.value = 'pending';
-                  filterEl.dispatchEvent(new Event('change'));
                 }
                 // Scroll to the trips section
                 document.getElementById('trips-section')?.scrollIntoView({ behavior: 'smooth' });
@@ -205,7 +203,7 @@ export default function DashboardClientView({ user, userProfile, trips: initialT
             
             <div className="bg-brand-card p-4 rounded-lg border border-brand-border">
               <h3 className="font-semibold text-brand-accent mb-2">Financial Overview</h3>
-              <p className="text-sm mb-4">Track payments, manage invoices, and view financial reports</p>
+              <p className="text-sm mb-4">Track payments and manage invoices.</p>
               <button 
                 onClick={() => router.push('/invoices')}
                 className="w-full text-center px-4 py-2 bg-brand-accent text-brand-buttonText rounded hover:opacity-90 transition-opacity"
