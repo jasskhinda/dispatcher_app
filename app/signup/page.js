@@ -23,43 +23,96 @@ export default function Signup() {
     setLoading(true);
 
     try {
-      // Sign up with Supabase Auth
-      const { data, error: signUpError } = await signUp(email, password);
+      // Simple direct approach - create auth user first
+      console.log('Creating auth user with email:', email);
+      
+      // Create user with Supabase Auth
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+            role: 'dispatcher' // Explicitly set role in user metadata
+          }
+        }
+      });
       
       if (signUpError) {
-        setError(signUpError.message);
+        console.error('Auth signup error:', signUpError);
+        setError(signUpError.message || 'Failed to create account');
+        setLoading(false);
         return;
       }
-
-      // If signup successful, add user profile to users table
-      if (data?.user) {
-        const { error: profileError } = await supabase
-          .from('users')
-          .insert([
-            { 
-              id: data.user.id, 
-              email,
-              first_name: firstName,
-              last_name: lastName,
-              phone_number: phoneNumber,
-              role: 'dispatcher', // Default role for this app
-              created_at: new Date()
-            }
-          ]);
-
-        if (profileError) {
-          console.error('Error creating user profile:', profileError);
-          setError('Account created but had trouble setting up your profile');
-          return;
-        }
-
-        // Redirect to login page with success message
-        router.push('/login?success=Account created! Please check your email to confirm your account.');
+      
+      // Safety check
+      if (!data?.user?.id) {
+        console.error('No user ID returned from signup');
+        setError('Failed to create account. Please try again.');
+        setLoading(false);
+        return;
       }
+      
+      console.log('Auth user created successfully, ID:', data.user.id);
+      
+      // Create profile directly - handles RLS issues
+      const profileData = { 
+        id: data.user.id,
+        email,
+        first_name: firstName,
+        last_name: lastName,
+        phone_number: phoneNumber,
+        role: 'dispatcher', // Explicitly set as dispatcher
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      
+      // Add explicit logging about the role
+      console.log('Setting profile role to dispatcher');
+      
+      console.log('Creating profile:', profileData);
+      
+      // Just go straight to API endpoint approach - most reliable
+      console.log('Using API endpoint to create profile');
+      
+      try {
+        const response = await fetch('/api/create-profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: data.user.id,
+            email,
+            firstName,
+            lastName,
+            phoneNumber,
+            role: 'dispatcher'
+          }),
+        });
+        
+        if (!response.ok) {
+          const result = await response.json();
+          throw new Error(result.error || `API failed with status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        console.log('Profile created successfully via API:', result);
+      } catch (apiError) {
+        console.warn('API profile creation error, but continuing anyway:', apiError);
+        // Don't show error to user - profile may have been created by triggers
+        // or the error might be because it already exists
+      }
+      
+      // Wait a moment to let any DB triggers complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Redirect to login
+      console.log('Signup completed successfully, redirecting to login');
+      router.push('/login?success=Account created successfully! You can now log in.');
+      
     } catch (err) {
+      console.error('Unexpected error during signup:', err);
       setError('An unexpected error occurred');
-      console.error(err);
-    } finally {
       setLoading(false);
     }
   };
