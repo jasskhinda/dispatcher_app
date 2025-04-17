@@ -15,13 +15,13 @@ export function AuthProvider({ children }) {
         try {
             console.log('Fetching profile for user ID:', userId);
             const { data, error } = await supabase
-                .from('users')
+                .from('profiles')
                 .select('*')
                 .eq('id', userId)
                 .single();
 
             if (error) {
-                // console.error('Error fetching user profile:', error);
+                console.error('Error fetching user profile:', error);
                 return null;
             }
 
@@ -119,8 +119,8 @@ export function AuthProvider({ children }) {
         signUp: (email, password) => supabase.auth.signUp({ email, password }),
         signIn: (email, password) => signInWithRole(email, password, 'dispatcher'),
         signOut: () => supabase.auth.signOut(),
-        hasRole: (role) => true, // Temporarily always return true
-        isDispatcher: () => true, // Temporarily always return true
+        hasRole: (role) => userProfile?.role === role,
+        isDispatcher: () => userProfile?.role === 'dispatcher',
     };
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

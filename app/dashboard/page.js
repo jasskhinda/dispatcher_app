@@ -22,53 +22,65 @@ export default async function Dashboard() {
             redirect('/login');
         }
 
-        // Try to fetch the user's profile and create it if it doesn't exist
+        // Fetch the user's existing profile - all users should already have one
         let userProfile = null;
         try {
-            // First try to get the profile
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', session.user.id)
-                .single();
-
-            if (error || !data) {
-                console.log('Profile not found, creating one');
-                // Create a new profile
-                const newProfile = {
-                    id: session.user.id,
-                    email: session.user.email || '',
-                    role: 'dispatcher',
-                    first_name: 'Dispatcher',
-                    last_name: 'User'
-                };
+            // Try multiple approaches to get the profile
+            console.log('Attempting to fetch existing user profile');
+            
+            // First, try the RPC function that bypasses RLS
+            try {
+                console.log('Trying to fetch profile with RPC function');
+                const { data, error } = await supabase.rpc('get_profiles_by_ids', {
+                    user_ids: [session.user.id]
+                });
                 
-                const { data: insertData, error: insertError } = await supabase
+                if (error) {
+                    console.log('RPC profile fetch failed:', error);
+                } else if (data && data.length > 0) {
+                    console.log('Profile fetched successfully with RPC');
+                    userProfile = data[0];
+                } else {
+                    console.log('No profile found with RPC function');
+                }
+            } catch (rpcError) {
+                console.error('RPC profile fetch exception:', rpcError);
+            }
+            
+            // If RPC failed, try direct select
+            if (!userProfile) {
+                console.log('Trying direct profile fetch');
+                const { data, error } = await supabase
                     .from('profiles')
-                    .upsert(newProfile)
-                    .select()
+                    .select('*')
+                    .eq('id', session.user.id)
                     .single();
                 
-                if (insertError) {
-                    console.error('Error creating profile:', insertError);
-                    userProfile = {
-                        ...newProfile,
-                        full_name: 'Dispatcher User'
-                    };
-                } else if (insertData) {
-                    console.log('Profile created successfully');
-                    userProfile = insertData;
-                    // Make sure we have a full_name if the DB didn't generate it
-                    if (!userProfile.full_name) {
-                        userProfile.full_name = `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim();
-                    }
+                if (error) {
+                    console.log('Direct profile fetch failed:', error);
+                } else if (data) {
+                    console.log('Profile fetched successfully with direct query');
+                    userProfile = data;
+                } else {
+                    console.log('No profile found with direct query');
                 }
-            } else {
-                userProfile = data;
-                // Make sure we have a full_name
-                if (!userProfile.full_name) {
-                    userProfile.full_name = `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim();
-                }
+            }
+            
+            // If we still don't have a profile, use a fallback
+            if (!userProfile) {
+                console.log('No profile found, using fallback');
+                userProfile = {
+                    id: session.user.id,
+                    role: 'dispatcher', // Assuming dispatcher role for this application
+                    first_name: session.user.user_metadata?.first_name || 'User',
+                    last_name: session.user.user_metadata?.last_name || '',
+                    full_name: session.user.user_metadata?.full_name || session.user.email || 'Dispatcher User'
+                };
+            }
+            
+            // Ensure we have a full_name
+            if (!userProfile.full_name) {
+                userProfile.full_name = `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim() || 'Dispatcher User';
             }
         } catch (profileError) {
             // Provide more detailed error information
@@ -81,7 +93,6 @@ export default async function Dashboard() {
             // Last resort fallback
             userProfile = {
                 id: session.user.id,
-                email: session.user.email || '',
                 role: 'dispatcher',
                 first_name: 'Dispatcher',
                 last_name: 'User',
@@ -141,10 +152,49 @@ export default async function Dashboard() {
             // Fetch profiles for these users if we have any valid user IDs
             if (userIds.length > 0) {
                 try {
-                    const { data: clientProfiles, error: clientsError } = await supabase
-                        .from('profiles')
-                        .select('id, full_name, first_name, last_name')
-                        .in('id', userIds);
+                    // Attempt to get profiles, but with a safety check
+                    // to avoid infinite recursion errors
+                    let clientProfiles = [];
+                    let clientsError = null;
+                    
+                    try {
+                        // First try with the RPC approach as it's designed to avoid recursion
+                        console.log('Trying to fetch client profiles with RPC function');
+                        const { data, error } = await supabase.rpc('get_profiles_by_ids', {
+                            user_ids: userIds
+                        });
+                        
+                        if (error) {
+                            console.log('RPC client profile fetch failed:', error);
+                            clientsError = error;
+                            
+                            // Only if RPC fails, try standard approach as fallback
+                            try {
+                                console.log('Falling back to direct query for client profiles');
+                                const result = await supabase
+                                    .from('profiles')
+                                    .select('id, full_name, first_name, last_name')
+                                    .in('id', userIds);
+                                
+                                clientProfiles = result.data || [];
+                                
+                                if (result.error) {
+                                    clientsError = result.error;
+                                    console.log('Direct client profile query also failed:', result.error);
+                                } else {
+                                    console.log(`Successfully fetched ${clientProfiles.length} profiles with direct query`);
+                                }
+                            } catch (directQueryError) {
+                                console.error('Direct client profiles query failed with exception:', directQueryError);
+                            }
+                        } else {
+                            clientProfiles = data || [];
+                            console.log(`Successfully fetched ${clientProfiles.length} client profiles with RPC`);
+                        }
+                    } catch (rpcError) {
+                        console.error('Exception in client profiles fetch process:', rpcError);
+                        // Both approaches failed, we'll use placeholders
+                    }
                     
                     if (clientsError) {
                         console.error('Error fetching client profiles:', clientsError);

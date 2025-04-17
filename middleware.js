@@ -2,12 +2,16 @@ import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
 import { NextResponse } from 'next/server';
 
 export async function middleware(req) {
+  console.log("MIDDLEWARE: Path =", req.nextUrl.pathname);
+  
   const res = NextResponse.next();
   const supabase = createMiddlewareClient({ req, res });
   
   const {
     data: { session },
   } = await supabase.auth.getSession();
+
+  console.log("MIDDLEWARE: Session exists =", !!session);
 
   // Check auth condition
   const isAuthRoute = req.nextUrl.pathname === '/login' || req.nextUrl.pathname === '/signup';
@@ -17,12 +21,14 @@ export async function middleware(req) {
   
   // If accessing a protected route without being authenticated
   if (!session && !isAuthRoute && !isPublicRoute) {
+    console.log("MIDDLEWARE: Redirecting to login - no session on protected route");
     const redirectUrl = new URL('/login', req.url);
     return NextResponse.redirect(redirectUrl);
   }
 
   // If accessing auth routes while authenticated
   if (session && isAuthRoute) {
+    console.log("MIDDLEWARE: Redirecting to dashboard - authenticated on auth route");
     const redirectUrl = new URL('/dashboard', req.url);
     return NextResponse.redirect(redirectUrl);
   }
@@ -37,27 +43,42 @@ export async function middleware(req) {
         .eq('id', session.user.id)
         .single();
       
-      // If profile not found, attempt to create a profile with dispatcher role
+      console.log("MIDDLEWARE: Profile check result:", profile?.role, error?.message);
+      
+      // Log profile status but don't try to create one - profiles should be created during signup
       if (error) {
-        // If profile doesn't exist, try to create one
-        await supabase
-          .from('profiles')
-          .insert({
-            id: session.user.id,
-            first_name: 'Dispatcher',
-            last_name: 'User',
-            role: 'dispatcher',
-            email: session.user.email
-          });
+        console.log('Profile not found in middleware check - will continue anyway');
+        // Don't try to create a profile here - it should already exist
+        // If it doesn't exist, the page components will handle it more gracefully
       } 
-      // If profile exists but doesn't have dispatcher role, update it
-      else if (profile && profile.role !== 'dispatcher') {
-        await supabase
-          .from('profiles')
-          .update({ role: 'dispatcher' })
-          .eq('id', session.user.id);
+      // Only modify the role if no role is set
+      else if (profile && !profile.role) {
+        try {
+          // Just to be sure the user has the correct role
+          await supabase
+            .from('profiles')
+            .update({ role: 'dispatcher' })
+            .eq('id', session.user.id);
+          console.log("MIDDLEWARE: Updated profile role to dispatcher");
+        } catch (roleUpdateError) {
+          console.log('Role update failed, continuing anyway');
+          // Continue anyway - not critical
+        }
+      }
+      
+      // The important part - check if they are a dispatcher
+      if (profile && profile.role === 'dispatcher') {
+        console.log("MIDDLEWARE: User is a dispatcher, allowing access");
+        return res;
+      } else {
+        console.log("MIDDLEWARE: Not a dispatcher, redirecting to login");
+        // Only dispatchers allowed in this app
+        await supabase.auth.signOut();
+        const redirectUrl = new URL('/login?error=Access%20denied.%20This%20app%20is%20for%20dispatchers%20only.', req.url);
+        return NextResponse.redirect(redirectUrl);
       }
     } catch (err) {
+      console.log('MIDDLEWARE ERROR:', err);
       // Continue anyway - the dispatcher app requires dispatcher role
       console.log('Note: could not verify or set dispatcher role');
     }

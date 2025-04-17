@@ -12,6 +12,15 @@ export default function ClientsView({ user, userProfile, clients: initialClients
     <div className="min-h-screen">
       {/* Main content */}
       <main className="max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-4 flex justify-end">
+          <button
+            onClick={() => router.push('/clients/add')}
+            className="px-4 py-2 bg-brand-accent text-brand-buttonText rounded-md hover:opacity-90 transition-opacity"
+          >
+            Add New Client
+          </button>
+        </div>
+        
         <div className="bg-brand-card shadow rounded-lg overflow-hidden border border-brand-border">
           <div className="px-6 py-5 border-b border-brand-border flex justify-between">
             <h3 className="text-lg font-medium">All Clients</h3>
