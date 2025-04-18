@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Script from 'next/script';
+import { supabase } from '@/lib/supabase';
 
 export function NewTripForm({ user, userProfile, clients }) {
   const router = useRouter();
@@ -159,16 +160,20 @@ export function NewTripForm({ user, userProfile, clients }) {
     // Add place_changed listeners
     pickupAutocompleteRef.current.addListener('place_changed', () => {
       const place = pickupAutocompleteRef.current.getPlace();
-      const updatedData = { ...formData, pickup_address: place.formatted_address || formData.pickup_address };
-      setFormData(updatedData);
-      calculatePrice(updatedData);
+      setFormData(prevData => {
+        const updatedData = { ...prevData, pickup_address: place.formatted_address || prevData.pickup_address };
+        calculatePrice(updatedData);
+        return updatedData;
+      });
     });
     
     destinationAutocompleteRef.current.addListener('place_changed', () => {
       const place = destinationAutocompleteRef.current.getPlace();
-      const updatedData = { ...formData, destination_address: place.formatted_address || formData.destination_address };
-      setFormData(updatedData);
-      calculatePrice(updatedData);
+      setFormData(prevData => {
+        const updatedData = { ...prevData, destination_address: place.formatted_address || prevData.destination_address };
+        calculatePrice(updatedData);
+        return updatedData;
+      });
     });
     
     // Cleanup function
@@ -186,31 +191,40 @@ export function NewTripForm({ user, userProfile, clients }) {
     e.preventDefault();
     setLoading(true);
     
-    // Include the calculated price in the submission
-    const tripData = {
-      ...formData,
-      estimated_price: priceInfo.totalPrice,
-      price_breakdown: {
-        base_price: priceInfo.basePrice,
-        distance_price: priceInfo.distancePrice,
-        weekend_surcharge: priceInfo.weekendSurcharge,
-        hour_surcharge: priceInfo.hourSurcharge,
-        holiday_surcharge: priceInfo.holidaySurcharge,
-        wheelchair_price: priceInfo.wheelchairPrice,
-        distance_miles: priceInfo.distance
-      }
-    };
-    
-    // In a real app, we would submit the form data to the server here
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      console.log('Form submitted:', tripData);
+      // Map form data to the trips table schema
+      const tripData = {
+        user_id: formData.client_id, // Use the client's ID as the user_id
+        pickup_address: formData.pickup_address,
+        destination_address: formData.destination_address,
+        pickup_time: formData.pickup_time,
+        status: 'pending', // Set initial status to pending
+        price: priceInfo.totalPrice,
+        special_requirements: formData.notes,
+        wheelchair_type: formData.wheelchair_required ? 'required' : null,
+        is_round_trip: formData.round_trip,
+        distance: priceInfo.distance
+      };
+
+      // Insert the trip into the database
+      const { data, error } = await supabase
+        .from('trips')
+        .insert(tripData)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating trip:', error);
+        throw new Error(error.message);
+      }
+
+      console.log('Trip created successfully:', data);
       
-      // Redirect to trips page after successful submission
+      // Redirect to dashboard after successful submission
       router.push('/dashboard');
     } catch (error) {
       console.error('Error submitting form:', error);
+      alert(`Failed to create trip: ${error.message}`);
     } finally {
       setLoading(false);
     }
