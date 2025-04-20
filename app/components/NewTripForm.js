@@ -1,12 +1,15 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Script from 'next/script';
 import { supabase } from '@/lib/supabase';
 
 export function NewTripForm({ user, userProfile, clients }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const driverId = searchParams.get('driver_id');
+  
   const [loading, setLoading] = useState(false);
   const [googleLoaded, setGoogleLoaded] = useState(false);
   const [formData, setFormData] = useState({
@@ -16,7 +19,9 @@ export function NewTripForm({ user, userProfile, clients }) {
     pickup_time: '',
     wheelchair_required: false,
     notes: '',
-    round_trip: false
+    round_trip: false,
+    driver_id: driverId || null,
+    driver_name: ''
   });
   
   // State for calculated price
@@ -141,6 +146,39 @@ export function NewTripForm({ user, userProfile, clients }) {
     calculatePrice();
   }, [googleLoaded, formData.pickup_time, formData.round_trip, formData.wheelchair_required]);
   
+  // Fetch driver information if driver_id is provided
+  useEffect(() => {
+    if (formData.driver_id) {
+      const fetchDriverInfo = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('first_name, last_name')
+            .eq('id', formData.driver_id)
+            .single();
+            
+          if (error) {
+            console.error('Error fetching driver:', error);
+            return;
+          }
+          
+          if (data) {
+            const driverName = `${data.first_name || ''} ${data.last_name || ''}`.trim();
+            // Store the driver name in formData
+            setFormData(prevData => ({
+              ...prevData,
+              driver_name: driverName
+            }));
+          }
+        } catch (error) {
+          console.error('Error in driver fetch:', error);
+        }
+      };
+      
+      fetchDriverInfo();
+    }
+  }, [formData.driver_id]);
+
   // Initialize Google Maps autocomplete
   useEffect(() => {
     if (!googleLoaded || !pickupInputRef.current || !destinationInputRef.current) return;
@@ -198,12 +236,14 @@ export function NewTripForm({ user, userProfile, clients }) {
         pickup_address: formData.pickup_address,
         destination_address: formData.destination_address,
         pickup_time: formData.pickup_time,
-        status: 'pending', // Set initial status to pending
+        status: formData.driver_id ? 'upcoming' : 'pending', // Set to upcoming if driver is assigned
         price: priceInfo.totalPrice,
         special_requirements: formData.notes,
         wheelchair_type: formData.wheelchair_required ? 'required' : null,
         is_round_trip: formData.round_trip,
-        distance: priceInfo.distance
+        distance: priceInfo.distance,
+        driver_id: formData.driver_id || null,
+        driver_name: formData.driver_name || null
       };
 
       // Insert the trip into the database
@@ -375,6 +415,22 @@ export function NewTripForm({ user, userProfile, clients }) {
                 </div>
               </div>
             </div>
+            
+            {/* Driver assignment info - only shown if a driver was pre-selected */}
+            {formData.driver_id && (
+              <div className="bg-brand-accent/10 rounded-lg p-4 border border-brand-accent/30">
+                <h3 className="text-sm font-medium mb-2">Driver Assignment</h3>
+                <div className="flex items-center">
+                  <div className="h-8 w-8 rounded-full bg-brand-accent flex items-center justify-center text-brand-buttonText">
+                    <span className="text-sm">{formData.driver_name ? formData.driver_name.charAt(0) : 'D'}</span>
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm font-medium">{formData.driver_name || 'Selected Driver'}</p>
+                    <p className="text-xs opacity-70">This trip will be assigned to this driver</p>
+                  </div>
+                </div>
+              </div>
+            )}
             
             {/* Price calculation box */}
             <div className="bg-brand-border/10 p-4 rounded-md border border-brand-border/30">

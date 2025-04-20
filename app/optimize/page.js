@@ -115,10 +115,13 @@ export default function OptimizePage() {
       const startDateStr = startOfRange.toISOString();
       const endDateStr = endOfRange.toISOString();
       
-      // Fetch trips for selected date
+      // Fetch trips for selected date with driver information
       const { data: trips, error: tripsError } = await supabase
         .from('trips')
-        .select('*')
+        .select(`
+          *,
+          driver:driver_id(id, first_name, last_name, phone_number)
+        `)
         .gte('pickup_time', startDateStr)
         .lt('pickup_time', endDateStr)
         .in('status', ['upcoming', 'pending'])
@@ -192,6 +195,12 @@ export default function OptimizePage() {
           clientName = `Client ${trip.user_id.substring(0, 8)}`;
         }
         
+        // Get driver name from the joined driver data
+        let driverName = trip.driver_name || 'Unassigned';
+        if (trip.driver) {
+          driverName = `${trip.driver.first_name || ''} ${trip.driver.last_name || ''}`.trim();
+        }
+        
         // Use date-fns for consistent formatting across server and client
         const formattedTime = pickupDate ? format(pickupDate, 'h:mm a') : 'No time';
         const formattedDate = pickupDate ? format(pickupDate, 'MM/dd/yyyy') : 'No date';
@@ -200,6 +209,7 @@ export default function OptimizePage() {
           ...trip,
           client_name: clientName,
           client_data: clientData || null,
+          driver_name: driverName,
           formatted_time: formattedTime,
           formatted_date: formattedDate,
           pickup_location: trip.pickup_address,
@@ -260,7 +270,7 @@ export default function OptimizePage() {
     
     try {
       // Simple optimization logic
-      const unassignedTrips = upcomingTrips.filter(trip => !trip.driver_name);
+      const unassignedTrips = upcomingTrips.filter(trip => !trip.driver_id);
       const availableDriversList = [...availableDrivers];
       
       // Group trips by date
@@ -414,7 +424,8 @@ export default function OptimizePage() {
         const { error: updateError } = await supabase
           .from('trips')
           .update({
-            driver_name: assignment.driver_name,
+            driver_id: assignment.driver_id,
+            driver_name: assignment.driver_name, // Keep for backward compatibility
             pickup_time: assignment.suggested_time,
             status: 'upcoming'
           })
@@ -574,7 +585,7 @@ export default function OptimizePage() {
                         </div>
                       </div>
                       <div className="mt-2 text-sm flex justify-between">
-                        <span><span className="font-medium">Driver:</span> {trip.driver_name || 'Unassigned'}</span>
+                        <span><span className="font-medium">Driver:</span> {trip.driver_name || (trip.driver_id ? 'Loading...' : 'Unassigned')}</span>
                         <span className="text-xs px-2 py-1 bg-brand-border/10 rounded inline-block">
                           ID: {trip.id.substring(0, 8)}
                         </span>
