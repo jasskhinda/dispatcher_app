@@ -24,6 +24,18 @@ export function NewTripForm({ user, userProfile, clients }) {
     driver_name: ''
   });
   
+  // State for new client form
+  const [showNewClientForm, setShowNewClientForm] = useState(false);
+  const [newClientFormData, setNewClientFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phoneNumber: '',
+    address: '',
+    notes: ''
+  });
+  const [creatingClient, setCreatingClient] = useState(false);
+  
   // State for calculated price
   const [priceInfo, setPriceInfo] = useState({
     basePrice: 50,
@@ -225,8 +237,111 @@ export function NewTripForm({ user, userProfile, clients }) {
     };
   }, [googleLoaded]);
 
+  // Function to handle creating a new client
+  const handleNewClientSubmit = async () => {
+    setCreatingClient(true);
+    
+    try {
+      // Generate a random password for the client's account
+      const password = Math.random().toString(36).slice(-10) + Math.random().toString(10).slice(-2);
+      
+      // Prepare client profile data
+      const userProfile = {
+        first_name: newClientFormData.firstName,
+        last_name: newClientFormData.lastName,
+        phone_number: newClientFormData.phoneNumber,
+        address: newClientFormData.address,
+        notes: newClientFormData.notes,
+      };
+      
+      // Call the API to create the user and profile
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: newClientFormData.email,
+          password,
+          userProfile,
+          role: 'client'
+        }),
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok && result.error && !result.error.includes('already has a client profile')) {
+        throw new Error(result.error || 'Failed to create client');
+      }
+      
+      // Get the client's ID either from the result or fetch profiles
+      let clientId;
+      
+      if (result.profile && result.profile.id) {
+        clientId = result.profile.id;
+      } else {
+        // If the profile ID wasn't returned, try to fetch it
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('email', newClientFormData.email)
+          .limit(1);
+          
+        if (profiles && profiles.length > 0) {
+          clientId = profiles[0].id;
+        } else {
+          throw new Error('Could not find the newly created client');
+        }
+      }
+      
+      // Set the client ID in the form data
+      setFormData(prev => ({ ...prev, client_id: clientId }));
+      
+      // Hide the new client form and show a success message
+      setShowNewClientForm(false);
+      
+      // Reset the new client form
+      setNewClientFormData({
+        firstName: '',
+        lastName: '',
+        email: '',
+        phoneNumber: '',
+        address: '',
+        notes: ''
+      });
+      
+    } catch (error) {
+      console.error('Error creating client:', error);
+      alert(`Failed to create client: ${error.message}`);
+    } finally {
+      setCreatingClient(false);
+    }
+  };
+
+  // Function to handle changes in the new client form
+  const handleNewClientFormChange = (e) => {
+    const { name, value } = e.target;
+    setNewClientFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Don't proceed if showing new client form
+    if (showNewClientForm) {
+      alert("Please complete client creation first");
+      return;
+    }
+    
+    // Validate client selection
+    if (!formData.client_id) {
+      alert("Please select a client or create a new one");
+      return;
+    }
+    
     setLoading(true);
     
     try {
@@ -270,6 +385,31 @@ export function NewTripForm({ user, userProfile, clients }) {
     }
   };
 
+  // Success message after client creation
+  const renderSuccess = () => {
+    if (formData.client_id && !showNewClientForm) {
+      // Find the client in the list to show their name
+      const selectedClient = clients?.find(client => client.id === formData.client_id);
+      const clientName = selectedClient ? 
+        (selectedClient.full_name || 
+         `${selectedClient.first_name || ''} ${selectedClient.last_name || ''}`.trim() || 
+         selectedClient.email) : 
+        'New client';
+      
+      return (
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md text-green-700 text-sm">
+          <div className="flex items-center">
+            <svg className="h-5 w-5 mr-2 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+            </svg>
+            Client <span className="font-medium">{clientName}</span> selected
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <>
       {/* Load Google Maps JavaScript API */}
@@ -283,32 +423,159 @@ export function NewTripForm({ user, userProfile, clients }) {
         
         <div className="bg-brand-card shadow rounded-lg p-6 border border-brand-border">
           <h2 className="text-lg font-medium mb-6">Trip Details</h2>
-          
+          {renderSuccess()}
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label htmlFor="client_id" className="block text-sm font-medium mb-1">Client</label>
-              <div className="relative">
-                <select
-                  id="client_id"
-                  name="client_id"
-                  value={formData.client_id}
-                  onChange={handleChange}
-                  className="w-full p-2 pr-10 border border-brand-border rounded-md bg-brand-background appearance-none"
-                  required
-                >
-                  <option value="">Select a client</option>
-                  {clients?.map(client => (
-                    <option key={client.id} value={client.id}>
-                      {client.full_name || `${client.first_name || ''} ${client.last_name || ''}`.trim() || client.email || 'Unnamed Client'}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-brand-accent">
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
-                  </svg>
+              
+              {!showNewClientForm ? (
+                <div className="space-y-2">
+                  <div className="relative">
+                    <select
+                      id="client_id"
+                      name="client_id"
+                      value={formData.client_id}
+                      onChange={handleChange}
+                      className="w-full p-2 pr-10 border border-brand-border rounded-md bg-brand-background appearance-none"
+                      required={!showNewClientForm}
+                      disabled={showNewClientForm}
+                    >
+                      <option value="">Select a client</option>
+                      {formData.client_id && !clients?.some(client => client.id === formData.client_id) && (
+                        <option key="newly-created" value={formData.client_id}>
+                          Newly Created Client
+                        </option>
+                      )}
+                      {clients?.map(client => (
+                        <option key={client.id} value={client.id}>
+                          {client.full_name || `${client.first_name || ''} ${client.last_name || ''}`.trim() || client.email || 'Unnamed Client'}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-brand-accent">
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                      </svg>
+                    </div>
+                  </div>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setShowNewClientForm(true)}
+                    className="text-sm text-brand-accent hover:underline focus:outline-none focus:underline flex items-center"
+                  >
+                    <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                    Create a new client instead
+                  </button>
                 </div>
-              </div>
+              ) : (
+                <div className="bg-brand-border/10 p-4 rounded-md border border-brand-border/30 space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-md font-medium">New Client Information</h3>
+                    <button
+                      type="button"
+                      onClick={() => setShowNewClientForm(false)}
+                      className="text-sm text-brand-accent hover:underline focus:outline-none"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div>
+                        <label htmlFor="firstName" className="block text-sm font-medium mb-1">First Name</label>
+                        <input
+                          id="firstName"
+                          name="firstName"
+                          type="text"
+                          value={newClientFormData.firstName}
+                          onChange={handleNewClientFormChange}
+                          required
+                          className="w-full p-2 border border-brand-border rounded-md bg-brand-background"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label htmlFor="lastName" className="block text-sm font-medium mb-1">Last Name</label>
+                        <input
+                          id="lastName"
+                          name="lastName"
+                          type="text"
+                          value={newClientFormData.lastName}
+                          onChange={handleNewClientFormChange}
+                          required
+                          className="w-full p-2 border border-brand-border rounded-md bg-brand-background"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label htmlFor="email" className="block text-sm font-medium mb-1">Email</label>
+                      <input
+                        id="email"
+                        name="email"
+                        type="email"
+                        value={newClientFormData.email}
+                        onChange={handleNewClientFormChange}
+                        required
+                        className="w-full p-2 border border-brand-border rounded-md bg-brand-background"
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="phoneNumber" className="block text-sm font-medium mb-1">Phone Number</label>
+                      <input
+                        id="phoneNumber"
+                        name="phoneNumber"
+                        type="tel"
+                        value={newClientFormData.phoneNumber}
+                        onChange={handleNewClientFormChange}
+                        required
+                        className="w-full p-2 border border-brand-border rounded-md bg-brand-background"
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="address" className="block text-sm font-medium mb-1">Address</label>
+                      <input
+                        id="address"
+                        name="address"
+                        type="text"
+                        value={newClientFormData.address}
+                        onChange={handleNewClientFormChange}
+                        className="w-full p-2 border border-brand-border rounded-md bg-brand-background"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label htmlFor="clientNotes" className="block text-sm font-medium mb-1">Notes</label>
+                      <textarea
+                        id="clientNotes"
+                        name="notes"
+                        value={newClientFormData.notes}
+                        onChange={handleNewClientFormChange}
+                        rows={2}
+                        placeholder="Special needs, preferences, etc."
+                        className="w-full p-2 border border-brand-border rounded-md bg-brand-background"
+                      />
+                    </div>
+                    
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={handleNewClientSubmit}
+                        disabled={creatingClient}
+                        className="px-4 py-2 bg-brand-accent text-brand-buttonText rounded-md hover:opacity-90 transition-opacity disabled:opacity-70"
+                      >
+                        {creatingClient ? 'Creating...' : 'Save & Continue'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
             
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
