@@ -163,14 +163,22 @@ export function NewTripForm({ user, userProfile, clients }) {
   
   // Check again after component mounts - Google Maps might have loaded after
   useEffect(() => {
+    // Check immediately once
+    if (typeof window !== 'undefined' && window.google && window.google.maps && !googleLoaded) {
+      console.log('Google Maps now available for NewTripForm (immediate check)');
+      setGoogleLoaded(true);
+      return; // Skip setting up the interval if already loaded
+    }
+    
     const intervalId = setInterval(() => {
       if (typeof window !== 'undefined' && window.google && window.google.maps && !googleLoaded) {
-        console.log('Google Maps now available for NewTripForm');
+        console.log('Google Maps now available for NewTripForm (interval check)');
         setGoogleLoaded(true);
         clearInterval(intervalId);
       }
     }, 500);
     
+    // Clean up interval on unmount
     return () => clearInterval(intervalId);
   }, [googleLoaded]);
 
@@ -214,49 +222,70 @@ export function NewTripForm({ user, userProfile, clients }) {
 
   // Initialize Google Maps autocomplete
   useEffect(() => {
-    if (!googleLoaded || !pickupInputRef.current || !destinationInputRef.current) return;
-    
-    // Initialize autocomplete for pickup address
-    pickupAutocompleteRef.current = new window.google.maps.places.Autocomplete(
-      pickupInputRef.current,
-      { types: [] }  // Allow all types of places including cities
-    );
-    
-    // Initialize autocomplete for destination address
-    destinationAutocompleteRef.current = new window.google.maps.places.Autocomplete(
-      destinationInputRef.current,
-      { types: [] }  // Allow all types of places including cities
-    );
-    
-    // Add place_changed listeners
-    pickupAutocompleteRef.current.addListener('place_changed', () => {
-      const place = pickupAutocompleteRef.current.getPlace();
-      setFormData(prevData => {
-        const updatedData = { ...prevData, pickup_address: place.formatted_address || prevData.pickup_address };
-        calculatePrice(updatedData);
-        return updatedData;
+    if (!googleLoaded || !pickupInputRef.current || !destinationInputRef.current) {
+      console.log('Cannot initialize autocomplete yet:', { 
+        googleLoaded, 
+        pickupInput: !!pickupInputRef.current, 
+        destinationInput: !!destinationInputRef.current 
       });
-    });
+      return;
+    }
     
-    destinationAutocompleteRef.current.addListener('place_changed', () => {
-      const place = destinationAutocompleteRef.current.getPlace();
-      setFormData(prevData => {
-        const updatedData = { ...prevData, destination_address: place.formatted_address || prevData.destination_address };
-        calculatePrice(updatedData);
-        return updatedData;
+    console.log('Initializing Google Maps autocomplete for address fields');
+    
+    try {
+      // Initialize autocomplete for pickup address
+      pickupAutocompleteRef.current = new window.google.maps.places.Autocomplete(
+        pickupInputRef.current,
+        { types: [] }  // Allow all types of places including cities
+      );
+      
+      // Initialize autocomplete for destination address
+      destinationAutocompleteRef.current = new window.google.maps.places.Autocomplete(
+        destinationInputRef.current,
+        { types: [] }  // Allow all types of places including cities
+      );
+      
+      // Add place_changed listeners
+      pickupAutocompleteRef.current.addListener('place_changed', () => {
+        const place = pickupAutocompleteRef.current.getPlace();
+        console.log('Pickup place selected:', place);
+        setFormData(prevData => {
+          const updatedData = { ...prevData, pickup_address: place.formatted_address || prevData.pickup_address };
+          calculatePrice(updatedData);
+          return updatedData;
+        });
       });
-    });
+      
+      destinationAutocompleteRef.current.addListener('place_changed', () => {
+        const place = destinationAutocompleteRef.current.getPlace();
+        console.log('Destination place selected:', place);
+        setFormData(prevData => {
+          const updatedData = { ...prevData, destination_address: place.formatted_address || prevData.destination_address };
+          calculatePrice(updatedData);
+          return updatedData;
+        });
+      });
+      
+      console.log('Google Maps autocomplete initialized successfully');
+    } catch (error) {
+      console.error('Error initializing Google Maps autocomplete:', error);
+    }
     
     // Cleanup function
     return () => {
-      if (pickupAutocompleteRef.current) {
-        window.google.maps.event.clearInstanceListeners(pickupAutocompleteRef.current);
-      }
-      if (destinationAutocompleteRef.current) {
-        window.google.maps.event.clearInstanceListeners(destinationAutocompleteRef.current);
+      try {
+        if (pickupAutocompleteRef.current) {
+          window.google.maps.event.clearInstanceListeners(pickupAutocompleteRef.current);
+        }
+        if (destinationAutocompleteRef.current) {
+          window.google.maps.event.clearInstanceListeners(destinationAutocompleteRef.current);
+        }
+      } catch (error) {
+        console.error('Error cleaning up Google Maps autocomplete:', error);
       }
     };
-  }, [googleLoaded]);
+  }, [googleLoaded, pickupInputRef.current, destinationInputRef.current]);
 
   // Function to handle creating a new client
   const handleNewClientSubmit = async () => {
@@ -470,7 +499,14 @@ export function NewTripForm({ user, userProfile, clients }) {
 
   return (
     <>
-      {/* No need to load Google Maps here - the MapView component handles it */}
+      <Script
+        src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`}
+        onLoad={() => {
+          console.log('Google Maps script loaded successfully in NewTripForm');
+          setGoogleLoaded(true);
+        }}
+        onError={() => console.error('Error loading Google Maps script in NewTripForm')}
+      />
       
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <h1 className="text-2xl font-semibold mb-6">Create New Trip</h1>
