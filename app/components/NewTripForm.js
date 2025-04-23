@@ -32,7 +32,8 @@ export function NewTripForm({ user, userProfile, clients }) {
     email: '',
     phoneNumber: '',
     address: '',
-    notes: ''
+    notes: '',
+    submitted: false
   });
   const [creatingClient, setCreatingClient] = useState(false);
   
@@ -152,7 +153,27 @@ export function NewTripForm({ user, userProfile, clients }) {
     setPriceInfo(newPriceInfo);
   };
   
-  // Initialize Google Maps autocomplete when the script is loaded
+  // Simple direct check for Google Maps
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.google && window.google.maps) {
+      console.log('Google Maps already available for NewTripForm');
+      setGoogleLoaded(true);
+    }
+  }, []);
+  
+  // Check again after component mounts - Google Maps might have loaded after
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      if (typeof window !== 'undefined' && window.google && window.google.maps && !googleLoaded) {
+        console.log('Google Maps now available for NewTripForm');
+        setGoogleLoaded(true);
+        clearInterval(intervalId);
+      }
+    }, 500);
+    
+    return () => clearInterval(intervalId);
+  }, [googleLoaded]);
+
   // Effect to recalculate price when form data changes
   useEffect(() => {
     calculatePrice();
@@ -198,13 +219,13 @@ export function NewTripForm({ user, userProfile, clients }) {
     // Initialize autocomplete for pickup address
     pickupAutocompleteRef.current = new window.google.maps.places.Autocomplete(
       pickupInputRef.current,
-      { types: ['address'] }
+      { types: [] }  // Allow all types of places including cities
     );
     
     // Initialize autocomplete for destination address
     destinationAutocompleteRef.current = new window.google.maps.places.Autocomplete(
       destinationInputRef.current,
-      { types: ['address'] }
+      { types: [] }  // Allow all types of places including cities
     );
     
     // Add place_changed listeners
@@ -270,8 +291,21 @@ export function NewTripForm({ user, userProfile, clients }) {
       
       const result = await response.json();
       
-      if (!response.ok && result.error && !result.error.includes('already has a client profile')) {
-        throw new Error(result.error || 'Failed to create client');
+      // Log response for debugging
+      console.log('Client creation API response:', {
+        status: response.status,
+        ok: response.ok,
+        result
+      });
+      
+      // Handle error responses
+      if (!response.ok) {
+        // Special case for "already has profile" errors that we can recover from
+        if (result.error && result.error.includes('already has a client profile')) {
+          console.log('Client already exists, proceeding to find their ID');
+        } else {
+          throw new Error(result.error || 'Failed to create client');
+        }
       }
       
       // Get the client's ID either from the result or fetch profiles
@@ -279,20 +313,37 @@ export function NewTripForm({ user, userProfile, clients }) {
       
       if (result.profile && result.profile.id) {
         clientId = result.profile.id;
+      } else if (result.userId) {
+        // If we have the userId directly, use that
+        clientId = result.userId;
       } else {
-        // If the profile ID wasn't returned, try to fetch it
-        const { data: profiles } = await supabase
+        // Add a small delay to allow database to update
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // If the profile ID wasn't returned, try to fetch it by email
+        // Try using both exact email and case-insensitive search
+        const { data: profiles, error: profilesError } = await supabase
           .from('profiles')
-          .select('id')
-          .eq('email', newClientFormData.email)
-          .limit(1);
+          .select('id, email')
+          .or(`email.eq.${newClientFormData.email},email.ilike.${newClientFormData.email}`)
+          .order('created_at', { ascending: false })
+          .limit(5);
+        
+        console.log('Profile lookup result:', { profiles, error: profilesError });
           
         if (profiles && profiles.length > 0) {
           clientId = profiles[0].id;
         } else {
-          throw new Error('Could not find the newly created client');
+          throw new Error('Could not find the newly created client. Please try again or check if the client exists under the Clients tab.');
         }
       }
+      
+      // Store the newly created client info for display
+      const newClientDisplayInfo = {
+        firstName: newClientFormData.firstName,
+        lastName: newClientFormData.lastName,
+        email: newClientFormData.email
+      };
       
       // Set the client ID in the form data
       setFormData(prev => ({ ...prev, client_id: clientId }));
@@ -300,15 +351,11 @@ export function NewTripForm({ user, userProfile, clients }) {
       // Hide the new client form and show a success message
       setShowNewClientForm(false);
       
-      // Reset the new client form
-      setNewClientFormData({
-        firstName: '',
-        lastName: '',
-        email: '',
-        phoneNumber: '',
-        address: '',
-        notes: ''
-      });
+      // Keep the client info for display, but mark as submitted
+      setNewClientFormData(prev => ({
+        ...prev,
+        submitted: true
+      }));
       
     } catch (error) {
       console.error('Error creating client:', error);
@@ -388,13 +435,24 @@ export function NewTripForm({ user, userProfile, clients }) {
   // Success message after client creation
   const renderSuccess = () => {
     if (formData.client_id && !showNewClientForm) {
-      // Find the client in the list to show their name
-      const selectedClient = clients?.find(client => client.id === formData.client_id);
-      const clientName = selectedClient ? 
-        (selectedClient.full_name || 
-         `${selectedClient.first_name || ''} ${selectedClient.last_name || ''}`.trim() || 
-         selectedClient.email) : 
-        'New client';
+      let clientName;
+      
+      // Case 1: Client is newly created and not in the clients list
+      if (!clients?.some(client => client.id === formData.client_id) && newClientFormData.submitted) {
+        clientName = `${newClientFormData.firstName} ${newClientFormData.lastName}`.trim() || 
+                     newClientFormData.email || 
+                     'New client';
+      } 
+      // Case 2: Client exists in the clients list
+      else {
+        // Find the client in the list to show their name
+        const selectedClient = clients?.find(client => client.id === formData.client_id);
+        clientName = selectedClient ? 
+          (selectedClient.full_name || 
+           `${selectedClient.first_name || ''} ${selectedClient.last_name || ''}`.trim() || 
+           selectedClient.email) : 
+          'New client';
+      }
       
       return (
         <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md text-green-700 text-sm">
@@ -412,11 +470,7 @@ export function NewTripForm({ user, userProfile, clients }) {
 
   return (
     <>
-      {/* Load Google Maps JavaScript API */}
-      <Script
-        src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`}
-        onLoad={() => setGoogleLoaded(true)}
-      />
+      {/* No need to load Google Maps here - the MapView component handles it */}
       
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <h1 className="text-2xl font-semibold mb-6">Create New Trip</h1>
@@ -443,7 +497,9 @@ export function NewTripForm({ user, userProfile, clients }) {
                       <option value="">Select a client</option>
                       {formData.client_id && !clients?.some(client => client.id === formData.client_id) && (
                         <option key="newly-created" value={formData.client_id}>
-                          Newly Created Client
+                          {newClientFormData.submitted ? 
+                            `${newClientFormData.firstName} ${newClientFormData.lastName}`.trim() || newClientFormData.email
+                            : 'Newly Created Client'}
                         </option>
                       )}
                       {clients?.map(client => (
@@ -461,7 +517,21 @@ export function NewTripForm({ user, userProfile, clients }) {
                   
                   <button
                     type="button"
-                    onClick={() => setShowNewClientForm(true)}
+                    onClick={() => {
+                      // Reset the form data when starting a new client
+                      if (!newClientFormData.submitted) {
+                        setNewClientFormData({
+                          firstName: '',
+                          lastName: '',
+                          email: '',
+                          phoneNumber: '',
+                          address: '',
+                          notes: '',
+                          submitted: false
+                        });
+                      }
+                      setShowNewClientForm(true);
+                    }}
                     className="text-sm text-brand-accent hover:underline focus:outline-none focus:underline flex items-center"
                   >
                     <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -589,7 +659,7 @@ export function NewTripForm({ user, userProfile, clients }) {
                   value={formData.pickup_address}
                   onChange={handleChange}
                   className="w-full p-2 border border-brand-border rounded-md bg-brand-background"
-                  placeholder="Start typing for address suggestions"
+                  placeholder="Enter address, city, or location"
                   required
                 />
               </div>
@@ -603,7 +673,7 @@ export function NewTripForm({ user, userProfile, clients }) {
                   value={formData.destination_address}
                   onChange={handleChange}
                   className="w-full p-2 border border-brand-border rounded-md bg-brand-background"
-                  placeholder="Start typing for address suggestions"
+                  placeholder="Enter address, city, or location"
                   required
                 />
               </div>

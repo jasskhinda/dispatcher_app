@@ -115,6 +115,7 @@ export async function POST(request) {
       const { error: updateError } = await supabaseAdmin
         .from('profiles')
         .update({
+          email: email, // Ensure email is included in the update
           first_name: userProfile.first_name,
           last_name: userProfile.last_name,
           phone_number: userProfile.phone_number,
@@ -138,6 +139,11 @@ export async function POST(request) {
       return NextResponse.json({
         success: true,
         userId: newUserId,
+        profile: {
+          id: newUserId,
+          role,
+          ...userProfile
+        },
         message: `${role.charAt(0).toUpperCase() + role.slice(1)} profile updated successfully`
       });
     }
@@ -149,6 +155,7 @@ export async function POST(request) {
     const profileData = {
       id: newUserId,
       role,
+      email: email, // Ensure email is included in the profile
       first_name: userProfile.first_name,
       last_name: userProfile.last_name,
       phone_number: userProfile.phone_number,
@@ -178,6 +185,11 @@ export async function POST(request) {
     return NextResponse.json({
       success: true,
       userId: newUserId,
+      profile: {
+        id: newUserId,
+        role,
+        ...userProfile
+      },
       message: `${role.charAt(0).toUpperCase() + role.slice(1)} created successfully`
     });
     
