@@ -14,7 +14,7 @@ export async function middleware(req) {
   console.log("MIDDLEWARE: Session exists =", !!session);
 
   // Check auth condition
-  const isAuthRoute = req.nextUrl.pathname === '/login' || req.nextUrl.pathname === '/signup';
+  const isAuthRoute = req.nextUrl.pathname === '/login';
   const isPublicRoute = req.nextUrl.pathname === '/' || 
                         req.nextUrl.pathname.startsWith('/_next') || 
                         req.nextUrl.pathname.match(/\.(ico|png|jpg|svg|css|js)$/);
