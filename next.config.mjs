@@ -10,7 +10,7 @@ const nextConfig = {
   },
   // Set custom dev server port
   devServer: {
-    port: 3015,
+    port: 3000,
   },
 };
 
