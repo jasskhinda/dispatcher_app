@@ -2,14 +2,27 @@
 
 import { useState, useEffect } from 'react';
 
-export function CalendarView({ user, userProfile, trips: initialTrips }) {
+export function CalendarView({ user, userProfile, trips: initialTrips, drivers = [] }) {
   const [trips, setTrips] = useState(initialTrips || []);
+  const [filteredTrips, setFilteredTrips] = useState(initialTrips || []);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [loading, setLoading] = useState(false);
+  const [selectedDriver, setSelectedDriver] = useState('all');
+
+  // Filter trips based on selected driver
+  useEffect(() => {
+    if (selectedDriver === 'all') {
+      setFilteredTrips(trips);
+    } else if (selectedDriver === 'unassigned') {
+      setFilteredTrips(trips.filter(trip => !trip.driver_id));
+    } else {
+      setFilteredTrips(trips.filter(trip => trip.driver_id === selectedDriver));
+    }
+  }, [selectedDriver, trips]);
 
   // Group trips by date for the calendar view
-  const tripsByDate = trips.reduce((acc, trip) => {
+  const tripsByDate = filteredTrips.reduce((acc, trip) => {
     const date = new Date(trip.pickup_time);
     const dateStr = date.toISOString().split('T')[0];
     if (!acc[dateStr]) {
@@ -69,23 +82,52 @@ export function CalendarView({ user, userProfile, trips: initialTrips }) {
     <div className="min-h-screen">
       {/* Main content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Status filters */}
+        {/* Status and driver filters */}
         <div className="bg-brand-card shadow rounded-lg py-2 px-4 mb-6 border border-brand-border">
-          <div className="flex flex-wrap items-center">
-            <span className="font-medium mr-6">Filter:</span>
-            {['All', 'Pending', 'Confirmed', 'In Progress', 'Completed', 'Cancelled'].map(status => (
-              <div key={status} className="flex items-center mr-6 py-1">
-                <input
-                  id={`filter-${status.toLowerCase().replace(' ', '-')}`}
-                  type="checkbox"
-                  className="h-4 w-4 text-brand-accent rounded border-brand-border flex-shrink-0"
-                  defaultChecked={status === 'All'}
-                />
-                <label htmlFor={`filter-${status.toLowerCase().replace(' ', '-')}`} className="ml-2 text-sm whitespace-nowrap">
-                  {status}
-                </label>
+          <div className="flex flex-wrap items-center justify-between">
+            <div className="flex flex-wrap items-center my-2">
+              <span className="font-medium mr-6">Status:</span>
+              {['All', 'Pending', 'Confirmed', 'In Progress', 'Completed', 'Cancelled'].map(status => (
+                <div key={status} className="flex items-center mr-6 py-1">
+                  <input
+                    id={`filter-${status.toLowerCase().replace(' ', '-')}`}
+                    type="checkbox"
+                    className="h-4 w-4 text-brand-accent rounded border-brand-border flex-shrink-0"
+                    defaultChecked={status === 'All'}
+                  />
+                  <label htmlFor={`filter-${status.toLowerCase().replace(' ', '-')}`} className="ml-2 text-sm whitespace-nowrap">
+                    {status}
+                  </label>
+                </div>
+              ))}
+            </div>
+            
+            {/* Driver filter */}
+            <div className="flex items-center my-2">
+              <span className="font-medium mr-3">Driver:</span>
+              <div className="relative inline-block w-64">
+                <select
+                  value={selectedDriver}
+                  onChange={(e) => setSelectedDriver(e.target.value)}
+                  className="block appearance-none w-full bg-brand-background border border-brand-border rounded-md py-2 pl-3 pr-10 text-sm"
+                >
+                  <option value="all">All Drivers</option>
+                  {drivers.map(driver => (
+                    <option key={driver.id} value={driver.id}>
+                      {driver.first_name && driver.last_name 
+                        ? `${driver.first_name} ${driver.last_name}`
+                        : driver.email || `Driver ${driver.id.substring(0, 6)}`}
+                    </option>
+                  ))}
+                  <option value="unassigned">Unassigned Trips</option>
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-brand-accent">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                  </svg>
+                </div>
               </div>
-            ))}
+            </div>
           </div>
         </div>
         
@@ -171,6 +213,7 @@ export function CalendarView({ user, userProfile, trips: initialTrips }) {
                         }`}
                       >
                         {new Date(trip.pickup_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {trip.client_name || 'Client'}
+                        {trip.driver_name && <span className="ml-1 text-xs opacity-75"> ({trip.driver_name})</span>}
                       </div>
                     ))}
                     {dayTrips.length > 3 && (

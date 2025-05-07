@@ -116,7 +116,7 @@ export default function DashboardClientView({ user, userProfile, trips: initialT
         <div className="bg-brand-card shadow rounded-lg p-6 mb-8 border border-brand-border">
           <h2 className="text-xl font-semibold mb-4">Welcome to the Dispatch Dashboard</h2>
           <p className="mb-6">
-            From here you can monitor and manage rides for Compassionate Rides.
+            From here you can monitor and manage rides for Compassionate Transportation.
           </p>
           
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">

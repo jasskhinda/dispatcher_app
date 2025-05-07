@@ -58,6 +58,16 @@ export default async function CalendarPage() {
             console.error('Error fetching trips for calendar:', tripsError);
         }
         
+        // Fetch all drivers for filtering
+        const { data: drivers, error: driversError } = await supabase
+            .from('profiles')
+            .select('id, first_name, last_name, email')
+            .eq('role', 'driver');
+            
+        if (driversError) {
+            console.error('Error fetching drivers:', driversError);
+        }
+        
         // Get all user IDs from trips to fetch their profiles
         const userIds = (trips || []).map(trip => trip.user_id).filter(Boolean);
         
@@ -105,7 +115,12 @@ export default async function CalendarPage() {
 
         const { CalendarView } = require('../components/CalendarView');
         
-        return <CalendarView user={session.user} userProfile={userProfile} trips={processedTrips} />;
+        return <CalendarView 
+            user={session.user} 
+            userProfile={userProfile} 
+            trips={processedTrips} 
+            drivers={drivers || []} 
+        />;
     } catch (error) {
         console.error('Error in calendar page:', error);
         redirect('/login?error=server_error');

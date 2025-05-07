@@ -1,4 +1,4 @@
-# Database Setup for Compassionate Rides Dispatcher App
+# Database Setup for Compassionate Transportation Dispatcher App
 
 This directory contains SQL scripts that need to be run on the Supabase database to ensure proper permissions and functionality.
 
