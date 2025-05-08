@@ -17,6 +17,7 @@ export function NewTripForm({ user, userProfile, clients }) {
     pickup_address: '',
     destination_address: '',
     pickup_time: '',
+    return_pickup_time: '',
     wheelchair_required: false,
     notes: '',
     round_trip: false,
@@ -82,7 +83,7 @@ export function NewTripForm({ user, userProfile, clients }) {
       totalPrice: 50
     };
     
-    // Round trip calculation
+    // Round trip calculation - add fixed $50 fee for round trips
     if (data.round_trip) {
       newPriceInfo.basePrice = 100;
       newPriceInfo.roundTripPrice = 50;
@@ -93,7 +94,7 @@ export function NewTripForm({ user, userProfile, clients }) {
       newPriceInfo.wheelchairPrice = 25;
     }
     
-    // Time-based surcharges
+    // Time-based surcharges for initial pickup
     if (data.pickup_time) {
       const pickupDate = new Date(data.pickup_time);
       
@@ -122,23 +123,61 @@ export function NewTripForm({ user, userProfile, clients }) {
       if (isNewYearsDay || isChristmas || isIndependenceDay || isThanksgiving) {
         newPriceInfo.holidaySurcharge = 100;
       }
+      
+      // No special surcharges for return trip - the fixed $50 round trip fee covers this
     }
     
     // Calculate distance price if we have both addresses
     if (data.pickup_address && data.destination_address && googleLoaded) {
       try {
-        // We would normally call an API here to get the distance
-        // For now, we'll just estimate with a placeholder value
-        // In a real app, you would call the Distance Matrix API here
+        console.log('Calculating distance between:', data.pickup_address, 'and', data.destination_address);
         
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Use Google Maps Distance Matrix API to calculate actual distance
+        const service = new window.google.maps.DistanceMatrixService();
         
-        // Calculate estimated distance (would come from API)
-        newPriceInfo.distance = 15; // miles, placeholder
-        newPriceInfo.distancePrice = newPriceInfo.distance * 3;
+        const response = await new Promise((resolve, reject) => {
+          service.getDistanceMatrix(
+            {
+              origins: [data.pickup_address],
+              destinations: [data.destination_address],
+              travelMode: 'DRIVING',
+              unitSystem: window.google.maps.UnitSystem.IMPERIAL, // Use miles
+              avoidHighways: false,
+              avoidTolls: false,
+            },
+            (response, status) => {
+              if (status === 'OK') {
+                resolve(response);
+              } else {
+                console.error('Distance Matrix API returned status: ' + status);
+                reject(new Error('Distance calculation failed: ' + status));
+              }
+            }
+          );
+        });
+        
+        // Extract distance value from the response
+        if (response.rows[0].elements[0].status === 'OK') {
+          const distanceInMeters = response.rows[0].elements[0].distance.value;
+          const distanceInMiles = distanceInMeters / 1609.34; // Convert meters to miles
+          const roundedDistance = Math.round(distanceInMiles * 10) / 10; // Round to 1 decimal place
+          
+          console.log('Distance calculated:', roundedDistance, 'miles');
+          
+          // Update price information with actual distance
+          newPriceInfo.distance = roundedDistance;
+          newPriceInfo.distancePrice = Math.round(newPriceInfo.distance * 3); // $3 per mile
+        } else {
+          console.warn('Distance calculation returned non-OK status:', response.rows[0].elements[0].status);
+          // Fallback to estimate
+          newPriceInfo.distance = 15; // miles, placeholder
+          newPriceInfo.distancePrice = newPriceInfo.distance * 3;
+        }
       } catch (error) {
         console.error('Error calculating distance:', error);
+        // Fallback to estimate
+        newPriceInfo.distance = 15; // miles, placeholder
+        newPriceInfo.distancePrice = newPriceInfo.distance * 3;
       }
     }
     
@@ -185,7 +224,15 @@ export function NewTripForm({ user, userProfile, clients }) {
   // Effect to recalculate price when form data changes
   useEffect(() => {
     calculatePrice();
-  }, [googleLoaded, formData.pickup_time, formData.round_trip, formData.wheelchair_required]);
+  }, [
+    googleLoaded, 
+    formData.pickup_time, 
+    formData.return_pickup_time, 
+    formData.round_trip, 
+    formData.wheelchair_required,
+    formData.pickup_address,
+    formData.destination_address
+  ]);
   
   // Fetch driver information if driver_id is provided
   useEffect(() => {
@@ -252,7 +299,10 @@ export function NewTripForm({ user, userProfile, clients }) {
         console.log('Pickup place selected:', place);
         setFormData(prevData => {
           const updatedData = { ...prevData, pickup_address: place.formatted_address || prevData.pickup_address };
-          calculatePrice(updatedData);
+          // Only trigger price calculation if both addresses are set
+          if (updatedData.pickup_address && updatedData.destination_address) {
+            setTimeout(() => calculatePrice(updatedData), 100); // Slight delay to ensure state is updated
+          }
           return updatedData;
         });
       });
@@ -262,7 +312,10 @@ export function NewTripForm({ user, userProfile, clients }) {
         console.log('Destination place selected:', place);
         setFormData(prevData => {
           const updatedData = { ...prevData, destination_address: place.formatted_address || prevData.destination_address };
-          calculatePrice(updatedData);
+          // Only trigger price calculation if both addresses are set
+          if (updatedData.pickup_address && updatedData.destination_address) {
+            setTimeout(() => calculatePrice(updatedData), 100); // Slight delay to ensure state is updated
+          }
           return updatedData;
         });
       });
@@ -418,6 +471,23 @@ export function NewTripForm({ user, userProfile, clients }) {
       return;
     }
     
+    // Validate return pickup time for round trips
+    if (formData.round_trip) {
+      if (!formData.return_pickup_time) {
+        alert("Please select a return pickup time for the round trip");
+        return;
+      }
+      
+      // Check that return pickup time is after initial pickup time
+      const pickupTime = new Date(formData.pickup_time);
+      const returnTime = new Date(formData.return_pickup_time);
+      
+      if (returnTime <= pickupTime) {
+        alert("Return pickup time must be after the initial pickup time");
+        return;
+      }
+    }
+    
     setLoading(true);
     
     try {
@@ -427,7 +497,8 @@ export function NewTripForm({ user, userProfile, clients }) {
         pickup_address: formData.pickup_address,
         destination_address: formData.destination_address,
         pickup_time: formData.pickup_time,
-        status: formData.driver_id ? 'upcoming' : 'pending', // Set to upcoming if driver is assigned
+        return_pickup_time: formData.round_trip ? formData.return_pickup_time : null, // Only include for round trips
+        status: 'upcoming', // Always set as upcoming since dispatcher app automatically approves trips
         price: priceInfo.totalPrice,
         special_requirements: formData.notes,
         wheelchair_type: formData.wheelchair_required ? 'required' : null,
@@ -751,6 +822,48 @@ export function NewTripForm({ user, userProfile, clients }) {
                     })}
                   </div>
                 )}
+                
+                {/* Return pickup time - only shown for round trips */}
+                {formData.round_trip && (
+                  <div className="mt-4">
+                    <label htmlFor="return_pickup_time" className="block text-sm font-medium mb-1">
+                      Return Pickup Date & Time
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="datetime-local"
+                        id="return_pickup_time"
+                        name="return_pickup_time"
+                        value={formData.return_pickup_time}
+                        onChange={handleChange}
+                        className="w-full p-2 border border-brand-border rounded-md bg-brand-background"
+                        required={formData.round_trip}
+                      />
+                      {formData.return_pickup_time && (
+                        <div className="absolute right-10 top-1/2 transform -translate-y-1/2 text-xs bg-brand-accent text-brand-buttonText px-1.5 py-0.5 rounded">
+                          {new Date(formData.return_pickup_time).toLocaleString('en-US', {
+                            hour: 'numeric',
+                            minute: 'numeric',
+                            hour12: true
+                          })}
+                        </div>
+                      )}
+                    </div>
+                    {formData.return_pickup_time && (
+                      <div className="mt-1 text-xs text-brand-accent">
+                        {new Date(formData.return_pickup_time).toLocaleString('en-US', {
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                          hour: 'numeric',
+                          minute: 'numeric',
+                          hour12: true
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium mb-2">Trip Type</label>
@@ -810,13 +923,13 @@ export function NewTripForm({ user, userProfile, clients }) {
               <h3 className="text-lg font-medium mb-3">Price Calculation</h3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span>Base fare:</span>
+                  <span>Base fare {formData.round_trip ? '(round trip)' : '(one way)'}:</span>
                   <span>${priceInfo.basePrice.toFixed(2)}</span>
                 </div>
                 
                 {priceInfo.distance > 0 && (
                   <div className="flex justify-between">
-                    <span>Distance ({priceInfo.distance} miles):</span>
+                    <span>Distance ({priceInfo.distance.toFixed(1)} miles @ $3/mile):</span>
                     <span>${priceInfo.distancePrice.toFixed(2)}</span>
                   </div>
                 )}
