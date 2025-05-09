@@ -166,18 +166,24 @@ export function NewTripForm({ user, userProfile, clients }) {
           
           // Update price information with actual distance
           newPriceInfo.distance = roundedDistance;
-          newPriceInfo.distancePrice = Math.round(newPriceInfo.distance * 3); // $3 per mile
+          // For round trips, double the distance for price calculation
+          const effectiveDistance = data.round_trip ? roundedDistance * 2 : roundedDistance;
+          newPriceInfo.distancePrice = Math.round(effectiveDistance * 3); // $3 per mile
         } else {
           console.warn('Distance calculation returned non-OK status:', response.rows[0].elements[0].status);
           // Fallback to estimate
           newPriceInfo.distance = 15; // miles, placeholder
-          newPriceInfo.distancePrice = newPriceInfo.distance * 3;
+          // For round trips, double the distance for price calculation
+          const effectiveDistance = data.round_trip ? newPriceInfo.distance * 2 : newPriceInfo.distance;
+          newPriceInfo.distancePrice = Math.round(effectiveDistance * 3);
         }
       } catch (error) {
         console.error('Error calculating distance:', error);
         // Fallback to estimate
         newPriceInfo.distance = 15; // miles, placeholder
-        newPriceInfo.distancePrice = newPriceInfo.distance * 3;
+        // For round trips, double the distance for price calculation
+        const effectiveDistance = data.round_trip ? newPriceInfo.distance * 2 : newPriceInfo.distance;
+        newPriceInfo.distancePrice = Math.round(effectiveDistance * 3);
       }
     }
     
@@ -929,7 +935,7 @@ export function NewTripForm({ user, userProfile, clients }) {
                 
                 {priceInfo.distance > 0 && (
                   <div className="flex justify-between">
-                    <span>Distance ({priceInfo.distance.toFixed(1)} miles @ $3/mile):</span>
+                    <span>Distance ({priceInfo.distance.toFixed(1)} miles {formData.round_trip ? 'x2 for round trip' : ''} @ $3/mile):</span>
                     <span>${priceInfo.distancePrice.toFixed(2)}</span>
                   </div>
                 )}
