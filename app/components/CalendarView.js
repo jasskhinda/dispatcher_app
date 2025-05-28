@@ -1,14 +1,19 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 
 export function CalendarView({ user, userProfile, trips: initialTrips, drivers = [] }) {
+  const router = useRouter();
   const [trips, setTrips] = useState(initialTrips || []);
   const [filteredTrips, setFilteredTrips] = useState(initialTrips || []);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [loading, setLoading] = useState(false);
   const [selectedDriver, setSelectedDriver] = useState('all');
+  const [selectedTrip, setSelectedTrip] = useState(null);
+  const [showModal, setShowModal] = useState(false);
 
   // Filter trips based on selected driver
   useEffect(() => {
@@ -76,6 +81,36 @@ export function CalendarView({ user, userProfile, trips: initialTrips, drivers =
     const today = new Date();
     setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1));
     setSelectedDate(today);
+  };
+
+  // Show trip details
+  const showTripDetails = (trip) => {
+    setSelectedTrip(trip);
+    setShowModal(true);
+  };
+
+  // Close modal
+  const closeModal = () => {
+    setShowModal(false);
+    setSelectedTrip(null);
+  };
+
+  // Handle escape key
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && showModal) {
+        closeModal();
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [showModal]);
+
+  // Format time for display
+  const formatTime = (timeStr) => {
+    if (!timeStr) return 'N/A';
+    const date = new Date(timeStr);
+    return date.toLocaleString();
   };
 
   return (
@@ -204,7 +239,11 @@ export function CalendarView({ user, userProfile, trips: initialTrips, drivers =
                     {dayTrips.slice(0, 3).map((trip, idx) => (
                       <div 
                         key={idx} 
-                        className={`rounded-sm px-1 py-0.5 truncate ${
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          showTripDetails(trip);
+                        }}
+                        className={`rounded-sm px-1 py-0.5 truncate cursor-pointer hover:opacity-80 transition-opacity ${
                           trip.status === 'completed' ? 'bg-brand-completed/20 text-brand-completed' : 
                           trip.status === 'in_progress' ? 'bg-brand-inProgress/20 text-brand-inProgress' : 
                           trip.status === 'cancelled' ? 'bg-brand-cancelled/20 text-brand-cancelled' : 
@@ -226,6 +265,178 @@ export function CalendarView({ user, userProfile, trips: initialTrips, drivers =
           </div>
         </div>
       </main>
+      
+      {/* Trip Details Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            {/* Background overlay */}
+            <div 
+              className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" 
+              aria-hidden="true"
+              onClick={closeModal}
+            ></div>
+
+            {/* Modal content */}
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div className="inline-block align-bottom bg-brand-card rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full border border-brand-border">
+              {selectedTrip && (
+                <>
+                  <div className="px-6 py-5 border-b border-brand-border flex justify-between items-center">
+                    <h3 className="text-lg font-medium" id="modal-title">Trip Details</h3>
+                    <button
+                      onClick={closeModal}
+                      className="rounded-md hover:bg-brand-border/20 p-1"
+                    >
+                      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div className="px-6 py-5">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      {/* Trip information - left column */}
+                      <div className="md:col-span-2">
+                        <div className="mb-6">
+                          <div className="flex justify-between items-center mb-4">
+                            <h4 className="text-md font-medium">Trip Information</h4>
+                            <span className={`px-2 py-1 text-xs rounded-full font-medium
+                              ${selectedTrip.status === 'completed' ? 'bg-brand-completed/20 text-brand-completed' : 
+                                selectedTrip.status === 'in_progress' ? 'bg-brand-inProgress/20 text-brand-inProgress' : 
+                                selectedTrip.status === 'cancelled' ? 'bg-brand-cancelled/20 text-brand-cancelled' : 
+                                selectedTrip.status === 'upcoming' ? 'bg-brand-upcoming/20 text-brand-upcoming' : 
+                                'bg-brand-pending/20 text-brand-pending'}`}>
+                              {selectedTrip.status.replace('_', ' ')}
+                            </span>
+                          </div>
+                          <dl className="grid grid-cols-1 gap-x-4 gap-y-4">
+                            <div>
+                              <dt className="text-sm font-medium opacity-70">Pickup Time</dt>
+                              <dd className="mt-1 text-sm">{formatTime(selectedTrip.pickup_time)}</dd>
+                            </div>
+                            
+                            {selectedTrip.return_pickup_time && (
+                              <div>
+                                <dt className="text-sm font-medium opacity-70">Return Pickup Time</dt>
+                                <dd className="mt-1 text-sm">{formatTime(selectedTrip.return_pickup_time)}</dd>
+                              </div>
+                            )}
+                            
+                            <div>
+                              <dt className="text-sm font-medium opacity-70">Route</dt>
+                              <dd className="mt-1 text-sm">
+                                <div className="flex items-center mb-2">
+                                  <span className="h-2 w-2 rounded-full bg-brand-completed inline-block mr-2 flex-shrink-0"></span>
+                                  <span>{selectedTrip.pickup_location}</span>
+                                </div>
+                                <div className="flex items-center">
+                                  <span className="h-2 w-2 rounded-full bg-brand-cancelled inline-block mr-2 flex-shrink-0"></span>
+                                  <span>{selectedTrip.dropoff_location}</span>
+                                </div>
+                              </dd>
+                            </div>
+                            
+                            <div>
+                              <dt className="text-sm font-medium opacity-70">Estimated Duration</dt>
+                              <dd className="mt-1 text-sm">{selectedTrip.estimated_duration || 30} minutes</dd>
+                            </div>
+                            
+                            {selectedTrip.special_requirements && (
+                              <div>
+                                <dt className="text-sm font-medium opacity-70">Special Requirements</dt>
+                                <dd className="mt-1 text-sm">{selectedTrip.special_requirements}</dd>
+                              </div>
+                            )}
+                            
+                            {selectedTrip.notes && (
+                              <div>
+                                <dt className="text-sm font-medium opacity-70">Notes</dt>
+                                <dd className="mt-1 text-sm">{selectedTrip.notes}</dd>
+                              </div>
+                            )}
+                          </dl>
+                        </div>
+                      </div>
+                      
+                      {/* Client and driver information - right column */}
+                      <div>
+                        {/* Client information */}
+                        <div className="mb-6">
+                          <h4 className="text-md font-medium mb-3">Client Information</h4>
+                          {selectedTrip.client_name ? (
+                            <dl className="space-y-2">
+                              <div>
+                                <dt className="text-sm font-medium opacity-70">Name</dt>
+                                <dd className="mt-1 text-sm">
+                                  {selectedTrip.client_name}
+                                </dd>
+                              </div>
+                              {selectedTrip.phone_number && (
+                                <div>
+                                  <dt className="text-sm font-medium opacity-70">Phone</dt>
+                                  <dd className="mt-1 text-sm">{selectedTrip.phone_number}</dd>
+                                </div>
+                              )}
+                              {selectedTrip.user_id && (
+                                <div>
+                                  <dt className="text-sm font-medium opacity-70">User ID</dt>
+                                  <dd className="mt-1 text-sm text-xs opacity-60">{selectedTrip.user_id.substring(0, 8)}...</dd>
+                                </div>
+                              )}
+                            </dl>
+                          ) : (
+                            <p className="text-sm opacity-70">Client information not available</p>
+                          )}
+                        </div>
+                        
+                        {/* Driver information */}
+                        <div>
+                          <h4 className="text-md font-medium mb-3">Driver Information</h4>
+                          {selectedTrip.driver_name ? (
+                            <dl className="space-y-2">
+                              <div>
+                                <dt className="text-sm font-medium opacity-70">Name</dt>
+                                <dd className="mt-1 text-sm">
+                                  {selectedTrip.driver_name}
+                                </dd>
+                              </div>
+                              {selectedTrip.driver_phone && (
+                                <div>
+                                  <dt className="text-sm font-medium opacity-70">Phone</dt>
+                                  <dd className="mt-1 text-sm">{selectedTrip.driver_phone}</dd>
+                                </div>
+                              )}
+                            </dl>
+                          ) : (
+                            <p className="text-sm opacity-70">No driver assigned to this trip</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="px-6 py-4 bg-brand-border/10 flex justify-between items-center">
+                    <button
+                      onClick={() => {
+                        closeModal();
+                        router.push(`/trips/${selectedTrip.id}`);
+                      }}
+                      className="text-sm text-brand-accent hover:underline"
+                    >
+                      View Full Details
+                    </button>
+                    <button
+                      onClick={closeModal}
+                      className="px-4 py-2 text-sm font-medium rounded-md bg-brand-accent text-white hover:opacity-90"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

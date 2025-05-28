@@ -34,6 +34,7 @@ export function NewTripForm({ user, userProfile, clients }) {
     phoneNumber: '',
     address: '',
     notes: '',
+    veteran: false,
     submitted: false
   });
   const [creatingClient, setCreatingClient] = useState(false);
@@ -48,8 +49,12 @@ export function NewTripForm({ user, userProfile, clients }) {
     holidaySurcharge: 0,
     roundTripPrice: 0,
     wheelchairPrice: 0,
+    veteranDiscount: 0,
     totalPrice: 50
   });
+  
+  // State for client details
+  const [clientDetails, setClientDetails] = useState(null);
   
   // Refs for the address input fields
   const pickupInputRef = useRef(null);
@@ -64,13 +69,41 @@ export function NewTripForm({ user, userProfile, clients }) {
     const newValue = type === 'checkbox' ? checked : value;
     setFormData(prev => {
       const updatedData = { ...prev, [name]: newValue };
+      
+      // If client_id changed, fetch client details
+      if (name === 'client_id' && newValue) {
+        fetchClientDetails(newValue);
+      }
+      
       calculatePrice(updatedData);
       return updatedData;
     });
   };
   
+  // Fetch client details including veteran status
+  const fetchClientDetails = async (clientId) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('metadata')
+        .eq('id', clientId)
+        .single();
+        
+      if (error) {
+        console.error('Error fetching client details:', error);
+        return;
+      }
+      
+      setClientDetails(data);
+      // Recalculate price with new client details
+      calculatePrice(formData, data);
+    } catch (error) {
+      console.error('Error in client fetch:', error);
+    }
+  };
+  
   // Calculate price based on form data
-  const calculatePrice = async (data = formData) => {
+  const calculatePrice = async (data = formData, client = clientDetails) => {
     let newPriceInfo = {
       basePrice: 50,
       distance: 0,
@@ -100,13 +133,19 @@ export function NewTripForm({ user, userProfile, clients }) {
       
       // Weekend surcharge
       const day = pickupDate.getDay();
+      const hour = pickupDate.getHours();
+      
       if (day === 0 || day === 6) {
-        newPriceInfo.weekendSurcharge = 40;
+        // Higher rate for weekend nights (after 8pm)
+        if (hour >= 20 || hour < 8) {
+          newPriceInfo.weekendSurcharge = 80; // Weekend night rate
+        } else {
+          newPriceInfo.weekendSurcharge = 40; // Regular weekend rate
+        }
       }
       
-      // Hour surcharge
-      const hour = pickupDate.getHours();
-      if (hour <= 8 || hour >= 20) {
+      // Hour surcharge - only apply if not a weekend
+      if ((hour < 8 || hour >= 20) && day !== 0 && day !== 6) {
         newPriceInfo.hourSurcharge = 40;
       }
       
@@ -168,14 +207,14 @@ export function NewTripForm({ user, userProfile, clients }) {
           newPriceInfo.distance = roundedDistance;
           // For round trips, double the distance for price calculation
           const effectiveDistance = data.round_trip ? roundedDistance * 2 : roundedDistance;
-          newPriceInfo.distancePrice = Math.round(effectiveDistance * 3); // $3 per mile
+          newPriceInfo.distancePrice = effectiveDistance * 3; // $3 per mile
         } else {
           console.warn('Distance calculation returned non-OK status:', response.rows[0].elements[0].status);
           // Fallback to estimate
           newPriceInfo.distance = 15; // miles, placeholder
           // For round trips, double the distance for price calculation
           const effectiveDistance = data.round_trip ? newPriceInfo.distance * 2 : newPriceInfo.distance;
-          newPriceInfo.distancePrice = Math.round(effectiveDistance * 3);
+          newPriceInfo.distancePrice = effectiveDistance * 3;
         }
       } catch (error) {
         console.error('Error calculating distance:', error);
@@ -183,8 +222,25 @@ export function NewTripForm({ user, userProfile, clients }) {
         newPriceInfo.distance = 15; // miles, placeholder
         // For round trips, double the distance for price calculation
         const effectiveDistance = data.round_trip ? newPriceInfo.distance * 2 : newPriceInfo.distance;
-        newPriceInfo.distancePrice = Math.round(effectiveDistance * 3);
+        newPriceInfo.distancePrice = effectiveDistance * 3;
       }
+    }
+    
+    // Apply veteran discount if applicable
+    newPriceInfo.veteranDiscount = 0; // Reset discount
+    const isVeteran = client?.metadata?.veteran || false;
+    
+    if (isVeteran) {
+      // Calculate subtotal before discount
+      const subtotal = newPriceInfo.basePrice + 
+                       newPriceInfo.distancePrice + 
+                       newPriceInfo.weekendSurcharge + 
+                       newPriceInfo.hourSurcharge + 
+                       newPriceInfo.holidaySurcharge +
+                       newPriceInfo.wheelchairPrice;
+      
+      // Apply 20% veteran discount
+      newPriceInfo.veteranDiscount = -(subtotal * 0.2); // Negative value to represent discount
     }
     
     // Calculate total price
@@ -193,7 +249,8 @@ export function NewTripForm({ user, userProfile, clients }) {
                              newPriceInfo.weekendSurcharge + 
                              newPriceInfo.hourSurcharge + 
                              newPriceInfo.holidaySurcharge +
-                             newPriceInfo.wheelchairPrice;
+                             newPriceInfo.wheelchairPrice +
+                             newPriceInfo.veteranDiscount;
     
     setPriceInfo(newPriceInfo);
   };
@@ -237,7 +294,9 @@ export function NewTripForm({ user, userProfile, clients }) {
     formData.round_trip, 
     formData.wheelchair_required,
     formData.pickup_address,
-    formData.destination_address
+    formData.destination_address,
+    formData.client_id,
+    clientDetails
   ]);
   
   // Fetch driver information if driver_id is provided
@@ -361,6 +420,7 @@ export function NewTripForm({ user, userProfile, clients }) {
         phone_number: newClientFormData.phoneNumber,
         address: newClientFormData.address,
         notes: newClientFormData.notes,
+        metadata: { veteran: newClientFormData.veteran }
       };
       
       // Call the API to create the user and profile
@@ -640,6 +700,7 @@ export function NewTripForm({ user, userProfile, clients }) {
                           phoneNumber: '',
                           address: '',
                           notes: '',
+                          veteran: false,
                           submitted: false
                         });
                       }
@@ -744,6 +805,19 @@ export function NewTripForm({ user, userProfile, clients }) {
                         placeholder="Special needs, preferences, etc."
                         className="w-full p-2 border border-brand-border rounded-md bg-brand-background"
                       />
+                    </div>
+                    
+                    <div>
+                      <label className="flex items-center space-x-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          name="veteran"
+                          checked={newClientFormData.veteran}
+                          onChange={(e) => setNewClientFormData(prev => ({ ...prev, veteran: e.target.checked }))}
+                          className="rounded border-brand-border text-brand-accent focus:ring-brand-accent"
+                        />
+                        <span className="text-sm font-medium">Veteran (eligible for 20% discount)</span>
+                      </label>
                     </div>
                     
                     <div className="flex justify-end">
@@ -942,7 +1016,9 @@ export function NewTripForm({ user, userProfile, clients }) {
                 
                 {priceInfo.weekendSurcharge > 0 && (
                   <div className="flex justify-between">
-                    <span>Weekend surcharge:</span>
+                    <span>
+                      {priceInfo.weekendSurcharge === 80 ? 'Weekend night surcharge:' : 'Weekend surcharge:'}
+                    </span>
                     <span>${priceInfo.weekendSurcharge.toFixed(2)}</span>
                   </div>
                 )}
@@ -965,6 +1041,13 @@ export function NewTripForm({ user, userProfile, clients }) {
                   <div className="flex justify-between">
                     <span>Wheelchair accessible vehicle:</span>
                     <span>${priceInfo.wheelchairPrice.toFixed(2)}</span>
+                  </div>
+                )}
+                
+                {priceInfo.veteranDiscount < 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Veteran discount (20%):</span>
+                    <span>${priceInfo.veteranDiscount.toFixed(2)}</span>
                   </div>
                 )}
                 

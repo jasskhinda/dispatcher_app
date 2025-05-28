@@ -106,10 +106,17 @@ export default async function CalendarPage() {
             if (!clientName) {
                 clientName = trip.user_id ? `Client ${trip.user_id.substring(0, 4)}` : 'Unknown Client';
             }
+            
+            // Use driver_name from the trip if available
+            let driverName = trip.driver_name || null;
                 
             return {
                 ...trip,
-                client_name: clientName
+                // Map database fields to what the UI expects
+                pickup_location: trip.pickup_address || trip.pickup_location,
+                dropoff_location: trip.destination_address || trip.dropoff_location,
+                client_name: clientName,
+                driver_name: driverName
             };
         });
 
