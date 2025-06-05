@@ -1,11 +1,84 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 export default function TripDetailsClient({ trip, user }) {
   const router = useRouter();
+  const supabase = createClientComponentClient();
   const [error, setError] = useState('');
+  const [showDriverSelect, setShowDriverSelect] = useState(false);
+  const [selectedDriverId, setSelectedDriverId] = useState(trip.driver_id || '');
+  const [drivers, setDrivers] = useState([]);
+  const [updating, setUpdating] = useState(false);
+
+  // Fetch available drivers on mount
+  useEffect(() => {
+    const fetchDrivers = async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .eq('role', 'driver')
+        .order('first_name');
+      
+      if (!error && data) {
+        setDrivers(data);
+      }
+    };
+    
+    fetchDrivers();
+  }, [supabase]);
+
+  // Handle driver assignment
+  const handleAssignDriver = async () => {
+    setUpdating(true);
+    setError('');
+    
+    try {
+      let updateData = {};
+      
+      if (selectedDriverId) {
+        // Get driver's name
+        const selectedDriver = drivers.find(d => d.id === selectedDriverId);
+        const driverName = selectedDriver 
+          ? `${selectedDriver.first_name || ''} ${selectedDriver.last_name || ''}`.trim() 
+          : '';
+        
+        updateData = {
+          driver_id: selectedDriverId,
+          driver_name: driverName,
+          status: trip.status === 'pending' ? 'upcoming' : trip.status
+        };
+      } else {
+        // Remove driver assignment
+        updateData = {
+          driver_id: null,
+          driver_name: null,
+          status: trip.status === 'upcoming' ? 'pending' : trip.status
+        };
+      }
+      
+      // Update trip
+      const { error: updateError } = await supabase
+        .from('trips')
+        .update(updateData)
+        .eq('id', trip.id);
+      
+      if (updateError) {
+        throw updateError;
+      }
+      
+      // Refresh the page to show updated data
+      router.refresh();
+      setShowDriverSelect(false);
+    } catch (err) {
+      console.error('Error updating driver assignment:', err);
+      setError('Failed to update driver assignment. Please try again.');
+    } finally {
+      setUpdating(false);
+    }
+  };
 
   // Format time for display
   const formatTime = (timeStr) => {
@@ -174,16 +247,77 @@ export default function TripDetailsClient({ trip, user }) {
                           <dd className="mt-1 text-sm">{trip.driver_phone}</dd>
                         </div>
                       )}
+                      <div className="mt-4">
+                        <button
+                          onClick={() => setShowDriverSelect(!showDriverSelect)}
+                          className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md bg-brand-border/20 hover:bg-brand-border/30"
+                        >
+                          Change Driver
+                        </button>
+                      </div>
                     </dl>
                   ) : (
                     <div>
                       <p className="text-sm opacity-70 mb-4">No driver assigned to this trip</p>
-                      <button
-                        onClick={() => router.push('/optimize')}
-                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-brand-accent hover:opacity-90"
+                      <div className="space-y-2">
+                        <button
+                          onClick={() => setShowDriverSelect(!showDriverSelect)}
+                          className="w-full inline-flex items-center justify-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-brand-accent hover:opacity-90"
+                        >
+                          Assign Driver
+                        </button>
+                        <button
+                          onClick={() => router.push('/optimize')}
+                          className="w-full inline-flex items-center justify-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md bg-brand-border/20 hover:bg-brand-border/30"
+                        >
+                          Bulk Optimize
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Driver selection UI */}
+                  {showDriverSelect && (
+                    <div className="mt-4 p-4 bg-brand-background rounded-md border border-brand-border">
+                      {error && (
+                        <div className="mb-3 p-2 bg-brand-cancelled/10 border border-brand-cancelled/20 rounded text-sm text-brand-cancelled">
+                          {error}
+                        </div>
+                      )}
+                      <select
+                        value={selectedDriverId}
+                        onChange={(e) => setSelectedDriverId(e.target.value)}
+                        className="w-full p-2 mb-3 border border-brand-border rounded-md bg-brand-background text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                        disabled={updating}
                       >
-                        Optimize Assignments
-                      </button>
+                        <option value="">
+                          {trip.driver_id ? 'Remove driver assignment' : 'Select a driver'}
+                        </option>
+                        {drivers.map(driver => (
+                          <option key={driver.id} value={driver.id}>
+                            {driver.first_name} {driver.last_name}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleAssignDriver}
+                          disabled={updating || (selectedDriverId === '' && !trip.driver_id)}
+                          className="flex-1 px-3 py-1.5 text-xs font-medium rounded-md text-white bg-brand-accent hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {updating ? 'Updating...' : 'Confirm'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowDriverSelect(false);
+                            setSelectedDriverId(trip.driver_id || '');
+                          }}
+                          disabled={updating}
+                          className="flex-1 px-3 py-1.5 text-xs font-medium rounded-md bg-brand-border/20 hover:bg-brand-border/30"
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
