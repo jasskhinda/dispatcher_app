@@ -323,6 +323,30 @@ export default async function Dashboard() {
         />;
     } catch (error) {
         console.error('Error in dashboard page:', error);
-        redirect('/login?error=server_error');
+        console.error('Error details:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
+        
+        // For development/debugging, show the actual error instead of redirecting
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6">
+                    <h1 className="text-xl font-bold text-red-600 mb-4">Dashboard Error</h1>
+                    <p className="text-gray-700 mb-4">Something went wrong while loading the dashboard.</p>
+                    <details className="mb-4">
+                        <summary className="cursor-pointer text-blue-600">Error Details</summary>
+                        <pre className="mt-2 text-xs bg-gray-100 p-2 rounded overflow-auto">
+                            {error?.message || 'Unknown error'}
+                        </pre>
+                    </details>
+                    <div className="flex space-x-4">
+                        <a href="/login" className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                            Go to Login
+                        </a>
+                        <button onClick={() => window.location.reload()} className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">
+                            Try Again
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
     }
 }
