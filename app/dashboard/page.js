@@ -1,9 +1,9 @@
-import SimpleDashboard from './debug';
+import WorkingDashboard from './WorkingDashboard';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
 
-// Temporary debug version
+// Working dashboard version
 export default function Dashboard() {
-    return <SimpleDashboard />;
+    return <WorkingDashboard />;
 }
