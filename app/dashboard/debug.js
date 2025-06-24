@@ -15,7 +15,12 @@ export default function SimpleDashboard() {
     async function checkUser() {
         try {
             console.log('Checking user session...');
+            console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
+            console.log('Has Anon Key:', !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+            
             const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            
+            console.log('Session result:', { session: !!session, error: sessionError });
             
             if (sessionError) {
                 console.error('Session error:', sessionError);
@@ -25,8 +30,9 @@ export default function SimpleDashboard() {
             }
 
             if (!session) {
-                console.log('No session found, redirecting to login');
-                window.location.href = '/login';
+                console.log('No session found');
+                setError('No authentication session found. Please log in.');
+                setLoading(false);
                 return;
             }
 
