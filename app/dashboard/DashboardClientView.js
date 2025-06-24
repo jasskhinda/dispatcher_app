@@ -69,25 +69,10 @@ export default function DashboardClientView({ user, userProfile, trips: initialT
       
       console.log('Trip approved successfully:', data);
       
-      // Update local state to reflect the change
-      const updatedTrips = trips.map(trip => 
-        trip.id === tripId ? { 
-          ...trip, 
-          status: 'upcoming',
-          driver_name: driverName,
-          vehicle: vehicle
-        } : trip
-      );
+      // Force a complete page refresh to ensure we get fresh data
+      alert('Trip approved successfully! Page will refresh to show updated status.');
+      window.location.reload();
       
-      setTrips(updatedTrips);
-      setFilteredTrips(
-        statusFilter === 'all' 
-          ? updatedTrips 
-          : updatedTrips.filter(trip => trip.status === statusFilter)
-      );
-      
-      console.log(`Trip ${tripId} approved and status updated to 'upcoming'`);
-      alert('Trip approved successfully!');
     } catch (error) {
       console.error('Error approving trip:', error);
       console.error('Error details:', JSON.stringify(error, null, 2));
@@ -123,24 +108,10 @@ export default function DashboardClientView({ user, userProfile, trips: initialT
       
       console.log('Trip rejected successfully:', data);
       
-      // Update local state to reflect the change
-      const updatedTrips = trips.map(trip => 
-        trip.id === tripId ? { 
-          ...trip, 
-          status: 'cancelled',
-          cancellation_reason: `Rejected by dispatcher: ${reason}`
-        } : trip
-      );
+      // Force a complete page refresh to ensure we get fresh data
+      alert('Trip rejected successfully! Page will refresh to show updated status.');
+      window.location.reload();
       
-      setTrips(updatedTrips);
-      setFilteredTrips(
-        statusFilter === 'all' 
-          ? updatedTrips 
-          : updatedTrips.filter(trip => trip.status === statusFilter)
-      );
-      
-      console.log(`Trip ${tripId} rejected and status updated to 'cancelled'`);
-      alert('Trip rejected successfully!');
     } catch (error) {
       console.error('Error rejecting trip:', error);
       console.error('Error details:', JSON.stringify(error, null, 2));
@@ -175,24 +146,10 @@ export default function DashboardClientView({ user, userProfile, trips: initialT
       
       console.log('Trip completed successfully:', data);
       
-      // Update local state to reflect the change
-      const updatedTrips = trips.map(trip => 
-        trip.id === tripId ? { 
-          ...trip, 
-          status: 'completed',
-          completed_at: new Date().toISOString()
-        } : trip
-      );
+      // Force a complete page refresh to ensure we get fresh data
+      alert('Trip marked as completed! Page will refresh to show updated status.');
+      window.location.reload();
       
-      setTrips(updatedTrips);
-      setFilteredTrips(
-        statusFilter === 'all' 
-          ? updatedTrips 
-          : updatedTrips.filter(trip => trip.status === statusFilter)
-      );
-      
-      console.log(`Trip ${tripId} completed and ready for billing`);
-      alert('Trip marked as completed! Ready for billing.');
     } catch (error) {
       console.error('Error completing trip:', error);
       console.error('Error details:', JSON.stringify(error, null, 2));
@@ -452,6 +409,9 @@ export default function DashboardClientView({ user, userProfile, trips: initialT
                         )}
                       </td>
                       <td className="px-2 py-3 whitespace-nowrap text-sm">
+                        {/* Debug: Show current trip status */}
+                        <div className="text-xs text-gray-500 mb-1">Status: {trip.status}</div>
+                        
                         {trip.status === 'pending' && (
                           <div className="flex space-x-2">
                             <button
@@ -478,6 +438,15 @@ export default function DashboardClientView({ user, userProfile, trips: initialT
                           >
                             {approving === trip.id ? 'Completing...' : 'Complete'}
                           </button>
+                        )}
+                        {trip.status === 'cancelled' && (
+                          <div className="text-red-600 text-xs">
+                            ❌ Rejected<br/>
+                            <span className="text-gray-500">{trip.cancellation_reason}</span>
+                          </div>
+                        )}
+                        {trip.status === 'completed' && (
+                          <div className="text-green-600 text-xs">✅ Completed</div>
                         )}
                         {trip.status === 'completed' && !trip.has_invoice && (
                           <button
