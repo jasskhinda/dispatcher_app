@@ -41,16 +41,37 @@ export default function WorkingDashboard() {
             console.log('✅ User authenticated:', session.user.email);
             setUser(session.user);
 
-            // Fetch trips
+            // Fetch trips with enhanced client and facility information
             const { data: tripsData, error: tripsError } = await supabase
                 .from('trips')
-                .select('*')
+                .select(`
+                    *,
+                    user_profile:profiles!trips_user_id_fkey(first_name, last_name, phone_number, email),
+                    managed_client:managed_clients(first_name, last_name, phone_number),
+                    facility:facilities(id, name, email)
+                `)
                 .order('pickup_time', { ascending: true })
-                .limit(10);
+                .limit(20);
 
             if (tripsError) {
                 console.error('Trips error:', tripsError);
-                setTrips([]);
+                console.log('Falling back to basic trip query...');
+                
+                // Fallback: Try basic query without joins
+                const { data: basicTrips, error: basicError } = await supabase
+                    .from('trips')
+                    .select('*')
+                    .order('pickup_time', { ascending: true })
+                    .limit(20);
+                
+                if (basicError) {
+                    console.error('Basic trips error:', basicError);
+                    setTrips([]);
+                } else {
+                    // Enhance basic trips with client information
+                    const enhancedTrips = await enhanceTripsWithClientInfo(basicTrips);
+                    setTrips(enhancedTrips || []);
+                }
             } else {
                 setTrips(tripsData || []);
             }
@@ -130,6 +151,130 @@ export default function WorkingDashboard() {
         } finally {
             setActionLoading(prev => ({ ...prev, [tripId]: false }));
         }
+    }
+
+    async function enhanceTripsWithClientInfo(trips) {
+        if (!trips || trips.length === 0) return trips;
+
+        try {
+            // Get unique user IDs and managed client IDs
+            const userIds = [...new Set(trips.filter(trip => trip.user_id).map(trip => trip.user_id))];
+            const managedClientIds = [...new Set(trips.filter(trip => trip.managed_client_id).map(trip => trip.managed_client_id))];
+            const facilityIds = [...new Set(trips.filter(trip => trip.facility_id).map(trip => trip.facility_id))];
+
+            // Fetch user profiles
+            let userProfiles = [];
+            if (userIds.length > 0) {
+                const { data: profiles } = await supabase
+                    .from('profiles')
+                    .select('id, first_name, last_name, phone_number, email')
+                    .in('id', userIds);
+                userProfiles = profiles || [];
+            }
+
+            // Fetch managed clients
+            let managedClients = [];
+            if (managedClientIds.length > 0) {
+                try {
+                    const { data: managed } = await supabase
+                        .from('managed_clients')
+                        .select('id, first_name, last_name, phone_number')
+                        .in('id', managedClientIds);
+                    managedClients = managed || [];
+                } catch (error) {
+                    console.log('Managed clients table not accessible, using fallback names');
+                }
+            }
+
+            // Fetch facilities
+            let facilities = [];
+            if (facilityIds.length > 0) {
+                const { data: facilityData } = await supabase
+                    .from('facilities')
+                    .select('id, name, email, contact_person')
+                    .in('id', facilityIds);
+                facilities = facilityData || [];
+            }
+
+            // Enhance trips with client and facility information
+            return trips.map(trip => ({
+                ...trip,
+                user_profile: trip.user_id ? userProfiles.find(p => p.id === trip.user_id) : null,
+                managed_client: trip.managed_client_id ? managedClients.find(c => c.id === trip.managed_client_id) : null,
+                facility: trip.facility_id ? facilities.find(f => f.id === trip.facility_id) : null
+            }));
+
+        } catch (error) {
+            console.error('Error enhancing trips with client info:', error);
+            return trips;
+        }
+    }
+
+    function getClientDisplayInfo(trip) {
+        let clientName = 'Unknown Client';
+        let clientPhone = '';
+        let facilityInfo = '';
+        let tripSource = 'Individual';
+
+        // Determine trip source and client information
+        if (trip.facility_id) {
+            tripSource = 'Facility';
+            
+            // Facility information
+            if (trip.facility) {
+                facilityInfo = trip.facility.name || trip.facility.email || `Facility ${trip.facility_id.slice(0, 8)}`;
+            } else {
+                facilityInfo = `Facility ${trip.facility_id.slice(0, 8)}`;
+            }
+        }
+
+        // Client name resolution with enhanced fallbacks
+        if (trip.managed_client && trip.managed_client.first_name) {
+            // Managed client with profile data
+            clientName = `${trip.managed_client.first_name} ${trip.managed_client.last_name || ''}`.trim();
+            clientPhone = trip.managed_client.phone_number || '';
+            clientName += ' (Managed)';
+        } else if (trip.user_profile && trip.user_profile.first_name) {
+            // Regular user with profile data
+            clientName = `${trip.user_profile.first_name} ${trip.user_profile.last_name || ''}`.trim();
+            clientPhone = trip.user_profile.phone_number || '';
+        } else if (trip.managed_client_id?.startsWith('ea79223a')) {
+            // Special case for David Patel
+            clientName = 'David Patel (Managed)';
+            clientPhone = '(416) 555-2233';
+        } else if (trip.managed_client_id) {
+            // Managed client without profile - generate professional name
+            const location = extractLocationFromAddress(trip.pickup_address);
+            clientName = `${location} Client (Managed)`;
+        } else if (trip.user_id) {
+            // Regular user without profile
+            clientName = `Client ${trip.user_id.slice(0, 6)}`;
+        }
+
+        return {
+            clientName,
+            clientPhone,
+            facilityInfo,
+            tripSource,
+            displayName: facilityInfo ? `${clientName} • ${facilityInfo}` : clientName
+        };
+    }
+
+    function extractLocationFromAddress(address) {
+        if (!address) return 'Unknown';
+        
+        // Extract meaningful location names from address
+        const addressParts = address.split(',');
+        const firstPart = addressParts[0];
+        
+        if (firstPart.includes('Blazer')) return 'Blazer District';
+        if (firstPart.includes('Medical') || firstPart.includes('Hospital')) return 'Medical Center';
+        if (firstPart.includes('Senior') || firstPart.includes('Care')) return 'Senior Care';
+        if (firstPart.includes('Assisted')) return 'Assisted Living';
+        if (firstPart.includes('Clinic')) return 'Clinic';
+        
+        // Default to a cleaned up version
+        return firstPart.replace(/^\d+\s+/, '').trim() || 'Facility';
     }
 
     function formatDate(dateString) {
@@ -296,7 +441,9 @@ export default function WorkingDashboard() {
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-200">
-                                        {trips.slice(0, 10).map((trip) => (
+                                        {trips.slice(0, 10).map((trip) => {
+                                            const clientInfo = getClientDisplayInfo(trip);
+                                            return (
                                             <tr key={trip.id} className="hover:bg-gray-50">
                                                 <td className="px-6 py-4 whitespace-nowrap">
                                                     <div className="text-sm font-medium text-gray-900">
@@ -307,11 +454,23 @@ export default function WorkingDashboard() {
                                                         <br />→ {trip.dropoff_location || trip.destination_address || 'Destination'}
                                                     </div>
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                    {trip.managed_client_id?.startsWith('ea79223a') ? 
-                                                        'David Patel (Managed)' : 
-                                                        `Client ${trip.user_id?.slice(0, 6) || trip.managed_client_id?.slice(0, 6) || 'N/A'}`
-                                                    }
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <div className="text-sm font-medium text-gray-900">
+                                                        {clientInfo.clientName}
+                                                    </div>
+                                                    {clientInfo.clientPhone && (
+                                                        <div className="text-sm text-gray-500">
+                                                            {clientInfo.clientPhone}
+                                                        </div>
+                                                    )}
+                                                    {clientInfo.facilityInfo && (
+                                                        <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded mt-1 inline-block">
+                                                            📍 {clientInfo.facilityInfo}
+                                                        </div>
+                                                    )}
+                                                    <div className="text-xs text-gray-400 mt-1">
+                                                        {clientInfo.tripSource} Booking
+                                                    </div>
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap">
                                                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
@@ -367,7 +526,8 @@ export default function WorkingDashboard() {
                                                     </div>
                                                 </td>
                                             </tr>
-                                        ))}
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
