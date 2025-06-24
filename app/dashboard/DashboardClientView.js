@@ -55,7 +55,10 @@ export default function DashboardClientView({ user, userProfile, trips: initialT
           status: 'upcoming',
           driver_name: driverName,
           vehicle: vehicle,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          approval_status: 'approved',
+          approved_by: user.id,
+          approved_at: new Date().toISOString()
         })
         .eq('id', tripId);
 
@@ -67,7 +70,8 @@ export default function DashboardClientView({ user, userProfile, trips: initialT
           ...trip, 
           status: 'upcoming',
           driver_name: driverName,
-          vehicle: vehicle
+          vehicle: vehicle,
+          approval_status: 'approved'
         } : trip
       );
       
@@ -77,8 +81,57 @@ export default function DashboardClientView({ user, userProfile, trips: initialT
           ? updatedTrips 
           : updatedTrips.filter(trip => trip.status === statusFilter)
       );
+      
+      console.log(`Trip ${tripId} approved and status updated to 'upcoming'`);
     } catch (error) {
       console.error('Error approving trip:', error);
+      alert('Failed to approve trip. Please try again.');
+    } finally {
+      setApproving(null);
+    }
+  };
+
+  const handleRejectTrip = async (tripId) => {
+    const reason = prompt('Please provide a reason for rejecting this trip:');
+    if (!reason) return; // User cancelled
+    
+    setApproving(tripId);
+    try {
+      const { error } = await supabase
+        .from('trips')
+        .update({ 
+          status: 'cancelled',
+          cancellation_reason: `Rejected by dispatcher: ${reason}`,
+          updated_at: new Date().toISOString(),
+          approval_status: 'rejected',
+          rejected_by: user.id,
+          rejected_at: new Date().toISOString()
+        })
+        .eq('id', tripId);
+
+      if (error) throw error;
+      
+      // Update local state to reflect the change
+      const updatedTrips = trips.map(trip => 
+        trip.id === tripId ? { 
+          ...trip, 
+          status: 'cancelled',
+          cancellation_reason: `Rejected by dispatcher: ${reason}`,
+          approval_status: 'rejected'
+        } : trip
+      );
+      
+      setTrips(updatedTrips);
+      setFilteredTrips(
+        statusFilter === 'all' 
+          ? updatedTrips 
+          : updatedTrips.filter(trip => trip.status === statusFilter)
+      );
+      
+      console.log(`Trip ${tripId} rejected and status updated to 'cancelled'`);
+    } catch (error) {
+      console.error('Error rejecting trip:', error);
+      alert('Failed to reject trip. Please try again.');
     } finally {
       setApproving(null);
     }
@@ -335,13 +388,22 @@ export default function DashboardClientView({ user, userProfile, trips: initialT
                       </td>
                       <td className="px-2 py-3 whitespace-nowrap text-sm">
                         {trip.status === 'pending' && (
-                          <button
-                            onClick={() => handleApproveTrip(trip.id)}
-                            disabled={approving === trip.id}
-                            className="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded bg-brand-accent text-brand-buttonText hover:opacity-90 transition-opacity focus:outline-none focus:ring-1 focus:ring-brand-accent disabled:opacity-50"
-                          >
-                            {approving === trip.id ? 'Approving...' : 'Approve'}
-                          </button>
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => handleApproveTrip(trip.id)}
+                              disabled={approving === trip.id}
+                              className="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded bg-brand-accent text-brand-buttonText hover:opacity-90 transition-opacity focus:outline-none focus:ring-1 focus:ring-brand-accent disabled:opacity-50"
+                            >
+                              {approving === trip.id ? 'Approving...' : 'Approve'}
+                            </button>
+                            <button
+                              onClick={() => handleRejectTrip(trip.id)}
+                              disabled={approving === trip.id}
+                              className="inline-flex items-center px-2 py-1 border border-red-300 text-xs font-medium rounded bg-red-50 text-red-700 hover:bg-red-100 transition-colors focus:outline-none focus:ring-1 focus:ring-red-500 disabled:opacity-50"
+                            >
+                              {approving === trip.id ? 'Processing...' : 'Reject'}
+                            </button>
+                          </div>
                         )}
                         {trip.status === 'completed' && !trip.has_invoice && (
                           <button

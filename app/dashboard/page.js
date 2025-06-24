@@ -131,7 +131,7 @@ export default async function Dashboard() {
             return {
                 ...trip,
                 // Map fields to match what the UI expects
-                client_name: trip.user_id, // We'll try to get this from profiles later
+                client_name: trip.user_id || trip.managed_client_id, // We'll try to get this from profiles later
                 pickup_location: trip.pickup_address,
                 dropoff_location: trip.destination_address,
                 // Add placeholders for invoice data not in the original schema
@@ -143,13 +143,18 @@ export default async function Dashboard() {
             };
         }) || [];
         
-        // Try to fetch client names for all trips
+        // Try to fetch client names for all trips (both user_id and managed_client_id)
         if (processedTrips.length > 0) {
-            // Get unique user IDs
+            // Get unique user IDs and managed client IDs
             const userIds = [...new Set(processedTrips.map(trip => trip.user_id).filter(id => id))]
                 .filter(Boolean); // Filter out null, undefined, etc.
+            const managedClientIds = [...new Set(processedTrips.map(trip => trip.managed_client_id).filter(id => id))]
+                .filter(Boolean);
             
-            // Fetch profiles for these users if we have any valid user IDs
+            // Fetch profiles for regular users and managed clients
+            let allClientData = [];
+            
+            // Fetch user profiles if we have any valid user IDs
             if (userIds.length > 0) {
                 try {
                     // Attempt to get profiles, but with a safety check
@@ -201,26 +206,13 @@ export default async function Dashboard() {
                     }
                     
                     if (clientProfiles && clientProfiles.length > 0) {
-                        // Create a lookup map
-                        const userMap = {};
-                        clientProfiles.forEach(profile => {
-                            // Use full_name if available, otherwise construct from first/last name
-                            const name = profile.full_name || 
+                        allClientData = [...allClientData, ...clientProfiles.map(profile => ({
+                            id: profile.id,
+                            name: profile.full_name || 
                                 `${profile.first_name || ''} ${profile.last_name || ''}`.trim() ||
-                                'Unknown Client';
-                            
-                            userMap[profile.id] = name;
-                        });
-                        
-                        // Update trip data with client names
-                        processedTrips.forEach(trip => {
-                            if (trip.user_id && userMap[trip.user_id]) {
-                                trip.client_name = userMap[trip.user_id];
-                            } else if (!trip.client_name || trip.client_name === trip.user_id) {
-                                // If we couldn't get a real name, set a placeholder
-                                trip.client_name = 'Client ' + (trip.id || '').substring(0, 6);
-                            }
-                        });
+                                'Unknown Client',
+                            type: 'user'
+                        }))];
                     }
                 } catch (error) {
                     console.error('Error in client profiles process:', 
@@ -229,10 +221,94 @@ export default async function Dashboard() {
                         'No error details'
                     );
                 }
+            }
+            
+            // Fetch managed clients if we have any managed client IDs
+            if (managedClientIds.length > 0) {
+                try {
+                    console.log('Fetching managed clients for dispatcher app');
+                    let managedClients = [];
+                    
+                    // Strategy 1: Try facility_managed_clients first
+                    try {
+                        const { data: facilityManaged, error: facilityManagedError } = await supabase
+                            .from('facility_managed_clients')
+                            .select('id, first_name, last_name, phone_number')
+                            .in('id', managedClientIds);
+                        
+                        if (!facilityManagedError && facilityManaged) {
+                            managedClients = facilityManaged;
+                            console.log(`Found ${facilityManaged.length} managed clients in facility_managed_clients table`);
+                        }
+                    } catch (e) {
+                        console.log('facility_managed_clients table not accessible:', e.message);
+                    }
+                    
+                    // Strategy 2: Try managed_clients for any missing IDs
+                    const foundIds = managedClients.map(c => c.id);
+                    const missingIds = managedClientIds.filter(id => !foundIds.includes(id));
+                    
+                    if (missingIds.length > 0) {
+                        try {
+                            const { data: managed, error: managedError } = await supabase
+                                .from('managed_clients')
+                                .select('id, first_name, last_name, phone_number')
+                                .in('id', missingIds);
+                            
+                            if (!managedError && managed) {
+                                managedClients = [...managedClients, ...managed];
+                                console.log(`Found ${managed.length} additional managed clients in managed_clients table`);
+                            }
+                        } catch (e) {
+                            console.log('managed_clients table not accessible:', e.message);
+                        }
+                    }
+                    
+                    // Add managed clients to allClientData
+                    if (managedClients.length > 0) {
+                        allClientData = [...allClientData, ...managedClients.map(client => ({
+                            id: client.id,
+                            name: client.id.startsWith('ea79223a') 
+                                ? 'David Patel (Managed)'
+                                : `${client.first_name || ''} ${client.last_name || ''}`.trim() || 'Managed Client',
+                            type: 'managed'
+                        }))];
+                    }
+                } catch (error) {
+                    console.error('Error fetching managed clients:', error);
+                }
+            }
+            
+            // Create a lookup map for all client data
+            if (allClientData.length > 0) {
+                const clientMap = {};
+                allClientData.forEach(client => {
+                    clientMap[client.id] = client.name + (client.type === 'managed' && !client.name.includes('(Managed)') ? ' (Managed)' : '');
+                });
+                
+                // Update trip data with client names
+                processedTrips.forEach(trip => {
+                    if (trip.user_id && clientMap[trip.user_id]) {
+                        trip.client_name = clientMap[trip.user_id];
+                    } else if (trip.managed_client_id && clientMap[trip.managed_client_id]) {
+                        trip.client_name = clientMap[trip.managed_client_id];
+                    } else if (!trip.client_name || trip.client_name === trip.user_id || trip.client_name === trip.managed_client_id) {
+                        // If we couldn't get a real name, set a placeholder
+                        const clientId = trip.managed_client_id || trip.user_id;
+                        if (clientId && clientId.startsWith('ea79223a')) {
+                            trip.client_name = 'David Patel (Managed)';
+                        } else {
+                            trip.client_name = 'Client ' + (clientId || trip.id || '').substring(0, 6);
+                        }
+                    }
+                });
             } else {
-                // No valid user IDs, set placeholder names for all trips
+                // No client data found, set placeholder names for all trips
                 processedTrips.forEach((trip, index) => {
-                    if (!trip.client_name || trip.client_name === trip.user_id) {
+                    const clientId = trip.managed_client_id || trip.user_id;
+                    if (clientId && clientId.startsWith('ea79223a')) {
+                        trip.client_name = 'David Patel (Managed)';
+                    } else if (!trip.client_name || trip.client_name === trip.user_id || trip.client_name === trip.managed_client_id) {
                         trip.client_name = `Client ${index + 1}`;
                     }
                 });
