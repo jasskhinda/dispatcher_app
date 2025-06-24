@@ -3,6 +3,9 @@ import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import TripDetailsClient from './TripDetailsClient';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 // This is a Server Component
 export default async function TripDetailsPage({ params }) {
   try {

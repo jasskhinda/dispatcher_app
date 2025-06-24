@@ -3,6 +3,9 @@ import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import DashboardClientView from './DashboardClientView';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 // This is a Server Component
 export default async function Dashboard() {
     console.log('Dashboard server component executing');
@@ -341,9 +344,9 @@ export default async function Dashboard() {
                         <a href="/login" className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
                             Go to Login
                         </a>
-                        <button onClick={() => window.location.reload()} className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">
+                        <a href="/dashboard" className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">
                             Try Again
-                        </button>
+                        </a>
                     </div>
                 </div>
             </div>

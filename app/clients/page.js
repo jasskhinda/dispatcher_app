@@ -2,6 +2,9 @@ import { redirect } from 'next/navigation';
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 // This is a Server Component
 export default async function ClientsPage() {
     console.log('Clients page server component executing');
