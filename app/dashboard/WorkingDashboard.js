@@ -189,6 +189,57 @@ export default function WorkingDashboard() {
         }
     }
 
+    async function handleCreateInvoice(trip) {
+        try {
+            setActionLoading(prev => ({ ...prev, [trip.id]: true }));
+            setActionMessage('');
+
+            // Get client info for invoice
+            const clientInfo = getClientDisplayInfo(trip);
+            
+            // Calculate amount based on trip price
+            const amount = parseFloat(trip.price || 0);
+            
+            if (amount <= 0) {
+                throw new Error('Trip must have a valid price to create invoice');
+            }
+
+            // Create invoice via API
+            const response = await fetch('/api/invoices', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    user_id: trip.user_id,
+                    trip_id: trip.id,
+                    amount: amount,
+                    description: `Transportation service: ${trip.pickup_address} → ${trip.destination_address}`,
+                    notes: `Created by dispatcher for completed trip on ${new Date(trip.pickup_time).toLocaleDateString()}`
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to create invoice');
+            }
+
+            const { invoice } = await response.json();
+            
+            setActionMessage(`✅ Invoice ${invoice.invoice_number} created successfully! Amount: $${amount.toFixed(2)}`);
+            
+            // Clear message after 5 seconds
+            setTimeout(() => setActionMessage(''), 5000);
+
+        } catch (err) {
+            console.error('Error creating invoice:', err);
+            setActionMessage(`❌ Invoice creation failed: ${err.message}`);
+            setTimeout(() => setActionMessage(''), 5000);
+        } finally {
+            setActionLoading(prev => ({ ...prev, [trip.id]: false }));
+        }
+    }
+
     async function enhanceTripsWithClientInfo(trips) {
         if (!trips || trips.length === 0) return trips;
 
@@ -465,6 +516,43 @@ export default function WorkingDashboard() {
                     </p>
                 </div>
 
+                {/* Dashboard Header with Navigation */}
+                <div className="bg-white rounded-lg shadow p-6 mb-8">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h1 className="text-3xl font-bold text-gray-900">Dispatcher Dashboard</h1>
+                            <p className="mt-2 text-gray-600">
+                                Manage trips, create invoices, and oversee facility billings
+                            </p>
+                        </div>
+                        <div className="flex items-center space-x-4">
+                            <span className="text-sm text-gray-500">
+                                Welcome, Dispatcher
+                            </span>
+                            <div className="flex space-x-2">
+                                <a 
+                                    href="/billing" 
+                                    className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors text-sm"
+                                >
+                                    💰 Billing Overview
+                                </a>
+                                <a 
+                                    href="/invoices" 
+                                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors text-sm"
+                                >
+                                    📄 Manage Invoices
+                                </a>
+                                <button
+                                    onClick={handleSignOut}
+                                    className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors text-sm"
+                                >
+                                    Sign Out
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 {/* Dashboard Stats */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                     <div className="bg-white rounded-lg shadow p-6">
@@ -675,8 +763,12 @@ export default function WorkingDashboard() {
                                                             </button>
                                                         )}
                                                         {trip.status === 'completed' && (
-                                                            <button className="text-purple-600 hover:text-purple-900 bg-purple-50 hover:bg-purple-100 px-3 py-1 rounded text-xs">
-                                                                Create Invoice
+                                                            <button 
+                                                                onClick={() => handleCreateInvoice(trip)}
+                                                                disabled={actionLoading[trip.id]}
+                                                                className="text-purple-600 hover:text-purple-900 bg-purple-50 hover:bg-purple-100 px-3 py-1 rounded text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                                            >
+                                                                {actionLoading[trip.id] ? 'Creating...' : 'Create Invoice'}
                                                             </button>
                                                         )}
                                                         {trip.status === 'cancelled' && (

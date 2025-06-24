@@ -85,9 +85,39 @@ export default async function InvoicesPage() {
             };
         }));
 
-        const InvoicesView = require('./InvoicesView').default;
+        const InvoicesDashboard = require('./InvoicesDashboard').default;
         
-        return <InvoicesView user={session.user} userProfile={userProfile} invoices={invoicesWithClients} />;
+        return (
+            <div className="min-h-screen bg-gray-50">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                    {/* Header */}
+                    <div className="mb-8">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h1 className="text-3xl font-bold text-gray-900">Invoice Management</h1>
+                                <p className="mt-2 text-gray-600">
+                                    Manage invoices for completed trips and facility billings
+                                </p>
+                            </div>
+                            <div className="flex items-center space-x-4">
+                                <span className="text-sm text-gray-500">
+                                    Welcome, {userProfile.first_name} {userProfile.last_name}
+                                </span>
+                                <a 
+                                    href="/dashboard" 
+                                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+                                >
+                                    ← Back to Dashboard
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Invoice Dashboard Component */}
+                    <InvoicesDashboard user={session.user} />
+                </div>
+            </div>
+        );
     } catch (error) {
         console.error('Error in invoices page:', error);
         redirect('/login?error=server_error');
