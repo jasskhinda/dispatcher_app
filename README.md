@@ -1,5 +1,8 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
+**🚀 Auto-Deployment Test - June 24, 2025 - IMMEDIATE TEST**
+**⏰ Testing at: 12:30 PM - This should trigger auto-deployment!**
+
 ## Getting Started
 
 Before starting the app, create a `.env.local` file with the required environment variables:

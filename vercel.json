@@ -1,21 +1,4 @@
 {
   "version": 2,
-  "name": "cct-dispatcher-app",
-  "builds": [
-    {
-      "src": "next.config.mjs",
-      "use": "@vercel/next"
-    }
-  ],
-  "env": {
-    "NEXT_PUBLIC_SUPABASE_URL": "@next_public_supabase_url",
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@next_public_supabase_anon_key",
-    "SUPABASE_SERVICE_ROLE_KEY": "@supabase_service_role_key",
-    "NEXT_PUBLIC_GOOGLE_MAPS_API_KEY": "@next_public_google_maps_api_key"
-  },
-  "functions": {
-    "app/**/*.js": {
-      "runtime": "@vercel/node"
-    }
-  }
+  "name": "cct-dispatcher-app"
 }
