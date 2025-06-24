@@ -8,10 +8,8 @@ const nextConfig = {
     // Disable TypeScript checking during build
     ignoreBuildErrors: true,
   },
-  // Set custom dev server port
-  devServer: {
-    port: 3000,
-  },
+  // Remove devServer as it's not a valid Next.js config option
+  // For custom port, use: next dev -p 3000
 };
 
 export default nextConfig;
