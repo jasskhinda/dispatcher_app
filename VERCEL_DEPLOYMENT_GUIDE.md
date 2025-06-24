@@ -36,7 +36,7 @@ Value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0
 Environment: Production, Preview, Development
 
 Variable Name: NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
-Value: AIzaSyDylwCsypHOs6T9e-JnTA7AoqOMrc3hbhE
+Value: AIzaSyBIQi8XIDFturI5zX1tNGxoQ4gvbk4G4iQ
 Environment: Production, Preview, Development
 ```
 
