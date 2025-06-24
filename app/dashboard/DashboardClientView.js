@@ -44,25 +44,30 @@ export default function DashboardClientView({ user, userProfile, trips: initialT
   const handleApproveTrip = async (tripId) => {
     setApproving(tripId);
     try {
+      console.log('Approving trip:', tripId);
+      
       // Find a driver to assign (in this example we'll use a placeholder)
       // In a real app, you'd have a driver selection feature
       const driverName = "Assigned Driver";
       const vehicle = "Standard Accessible Vehicle";
       
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('trips')
         .update({ 
           status: 'upcoming',
           driver_name: driverName,
           vehicle: vehicle,
-          updated_at: new Date().toISOString(),
-          approval_status: 'approved',
-          approved_by: user.id,
-          approved_at: new Date().toISOString()
+          updated_at: new Date().toISOString()
         })
-        .eq('id', tripId);
+        .eq('id', tripId)
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+      
+      console.log('Trip approved successfully:', data);
       
       // Update local state to reflect the change
       const updatedTrips = trips.map(trip => 
@@ -70,8 +75,7 @@ export default function DashboardClientView({ user, userProfile, trips: initialT
           ...trip, 
           status: 'upcoming',
           driver_name: driverName,
-          vehicle: vehicle,
-          approval_status: 'approved'
+          vehicle: vehicle
         } : trip
       );
       
@@ -83,9 +87,11 @@ export default function DashboardClientView({ user, userProfile, trips: initialT
       );
       
       console.log(`Trip ${tripId} approved and status updated to 'upcoming'`);
+      alert('Trip approved successfully!');
     } catch (error) {
       console.error('Error approving trip:', error);
-      alert('Failed to approve trip. Please try again.');
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      alert(`Failed to approve trip: ${error.message || 'Please try again.'}`);
     } finally {
       setApproving(null);
     }
@@ -97,27 +103,32 @@ export default function DashboardClientView({ user, userProfile, trips: initialT
     
     setApproving(tripId);
     try {
-      const { error } = await supabase
+      console.log('Rejecting trip:', tripId, 'with reason:', reason);
+      
+      // Simple update with only essential columns that should exist
+      const { data, error } = await supabase
         .from('trips')
         .update({ 
           status: 'cancelled',
           cancellation_reason: `Rejected by dispatcher: ${reason}`,
-          updated_at: new Date().toISOString(),
-          approval_status: 'rejected',
-          rejected_by: user.id,
-          rejected_at: new Date().toISOString()
+          updated_at: new Date().toISOString()
         })
-        .eq('id', tripId);
+        .eq('id', tripId)
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+      
+      console.log('Trip rejected successfully:', data);
       
       // Update local state to reflect the change
       const updatedTrips = trips.map(trip => 
         trip.id === tripId ? { 
           ...trip, 
           status: 'cancelled',
-          cancellation_reason: `Rejected by dispatcher: ${reason}`,
-          approval_status: 'rejected'
+          cancellation_reason: `Rejected by dispatcher: ${reason}`
         } : trip
       );
       
@@ -129,9 +140,11 @@ export default function DashboardClientView({ user, userProfile, trips: initialT
       );
       
       console.log(`Trip ${tripId} rejected and status updated to 'cancelled'`);
+      alert('Trip rejected successfully!');
     } catch (error) {
       console.error('Error rejecting trip:', error);
-      alert('Failed to reject trip. Please try again.');
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      alert(`Failed to reject trip: ${error.message || 'Please try again.'}`);
     } finally {
       setApproving(null);
     }
