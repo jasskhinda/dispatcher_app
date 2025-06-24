@@ -8,15 +8,32 @@ export default function WorkingDashboard() {
     const [loading, setLoading] = useState(true);
     const [user, setUser] = useState(null);
     const [trips, setTrips] = useState([]);
+    const [filteredTrips, setFilteredTrips] = useState([]);
     const [error, setError] = useState(null);
     const [actionLoading, setActionLoading] = useState({});
     const [actionMessage, setActionMessage] = useState('');
+    const [tripFilter, setTripFilter] = useState('all'); // 'all', 'facility', 'individual'
     const router = useRouter();
     const supabase = createClientComponentClient();
 
     useEffect(() => {
         getSession();
     }, []);
+
+    // Filter trips whenever trips or filter changes
+    useEffect(() => {
+        filterTrips();
+    }, [trips, tripFilter]);
+
+    function filterTrips() {
+        if (tripFilter === 'all') {
+            setFilteredTrips(trips);
+        } else if (tripFilter === 'facility') {
+            setFilteredTrips(trips.filter(trip => trip.facility_id));
+        } else if (tripFilter === 'individual') {
+            setFilteredTrips(trips.filter(trip => !trip.facility_id));
+        }
+    }
 
     async function getSession() {
         try {
@@ -48,7 +65,7 @@ export default function WorkingDashboard() {
                     *,
                     user_profile:profiles!trips_user_id_fkey(first_name, last_name, phone_number, email),
                     managed_client:managed_clients(first_name, last_name, phone_number),
-                    facility:facilities(id, name, email)
+                    facility:facilities(id, name, email, contact_email, phone_number, address, facility_type)
                 `)
                 .order('pickup_time', { ascending: true })
                 .limit(20);
@@ -191,7 +208,7 @@ export default function WorkingDashboard() {
             if (facilityIds.length > 0) {
                 const { data: facilityData } = await supabase
                     .from('facilities')
-                    .select('id, name, email, contact_person')
+                    .select('id, name, email, contact_email, phone_number, address, facility_type')
                     .in('id', facilityIds);
                 facilities = facilityData || [];
             }
@@ -214,47 +231,83 @@ export default function WorkingDashboard() {
         let clientName = 'Unknown Client';
         let clientPhone = '';
         let facilityInfo = '';
+        let facilityContact = '';
         let tripSource = 'Individual';
 
-        // Determine trip source and client information
+        console.log('Processing trip:', trip.id, {
+            facility_id: trip.facility_id,
+            user_id: trip.user_id,
+            managed_client_id: trip.managed_client_id,
+            user_profile: trip.user_profile,
+            managed_client: trip.managed_client,
+            facility: trip.facility
+        });
+
+        // Determine trip source and facility information first
         if (trip.facility_id) {
             tripSource = 'Facility';
             
-            // Facility information
             if (trip.facility) {
-                facilityInfo = trip.facility.name || trip.facility.email || `Facility ${trip.facility_id.slice(0, 8)}`;
+                // Professional facility display with multiple fallbacks
+                if (trip.facility.name) {
+                    facilityInfo = trip.facility.name;
+                } else if (trip.facility.contact_email) {
+                    facilityInfo = trip.facility.contact_email;
+                } else if (trip.facility.email) {
+                    facilityInfo = trip.facility.email;
+                } else {
+                    facilityInfo = `Facility ${trip.facility_id.slice(0, 8)}`;
+                }
+                
+                // Add facility contact information
+                if (trip.facility.phone_number) {
+                    facilityContact = trip.facility.phone_number;
+                } else if (trip.facility.contact_email) {
+                    facilityContact = trip.facility.contact_email;
+                } else if (trip.facility.email) {
+                    facilityContact = trip.facility.email;
+                }
             } else {
                 facilityInfo = `Facility ${trip.facility_id.slice(0, 8)}`;
             }
         }
 
-        // Client name resolution with enhanced fallbacks
-        if (trip.managed_client && trip.managed_client.first_name) {
-            // Managed client with profile data
-            clientName = `${trip.managed_client.first_name} ${trip.managed_client.last_name || ''}`.trim();
-            clientPhone = trip.managed_client.phone_number || '';
-            clientName += ' (Managed)';
-        } else if (trip.user_profile && trip.user_profile.first_name) {
-            // Regular user with profile data
-            clientName = `${trip.user_profile.first_name} ${trip.user_profile.last_name || ''}`.trim();
-            clientPhone = trip.user_profile.phone_number || '';
-        } else if (trip.managed_client_id?.startsWith('ea79223a')) {
-            // Special case for David Patel
-            clientName = 'David Patel (Managed)';
-            clientPhone = '(416) 555-2233';
-        } else if (trip.managed_client_id) {
-            // Managed client without profile - generate professional name
-            const location = extractLocationFromAddress(trip.pickup_address);
-            clientName = `${location} Client (Managed)`;
+        // Client name resolution with improved logic
+        if (trip.managed_client_id) {
+            // This is a managed client
+            if (trip.managed_client && trip.managed_client.first_name) {
+                clientName = `${trip.managed_client.first_name} ${trip.managed_client.last_name || ''}`.trim();
+                clientPhone = trip.managed_client.phone_number || '';
+                clientName += ' (Managed)';
+            } else if (trip.managed_client_id.startsWith('ea79223a')) {
+                // Special case for David Patel
+                clientName = 'David Patel (Managed)';
+                clientPhone = '(416) 555-2233';
+            } else {
+                // Managed client without profile data
+                const location = extractLocationFromAddress(trip.pickup_address);
+                clientName = `${location} Client (Managed)`;
+            }
         } else if (trip.user_id) {
-            // Regular user without profile
-            clientName = `Client ${trip.user_id.slice(0, 6)}`;
+            // Regular user booking
+            if (trip.user_profile && trip.user_profile.first_name) {
+                clientName = `${trip.user_profile.first_name} ${trip.user_profile.last_name || ''}`.trim();
+                clientPhone = trip.user_profile.phone_number || trip.user_profile.email || '';
+            } else {
+                // User without profile data - try to make it more descriptive
+                const location = extractLocationFromAddress(trip.pickup_address);
+                clientName = `${location} Client`;
+            }
+        } else if (trip.client_name) {
+            // Fallback to any client_name field that might exist
+            clientName = trip.client_name;
         }
 
         return {
             clientName,
             clientPhone,
             facilityInfo,
+            facilityContact,
             tripSource,
             displayName: facilityInfo ? `${clientName} • ${facilityInfo}` : clientName
         };
@@ -415,10 +468,29 @@ export default function WorkingDashboard() {
                 {/* Recent Trips with Actions */}
                 <div className="bg-white rounded-lg shadow">
                     <div className="px-6 py-4 border-b border-gray-200">
-                        <h2 className="text-lg font-semibold text-gray-900">Trip Management</h2>
+                        <div className="flex justify-between items-center">
+                            <h2 className="text-lg font-semibold text-gray-900">Trip Management</h2>
+                            
+                            {/* Trip Filter */}
+                            <div className="flex items-center space-x-4">
+                                <label className="text-sm font-medium text-gray-700">Filter by:</label>
+                                <select
+                                    value={tripFilter}
+                                    onChange={(e) => setTripFilter(e.target.value)}
+                                    className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                >
+                                    <option value="all">All Trips</option>
+                                    <option value="facility">Facility Bookings</option>
+                                    <option value="individual">Individual Bookings</option>
+                                </select>
+                                <div className="text-xs text-gray-500">
+                                    Showing {filteredTrips.length} of {trips.length} trips
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div className="p-6">
-                        {trips.length > 0 ? (
+                        {filteredTrips.length > 0 ? (
                             <div className="overflow-x-auto">
                                 <table className="min-w-full divide-y divide-gray-200">
                                     <thead className="bg-gray-50">
@@ -441,7 +513,7 @@ export default function WorkingDashboard() {
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-200">
-                                        {trips.slice(0, 10).map((trip) => {
+                                        {filteredTrips.slice(0, 10).map((trip) => {
                                             const clientInfo = getClientDisplayInfo(trip);
                                             return (
                                             <tr key={trip.id} className="hover:bg-gray-50">
@@ -455,21 +527,43 @@ export default function WorkingDashboard() {
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap">
-                                                    <div className="text-sm font-medium text-gray-900">
-                                                        {clientInfo.clientName}
-                                                    </div>
-                                                    {clientInfo.clientPhone && (
-                                                        <div className="text-sm text-gray-500">
-                                                            {clientInfo.clientPhone}
+                                                    {/* Client Information Section */}
+                                                    <div className="space-y-2">
+                                                        {/* Client Name */}
+                                                        <div className="text-sm font-medium text-gray-900">
+                                                            {clientInfo.clientName}
                                                         </div>
-                                                    )}
-                                                    {clientInfo.facilityInfo && (
-                                                        <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded mt-1 inline-block">
-                                                            📍 {clientInfo.facilityInfo}
-                                                        </div>
-                                                    )}
-                                                    <div className="text-xs text-gray-400 mt-1">
-                                                        {clientInfo.tripSource} Booking
+                                                        
+                                                        {/* Client Phone */}
+                                                        {clientInfo.clientPhone && (
+                                                            <div className="text-sm text-gray-500">
+                                                                📞 {clientInfo.clientPhone}
+                                                            </div>
+                                                        )}
+                                                        
+                                                        {/* Facility Information (for facility bookings) */}
+                                                        {clientInfo.facilityInfo && (
+                                                            <div className="bg-blue-50 p-2 rounded-md border-l-4 border-blue-400">
+                                                                <div className="text-xs font-semibold text-blue-800 uppercase tracking-wide mb-1">
+                                                                    {clientInfo.tripSource} Booking
+                                                                </div>
+                                                                <div className="text-sm font-medium text-blue-900">
+                                                                    🏥 {clientInfo.facilityInfo}
+                                                                </div>
+                                                                {clientInfo.facilityContact && (
+                                                                    <div className="text-xs text-blue-600 mt-1">
+                                                                        📧 {clientInfo.facilityContact}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                        
+                                                        {/* Individual Booking Indicator */}
+                                                        {!clientInfo.facilityInfo && (
+                                                            <div className="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded">
+                                                                👤 {clientInfo.tripSource} Booking
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap">
