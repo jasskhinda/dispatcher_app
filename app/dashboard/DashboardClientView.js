@@ -150,6 +150,58 @@ export default function DashboardClientView({ user, userProfile, trips: initialT
     }
   };
 
+  const handleCompleteTrip = async (tripId) => {
+    const confirmComplete = confirm('Mark this trip as completed? This will make it ready for billing.');
+    if (!confirmComplete) return; // User cancelled
+    
+    setApproving(tripId);
+    try {
+      console.log('Completing trip:', tripId);
+      
+      const { data, error } = await supabase
+        .from('trips')
+        .update({ 
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', tripId)
+        .select();
+
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+      
+      console.log('Trip completed successfully:', data);
+      
+      // Update local state to reflect the change
+      const updatedTrips = trips.map(trip => 
+        trip.id === tripId ? { 
+          ...trip, 
+          status: 'completed',
+          completed_at: new Date().toISOString()
+        } : trip
+      );
+      
+      setTrips(updatedTrips);
+      setFilteredTrips(
+        statusFilter === 'all' 
+          ? updatedTrips 
+          : updatedTrips.filter(trip => trip.status === statusFilter)
+      );
+      
+      console.log(`Trip ${tripId} completed and ready for billing`);
+      alert('Trip marked as completed! Ready for billing.');
+    } catch (error) {
+      console.error('Error completing trip:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      alert(`Failed to complete trip: ${error.message || 'Please try again.'}`);
+    } finally {
+      setApproving(null);
+    }
+  };
+
   return (
     <div className="min-h-screen">
       {/* Main content */}
@@ -417,6 +469,15 @@ export default function DashboardClientView({ user, userProfile, trips: initialT
                               {approving === trip.id ? 'Processing...' : 'Reject'}
                             </button>
                           </div>
+                        )}
+                        {trip.status === 'upcoming' && (
+                          <button
+                            onClick={() => handleCompleteTrip(trip.id)}
+                            disabled={approving === trip.id}
+                            className="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded bg-green-600 text-white hover:bg-green-700 transition-colors focus:outline-none focus:ring-1 focus:ring-green-500 disabled:opacity-50"
+                          >
+                            {approving === trip.id ? 'Completing...' : 'Complete'}
+                          </button>
                         )}
                         {trip.status === 'completed' && !trip.has_invoice && (
                           <button
