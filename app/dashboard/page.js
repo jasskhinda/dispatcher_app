@@ -1,14 +1,12 @@
-import { redirect } from 'next/navigation';
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
-import DashboardClientView from './DashboardClientView';
+import SimpleDashboard from './debug';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
 
-// This is a Server Component
-export default async function Dashboard() {
-    console.log('Dashboard server component executing');
+// Temporary debug version
+export default function Dashboard() {
+    return <SimpleDashboard />;
+}
     
     try {
         // Create server component client
