@@ -58,28 +58,28 @@ export default function WorkingDashboard() {
             console.log('✅ User authenticated:', session.user.email);
             setUser(session.user);
 
-            // Fetch trips with enhanced client and facility information
+            // Fetch trips with enhanced client and facility information - SHOW NEWEST FIRST
+            // Note: Using manual enhancement instead of joins due to potential FK constraints
             const { data: tripsData, error: tripsError } = await supabase
                 .from('trips')
                 .select(`
                     *,
                     user_profile:profiles!trips_user_id_fkey(first_name, last_name, phone_number, email),
-                    managed_client:managed_clients(first_name, last_name, phone_number),
                     facility:facilities(id, name, email, contact_email, phone_number, address, facility_type)
                 `)
-                .order('pickup_time', { ascending: true })
-                .limit(20);
+                .order('created_at', { ascending: false })
+                .limit(50);
 
             if (tripsError) {
                 console.error('Trips error:', tripsError);
                 console.log('Falling back to basic trip query...');
                 
-                // Fallback: Try basic query without joins
+                // Fallback: Try basic query without joins - SHOW NEWEST FIRST
                 const { data: basicTrips, error: basicError } = await supabase
                     .from('trips')
                     .select('*')
-                    .order('pickup_time', { ascending: true })
-                    .limit(20);
+                    .order('created_at', { ascending: false })
+                    .limit(50);
                 
                 if (basicError) {
                     console.error('Basic trips error:', basicError);
@@ -90,7 +90,26 @@ export default function WorkingDashboard() {
                     setTrips(enhancedTrips || []);
                 }
             } else {
-                setTrips(tripsData || []);
+                // Enhance trips with managed client information manually
+                const enhancedTrips = await enhanceTripsWithClientInfo(tripsData);
+                setTrips(enhancedTrips || []);
+                console.log(`✅ Loaded ${enhancedTrips?.length || 0} trips with enhanced client data`);
+                
+                // DEBUG: Show sample trip data structure
+                if (enhancedTrips && enhancedTrips.length > 0) {
+                    console.log('🔍 Sample trip data structure:', {
+                        sample_trip: {
+                            id: enhancedTrips[0].id,
+                            facility_id: enhancedTrips[0].facility_id,
+                            user_id: enhancedTrips[0].user_id,
+                            managed_client_id: enhancedTrips[0].managed_client_id,
+                            has_user_profile: !!enhancedTrips[0].user_profile,
+                            has_managed_client: !!enhancedTrips[0].managed_client,
+                            has_facility: !!enhancedTrips[0].facility,
+                            pickup_address: enhancedTrips[0].pickup_address?.substring(0, 50) + '...'
+                        }
+                    });
+                }
             }
 
             setLoading(false);
@@ -173,11 +192,20 @@ export default function WorkingDashboard() {
     async function enhanceTripsWithClientInfo(trips) {
         if (!trips || trips.length === 0) return trips;
 
+        console.log(`🔧 Enhancing ${trips.length} trips with client information...`);
+
         try {
             // Get unique user IDs and managed client IDs
             const userIds = [...new Set(trips.filter(trip => trip.user_id).map(trip => trip.user_id))];
             const managedClientIds = [...new Set(trips.filter(trip => trip.managed_client_id).map(trip => trip.managed_client_id))];
             const facilityIds = [...new Set(trips.filter(trip => trip.facility_id).map(trip => trip.facility_id))];
+
+            console.log('📊 Data analysis:', {
+                total_trips: trips.length,
+                user_trips: userIds.length,
+                managed_client_trips: managedClientIds.length,
+                facility_trips: facilityIds.length
+            });
 
             // Fetch user profiles
             let userProfiles = [];
@@ -187,19 +215,35 @@ export default function WorkingDashboard() {
                     .select('id, first_name, last_name, phone_number, email')
                     .in('id', userIds);
                 userProfiles = profiles || [];
+                console.log(`✅ Found ${userProfiles.length} user profiles`);
             }
 
             // Fetch managed clients
             let managedClients = [];
             if (managedClientIds.length > 0) {
                 try {
+                    // Try facility_managed_clients first (primary table for facility app)
                     const { data: managed } = await supabase
-                        .from('managed_clients')
-                        .select('id, first_name, last_name, phone_number')
+                        .from('facility_managed_clients')
+                        .select('id, first_name, last_name, phone_number, email')
                         .in('id', managedClientIds);
                     managedClients = managed || [];
+                    console.log(`✅ Found ${managedClients.length} managed clients in facility_managed_clients table`);
                 } catch (error) {
-                    console.log('Managed clients table not accessible, using fallback names');
+                    console.log('⚠️ facility_managed_clients table not accessible, trying managed_clients fallback...');
+                    
+                    // Fallback to legacy managed_clients table
+                    try {
+                        const { data: managed } = await supabase
+                            .from('managed_clients')
+                            .select('id, first_name, last_name, phone_number, email')
+                            .in('id', managedClientIds);
+                        managedClients = managed || [];
+                        console.log(`✅ Found ${managedClients.length} managed clients in managed_clients table`);
+                    } catch (fallbackError) {
+                        console.log('❌ Both managed client tables inaccessible, using enhanced fallbacks');
+                        managedClients = [];
+                    }
                 }
             }
 
@@ -234,13 +278,15 @@ export default function WorkingDashboard() {
         let facilityContact = '';
         let tripSource = 'Individual';
 
-        console.log('Processing trip:', trip.id, {
+        console.log('🔍 Processing trip for client resolution:', {
+            trip_id: trip.id,
             facility_id: trip.facility_id,
             user_id: trip.user_id,
             managed_client_id: trip.managed_client_id,
-            user_profile: trip.user_profile,
-            managed_client: trip.managed_client,
-            facility: trip.facility
+            has_user_profile: !!trip.user_profile,
+            has_managed_client: !!trip.managed_client,
+            has_facility: !!trip.facility,
+            pickup_address: trip.pickup_address?.substring(0, 50) + '...'
         });
 
         // Determine trip source and facility information first
@@ -272,31 +318,50 @@ export default function WorkingDashboard() {
             }
         }
 
-        // Client name resolution with improved logic
+        // Client name resolution with enhanced debugging and logic
         if (trip.managed_client_id) {
+            console.log('📋 Managed client trip detected:', {
+                managed_client_id: trip.managed_client_id,
+                has_managed_client_data: !!trip.managed_client,
+                managed_client_fields: trip.managed_client ? Object.keys(trip.managed_client) : 'none'
+            });
+            
             // This is a managed client
             if (trip.managed_client && trip.managed_client.first_name) {
                 clientName = `${trip.managed_client.first_name} ${trip.managed_client.last_name || ''}`.trim();
-                clientPhone = trip.managed_client.phone_number || '';
+                clientPhone = trip.managed_client.phone_number || trip.managed_client.email || '';
                 clientName += ' (Managed)';
+                console.log('✅ Managed client name resolved:', clientName);
             } else if (trip.managed_client_id.startsWith('ea79223a')) {
                 // Special case for David Patel
                 clientName = 'David Patel (Managed)';
                 clientPhone = '(416) 555-2233';
+                console.log('✅ Special case managed client resolved:', clientName);
             } else {
-                // Managed client without profile data
+                // Enhanced fallback for managed clients
                 const location = extractLocationFromAddress(trip.pickup_address);
-                clientName = `${location} Client (Managed)`;
+                const shortId = trip.managed_client_id.slice(0, 8);
+                clientName = `${location} Client (Managed) - ${shortId}`;
+                console.log('⚠️ Managed client fallback used:', clientName);
             }
         } else if (trip.user_id) {
+            console.log('👤 Individual user trip detected:', {
+                user_id: trip.user_id,
+                has_user_profile: !!trip.user_profile,
+                user_profile_fields: trip.user_profile ? Object.keys(trip.user_profile) : 'none'
+            });
+            
             // Regular user booking
             if (trip.user_profile && trip.user_profile.first_name) {
                 clientName = `${trip.user_profile.first_name} ${trip.user_profile.last_name || ''}`.trim();
                 clientPhone = trip.user_profile.phone_number || trip.user_profile.email || '';
+                console.log('✅ Individual user name resolved:', clientName);
             } else {
                 // User without profile data - try to make it more descriptive
                 const location = extractLocationFromAddress(trip.pickup_address);
-                clientName = `${location} Client`;
+                const shortId = trip.user_id.slice(0, 8);
+                clientName = `${location} Client - ${shortId}`;
+                console.log('⚠️ Individual user fallback used:', clientName);
             }
         } else if (trip.client_name) {
             // Fallback to any client_name field that might exist
