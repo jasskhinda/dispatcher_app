@@ -103,8 +103,20 @@ export default function SimpleDashboard() {
                 <div className="bg-white rounded-lg shadow-md p-6">
                     <h2 className="text-lg font-semibold mb-4">Environment Check</h2>
                     <div className="space-y-2 text-sm">
-                        <p><strong>Supabase URL:</strong> {process.env.NEXT_PUBLIC_SUPABASE_URL ? '✅ Set' : '❌ Missing'}</p>
+                        <p><strong>Supabase URL:</strong> {process.env.NEXT_PUBLIC_SUPABASE_URL || '❌ Missing'}</p>
                         <p><strong>Supabase Anon Key:</strong> {process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? '✅ Set' : '❌ Missing'}</p>
+                        <p><strong>Environment:</strong> {process.env.NODE_ENV}</p>
+                        <div className="mt-4 p-3 bg-gray-100 rounded">
+                            <p className="font-semibold mb-2">Authentication Test:</p>
+                            <p>• Environment variables: {(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) ? '✅ OK' : '❌ Missing'}</p>
+                            <p>• Supabase client: {typeof supabase === 'object' ? '✅ Created' : '❌ Failed'}</p>
+                            <p>• Current session: {user ? '✅ Authenticated' : '❌ Not logged in'}</p>
+                        </div>
+                        <div className="mt-4">
+                            <a href="/login" className="inline-block bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                                Go to Login Page
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
