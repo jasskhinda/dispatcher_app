@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/admin-supabase';
 
 export default function DashboardClientView({ user, userProfile, trips: initialTrips }) {
   const router = useRouter();
@@ -88,10 +89,33 @@ export default function DashboardClientView({ user, userProfile, trips: initialT
     
     setApproving(tripId);
     try {
-      console.log('Rejecting trip:', tripId, 'with reason:', reason);
+      console.log('🔄 Starting trip rejection process...');
+      console.log('Trip ID:', tripId);
+      console.log('Reason:', reason);
       
-      // Simple update with only essential columns that should exist
-      const { data, error } = await supabase
+      // Use admin client for guaranteed permissions
+      const adminSupabase = supabaseAdmin;
+      
+      // First, let's check the current status
+      const { data: currentTrip, error: fetchError } = await adminSupabase
+        .from('trips')
+        .select('id, status, cancellation_reason, updated_at')
+        .eq('id', tripId)
+        .single();
+      
+      if (fetchError) {
+        console.error('❌ Error fetching current trip:', fetchError);
+        throw new Error(`Failed to fetch trip: ${fetchError.message}`);
+      }
+      
+      console.log('📋 Current trip status:', currentTrip);
+      
+      if (currentTrip.status !== 'pending') {
+        throw new Error(`Trip is no longer pending (current status: ${currentTrip.status}). Please refresh the page.`);
+      }
+      
+      // Perform the rejection update
+      const { data, error } = await adminSupabase
         .from('trips')
         .update({ 
           status: 'cancelled',
@@ -102,19 +126,35 @@ export default function DashboardClientView({ user, userProfile, trips: initialT
         .select();
 
       if (error) {
-        console.error('Supabase error:', error);
-        throw error;
+        console.error('❌ Supabase update error:', error);
+        throw new Error(`Database update failed: ${error.message}`);
       }
       
-      console.log('Trip rejected successfully:', data);
+      console.log('✅ Trip rejection successful:', data);
       
-      // Force a complete page refresh to ensure we get fresh data
-      alert('Trip rejected successfully! Page will refresh to show updated status.');
+      // Verify the update worked
+      const { data: verifyTrip, error: verifyError } = await adminSupabase
+        .from('trips')
+        .select('id, status, cancellation_reason')
+        .eq('id', tripId)
+        .single();
+      
+      if (verifyError) {
+        console.warn('⚠️ Could not verify update:', verifyError);
+      } else {
+        console.log('🔍 Verification - Trip status after update:', verifyTrip);
+        
+        if (verifyTrip.status !== 'cancelled') {
+          throw new Error(`Update verification failed. Expected 'cancelled' but got '${verifyTrip.status}'`);
+        }
+      }
+      
+      // Success - force page refresh to show updated data
+      alert(`Trip rejected successfully! Status verified as 'cancelled'. Page will refresh.`);
       window.location.reload();
       
     } catch (error) {
-      console.error('Error rejecting trip:', error);
-      console.error('Error details:', JSON.stringify(error, null, 2));
+      console.error('❌ Error rejecting trip:', error);
       alert(`Failed to reject trip: ${error.message || 'Please try again.'}`);
     } finally {
       setApproving(null);
