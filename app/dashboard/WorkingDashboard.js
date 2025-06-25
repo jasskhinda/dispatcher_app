@@ -1048,10 +1048,10 @@ export default function WorkingDashboard() {
                                                         )}
                                                         {trip.status === 'completed' && (
                                                             <a
-                                                                href={`/invoice/${trip.id}`}
+                                                                href={trip.facility_id ? `/invoice/facility-monthly/${trip.facility_id}-${new Date(trip.pickup_time).getFullYear()}-${String(new Date(trip.pickup_time).getMonth() + 1).padStart(2, '0')}` : `/invoice/${trip.id}`}
                                                                 className="inline-flex items-center bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 shadow-sm"
                                                             >
-                                                                📄 Invoice Details
+                                                                📄 {trip.facility_id ? 'Monthly Invoice' : 'Invoice Details'}
                                                             </a>
                                                         )}
                                                         {trip.status === 'cancelled' && (
