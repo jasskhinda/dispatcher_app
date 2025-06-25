@@ -1083,7 +1083,7 @@ export default function WorkingDashboard() {
                 </div>
 
                 {/* Quick Actions */}
-                <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="mt-8 grid grid-cols-1 md:grid-cols-4 gap-6">
                     <div className="bg-white rounded-lg shadow p-6 text-center">
                         <div className="text-blue-500 text-4xl mb-3">📅</div>
                         <h3 className="text-lg font-semibold text-gray-900 mb-2">Calendar View</h3>
@@ -1099,6 +1099,15 @@ export default function WorkingDashboard() {
                         <p className="text-gray-600 text-sm mb-4">View and manage client information</p>
                         <a href="/clients" className="inline-block bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 text-sm">
                             View Clients
+                        </a>
+                    </div>
+
+                    <div className="bg-white rounded-lg shadow p-6 text-center">
+                        <div className="text-yellow-500 text-4xl mb-3">💳</div>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Facility Billing</h3>
+                        <p className="text-gray-600 text-sm mb-4">Manage monthly facility invoices and payments</p>
+                        <a href="/dashboard/facility-billing" className="inline-block bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 text-sm">
+                            Billing Dashboard
                         </a>
                     </div>
                     
