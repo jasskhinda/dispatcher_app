@@ -50,13 +50,12 @@ export default function FacilityTripsPage() {
         try {
             console.log('🔍 Fetching facility trips...');
             
-            // Fetch trips from facility app (has facility_id)
+            // Fetch trips from facility app (has facility_id) - without problematic joins
             const { data: tripsData, error: tripsError } = await supabase
                 .from('trips')
                 .select(`
                     *,
-                    facilities(id, name, address, contact_email, phone_number),
-                    managed_clients(id, first_name, last_name, facility_id)
+                    facilities(id, name, address, contact_email, phone_number)
                 `)
                 .not('facility_id', 'is', null)
                 .order('created_at', { ascending: false })
@@ -66,11 +65,63 @@ export default function FacilityTripsPage() {
 
             console.log(`✅ Found ${tripsData?.length || 0} facility trips`);
 
+            // Fetch client information separately (to avoid schema relationship issues)
+            let managedClients = [];
+            if (tripsData && tripsData.length > 0) {
+                const managedClientIds = [...new Set(tripsData.filter(trip => trip.managed_client_id).map(trip => trip.managed_client_id))];
+                
+                if (managedClientIds.length > 0) {
+                    console.log(`🔍 Fetching ${managedClientIds.length} managed clients separately...`);
+                    
+                    // Try managed_clients table first
+                    try {
+                        const { data: mc, error: mcError } = await supabase
+                            .from('managed_clients')
+                            .select('id, first_name, last_name, facility_id')
+                            .in('id', managedClientIds);
+                        
+                        if (!mcError && mc) {
+                            managedClients = mc;
+                            console.log(`   ✅ Fetched ${managedClients.length} managed clients`);
+                        }
+                    } catch (e) {
+                        console.log('   ⚠️ managed_clients table not accessible, trying facility_managed_clients...');
+                        
+                        // Fallback to facility_managed_clients table
+                        try {
+                            const { data: fmc, error: fmcError } = await supabase
+                                .from('facility_managed_clients')
+                                .select('id, first_name, last_name, facility_id')
+                                .in('id', managedClientIds);
+                            
+                            if (!fmcError && fmc) {
+                                managedClients = fmc;
+                                console.log(`   ✅ Fetched ${managedClients.length} managed clients from facility_managed_clients`);
+                            }
+                        } catch (e2) {
+                            console.log('   ⚠️ No client tables accessible');
+                        }
+                    }
+                }
+            }
+
+            // Enhance trips with client information
+            const enhancedTrips = tripsData?.map(trip => {
+                const enhancedTrip = { ...trip };
+                
+                // Add managed client if exists
+                if (trip.managed_client_id) {
+                    enhancedTrip.managed_clients = managedClients.find(client => client.id === trip.managed_client_id) || null;
+                }
+                
+                return enhancedTrip;
+            }) || [];
+
             // Get unique facilities for filter
-            const uniqueFacilities = [...new Set(tripsData?.map(trip => trip.facilities).filter(Boolean))];
+            const uniqueFacilities = [...new Set(enhancedTrips?.map(trip => trip.facilities).filter(Boolean))];
             setFacilities(uniqueFacilities);
 
-            setTrips(tripsData || []);
+            setTrips(enhancedTrips);
             setLoading(false);
 
         } catch (err) {
