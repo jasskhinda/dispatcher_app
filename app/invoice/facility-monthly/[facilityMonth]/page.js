@@ -527,42 +527,23 @@ export default function FacilityMonthlyInvoicePage() {
 
     return (
         <div className="min-h-screen bg-gray-50 print:bg-white">
-            {/* Header */}
+            {/* Compact Navigation Bar */}
             <div className="bg-white shadow-sm border-b no-print">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between items-center py-6">
+                    <div className="flex justify-between items-center py-3">
                         <div className="flex items-center space-x-4">
                             <a href="/dashboard" className="text-gray-400 hover:text-gray-600">
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                                 </svg>
                             </a>
-                            <div>
-                                <h1 className="text-2xl font-bold text-gray-900">
-                                    Monthly Invoice - {facilityInfo?.name}
-                                </h1>
-                                <p className="text-sm text-gray-500">
-                                    {getMonthDisplayName()} • {billableTrips.length} billable trips
-                                    <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
-                                        🏥 Facility Billing
-                                    </span>
-                                    {paymentStatus && (
-                                        <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${
-                                            paymentStatus.status === 'PAID' 
-                                                ? 'bg-green-100 text-green-800' 
-                                                : 'bg-yellow-100 text-yellow-800'
-                                        }`}>
-                                            {paymentStatus.status === 'PAID' ? '✅ PAID' : '💰 UNPAID'}
-                                        </span>
-                                    )}
-                                </p>
-                            </div>
+                            <span className="text-sm text-gray-600">Monthly Invoice</span>
                         </div>
-                        <div className="flex space-x-3">
+                        <div className="flex space-x-2">
                             <button 
                                 onClick={handleTogglePaymentStatus}
                                 disabled={updatingPaymentStatus}
-                                className={`inline-flex items-center px-4 py-2 border rounded-md shadow-sm text-sm font-medium ${
+                                className={`inline-flex items-center px-3 py-1 border rounded text-xs font-medium ${
                                     paymentStatus?.status === 'PAID'
                                         ? 'border-yellow-300 text-yellow-700 bg-yellow-50 hover:bg-yellow-100'
                                         : 'border-green-300 text-green-700 bg-green-50 hover:bg-green-100'
@@ -570,7 +551,7 @@ export default function FacilityMonthlyInvoicePage() {
                             >
                                 {updatingPaymentStatus ? (
                                     <>
-                                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                        <svg className="animate-spin -ml-1 mr-1 h-3 w-3" fill="none" viewBox="0 0 24 24">
                                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                         </svg>
@@ -584,15 +565,15 @@ export default function FacilityMonthlyInvoicePage() {
                             </button>
                             <button 
                                 onClick={() => window.print()}
-                                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                                className="inline-flex items-center px-3 py-1 border border-gray-300 rounded text-xs font-medium text-gray-700 bg-white hover:bg-gray-50"
                             >
-                                🖨️ Print Invoice
+                                🖨️ Print
                             </button>
                             {billableTrips.length > 0 && (
                                 <button 
                                     onClick={handleSendMonthlyInvoice}
                                     disabled={sendingInvoice}
-                                    className={`inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
+                                    className={`inline-flex items-center px-3 py-1 border border-transparent rounded text-xs font-medium text-white ${
                                         sendingInvoice 
                                             ? 'bg-gray-400 cursor-not-allowed' 
                                             : 'bg-blue-600 hover:bg-blue-700'
@@ -600,20 +581,20 @@ export default function FacilityMonthlyInvoicePage() {
                                 >
                                     {sendingInvoice ? (
                                         <>
-                                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                                            <svg className="animate-spin -ml-1 mr-1 h-3 w-3 text-white" fill="none" viewBox="0 0 24 24">
                                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                             </svg>
                                             Sending...
                                         </>
                                     ) : (
-                                        <>📧 Send Monthly Invoice</>
+                                        <>📧 Send</>
                                     )}
                                 </button>
                             )}
                             {invoiceSent && (
-                                <span className="inline-flex items-center px-4 py-2 border border-green-300 rounded-md shadow-sm text-sm font-medium text-green-700 bg-green-50">
-                                    ✅ Invoice Sent
+                                <span className="inline-flex items-center px-3 py-1 border border-green-300 rounded text-xs font-medium text-green-700 bg-green-50">
+                                    ✅ Sent
                                 </span>
                             )}
                         </div>
