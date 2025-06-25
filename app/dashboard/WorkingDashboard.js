@@ -65,7 +65,7 @@ export default function WorkingDashboard() {
                 .select(`
                     *,
                     user_profile:profiles!trips_user_id_fkey(first_name, last_name, phone_number, email),
-                    facility:facilities(id, name, email, contact_email, phone_number, address, facility_type)
+                    facility:facilities(id, name, contact_email, phone_number)
                 `)
                 .order('created_at', { ascending: false })
                 .limit(50);
@@ -303,7 +303,7 @@ export default function WorkingDashboard() {
             if (facilityIds.length > 0) {
                 const { data: facilityData } = await supabase
                     .from('facilities')
-                    .select('id, name, email, contact_email, phone_number, address, facility_type')
+                    .select('id, name, contact_email, phone_number')
                     .in('id', facilityIds);
                 facilities = facilityData || [];
             }
@@ -350,8 +350,6 @@ export default function WorkingDashboard() {
                     facilityInfo = trip.facility.name;
                 } else if (trip.facility.contact_email) {
                     facilityInfo = trip.facility.contact_email;
-                } else if (trip.facility.email) {
-                    facilityInfo = trip.facility.email;
                 } else {
                     facilityInfo = `Facility ${trip.facility_id.slice(0, 8)}`;
                 }
@@ -361,8 +359,6 @@ export default function WorkingDashboard() {
                     facilityContact = trip.facility.phone_number;
                 } else if (trip.facility.contact_email) {
                     facilityContact = trip.facility.contact_email;
-                } else if (trip.facility.email) {
-                    facilityContact = trip.facility.email;
                 }
             } else {
                 facilityInfo = `Facility ${trip.facility_id.slice(0, 8)}`;
