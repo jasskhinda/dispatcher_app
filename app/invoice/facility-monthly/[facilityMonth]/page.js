@@ -118,10 +118,10 @@ export default function FacilityMonthlyInvoicePage() {
                     const fallbackFacility = {
                         id: facilityId,
                         name: 'CareBridge Living', // Known facility name from the system
-                        contact_email: 'admin@carebridge.com',
-                        billing_email: 'billing@carebridge.com',
-                        phone_number: '(416) 555-0199',
-                        address: '123 Care Bridge Drive, Toronto, ON'
+                        contact_email: 'admin@ccttransportation.com',
+                        billing_email: 'billing@ccttransportation.com', // Use correct billing email to match company header
+                        phone_number: '(416) 555-0123',
+                        address: '123 Healthcare Drive, Toronto, ON M5V 3A8'
                     };
                     
                     // 🔧 PERMANENT FIX: Try to create the facility record in the database
@@ -132,10 +132,10 @@ export default function FacilityMonthlyInvoicePage() {
                             .upsert([{
                                 id: facilityId,
                                 name: 'CareBridge Living',
-                                contact_email: 'admin@carebridge.com',
-                                billing_email: 'billing@carebridge.com',
-                                phone_number: '(416) 555-0199',
-                                address: '123 Care Bridge Drive, Toronto, ON M1A 1A1',
+                                contact_email: 'admin@ccttransportation.com',
+                                billing_email: 'billing@ccttransportation.com',
+                                phone_number: '(416) 555-0123',
+                                address: '123 Healthcare Drive, Toronto, ON M5V 3A8',
                                 created_at: new Date().toISOString(),
                                 updated_at: new Date().toISOString()
                             }], {
@@ -629,31 +629,51 @@ export default function FacilityMonthlyInvoicePage() {
                         <div className="flex justify-between items-start">
                             <div>
                                 <h2 className="text-3xl font-bold mb-2">CCT Transportation</h2>
-                                <p className="text-blue-100">Professional Transportation Services</p>
-                                <div className="mt-3 bg-white/10 rounded-lg p-3">
-                                    <p className="text-sm text-blue-200">Monthly Invoice for:</p>
-                                    <p className="text-lg font-semibold text-white">{facilityInfo?.name}</p>
-                                    <p className="text-sm text-blue-200">{getMonthDisplayName()}</p>
-                                </div>
-                                <div className="mt-4 text-sm">
-                                    <p>📧 billing@ccttransportation.com</p>
-                                    <p>📞 (416) 555-0123</p>
-                                    <p>📍 Toronto, Ontario, Canada</p>
+                                <p className="text-blue-100 text-lg">Professional Transportation Services</p>
+                                <div className="mt-4 text-sm space-y-1">
+                                    <p className="flex items-center">
+                                        <span className="mr-2">📧</span>
+                                        billing@ccttransportation.com
+                                    </p>
+                                    <p className="flex items-center">
+                                        <span className="mr-2">📞</span>
+                                        (416) 555-0123
+                                    </p>
+                                    <p className="flex items-center">
+                                        <span className="mr-2">📍</span>
+                                        Toronto, Ontario, Canada
+                                    </p>
                                 </div>
                             </div>
                             <div className="text-right">
                                 <div className="bg-white/20 rounded-lg p-4 print:bg-white/10">
-                                    <h3 className="text-lg font-semibold mb-2">Monthly Invoice</h3>
-                                    <p className="text-blue-100">
-                                        {new Date().toLocaleDateString('en-US', {
-                                            year: 'numeric',
-                                            month: 'long',
-                                            day: 'numeric'
-                                        })}
-                                    </p>
-                                    <p className="text-sm text-blue-200 mt-2">
-                                        Due: {new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US')}
-                                    </p>
+                                    <h3 className="text-2xl font-bold mb-2 text-white">MONTHLY INVOICE</h3>
+                                    <div className="space-y-2">
+                                        <div>
+                                            <p className="text-xs text-blue-200 uppercase">Invoice Date:</p>
+                                            <p className="text-white font-medium">
+                                                {new Date().toLocaleDateString('en-US', {
+                                                    year: 'numeric',
+                                                    month: 'long',
+                                                    day: 'numeric'
+                                                })}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-blue-200 uppercase">Due Date:</p>
+                                            <p className="text-white font-medium">
+                                                {new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', {
+                                                    year: 'numeric',
+                                                    month: 'long',
+                                                    day: 'numeric'
+                                                })}
+                                            </p>
+                                        </div>
+                                        <div className="pt-2 border-t border-white/30">
+                                            <p className="text-xs text-blue-200 uppercase">Billing Period:</p>
+                                            <p className="text-lg font-bold text-white">{getMonthDisplayName()}</p>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -918,7 +938,7 @@ export default function FacilityMonthlyInvoicePage() {
                                                 <span className="font-medium text-green-900">Company Check (Preferred)</span>
                                             </div>
                                             <p className="text-sm text-green-700 mt-1 ml-6">
-                                                Mail to: CCT Transportation, 123 Business Ave, Toronto, ON M5V 3A8
+                                                Mail to: CCT Transportation, 123 Healthcare Drive, Toronto, ON M5V 3A8
                                             </p>
                                         </div>
                                         
