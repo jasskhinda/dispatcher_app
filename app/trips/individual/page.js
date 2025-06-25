@@ -62,34 +62,38 @@ export default function IndividualTripsPage() {
 
             console.log(`✅ Found ${tripsData?.length || 0} individual trips`);
 
-            // Get user profiles for the trips
-            const userIds = [...new Set(tripsData?.map(trip => trip.user_id).filter(Boolean))];
-            let profiles = [];
-            
-            if (userIds.length > 0) {
-                const { data: profilesData, error: profilesError } = await supabase
-                    .from('user_profiles')
-                    .select('*')
-                    .in('user_id', userIds);
+            // Get user profiles for the trips separately (to avoid schema relationship issues)
+            let userProfiles = [];
+            if (tripsData && tripsData.length > 0) {
+                const userIds = [...new Set(tripsData.map(trip => trip.user_id).filter(Boolean))];
+                
+                if (userIds.length > 0) {
+                    console.log(`🔍 Fetching ${userIds.length} user profiles...`);
+                    
+                    const { data: profilesData, error: profilesError } = await supabase
+                        .from('profiles')
+                        .select('id, first_name, last_name, phone_number, address, email')
+                        .in('id', userIds);
 
-                if (profilesError) {
-                    console.warn('Could not fetch user profiles:', profilesError);
-                } else {
-                    profiles = profilesData || [];
+                    if (profilesError) {
+                        console.warn('Could not fetch user profiles:', profilesError);
+                    } else {
+                        userProfiles = profilesData || [];
+                        console.log(`   ✅ Fetched ${userProfiles.length} user profiles`);
+                    }
                 }
-
-                setUserProfiles(profiles);
             }
 
             // Enhance trips with user profile information
             const enhancedTrips = tripsData?.map(trip => {
-                const userProfile = profiles.find(profile => profile.user_id === trip.user_id);
+                const userProfile = userProfiles.find(profile => profile.id === trip.user_id);
                 return {
                     ...trip,
                     user_profile: userProfile
                 };
             }) || [];
 
+            setUserProfiles(userProfiles);
             setTrips(enhancedTrips);
             setLoading(false);
 
@@ -185,6 +189,17 @@ export default function IndividualTripsPage() {
             return `${trip.user_profile.first_name || ''} ${trip.user_profile.last_name || ''}`.trim() || 'Unknown User';
         }
         return 'User Profile Not Available';
+    };
+
+    const getClientContactInfo = (trip) => {
+        if (!trip.user_profile) return null;
+        
+        return {
+            name: getClientDisplayName(trip),
+            email: trip.user_profile.email || 'No email',
+            phone: trip.user_profile.phone_number || 'No phone',
+            address: trip.user_profile.address || 'No address'
+        };
     };
 
     if (loading) {
@@ -391,14 +406,40 @@ export default function IndividualTripsPage() {
                                                     )}
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap">
-                                                    <div className="text-sm font-medium text-gray-900">
-                                                        👤 {getClientDisplayName(trip)}
-                                                    </div>
-                                                    <div className="text-sm text-gray-500">
-                                                        {trip.user_profile?.email || 'Email not available'}
-                                                    </div>
-                                                    <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded mt-1 inline-block">
-                                                        📱 Booking App
+                                                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                                        <div className="text-sm font-medium text-gray-900 mb-2">
+                                                            👤 {getClientDisplayName(trip)}
+                                                        </div>
+                                                        {trip.user_profile && (
+                                                            <div className="space-y-1">
+                                                                {trip.user_profile.email && (
+                                                                    <div className="text-xs text-gray-600 flex items-center">
+                                                                        <span className="text-blue-600 mr-1">📧</span>
+                                                                        {trip.user_profile.email}
+                                                                    </div>
+                                                                )}
+                                                                {trip.user_profile.phone_number && (
+                                                                    <div className="text-xs text-gray-600 flex items-center">
+                                                                        <span className="text-green-600 mr-1">📞</span>
+                                                                        {trip.user_profile.phone_number}
+                                                                    </div>
+                                                                )}
+                                                                {trip.user_profile.address && (
+                                                                    <div className="text-xs text-gray-600 flex items-center">
+                                                                        <span className="text-purple-600 mr-1">📍</span>
+                                                                        <span className="truncate" title={trip.user_profile.address}>
+                                                                            {trip.user_profile.address.length > 30 ? 
+                                                                                `${trip.user_profile.address.substring(0, 30)}...` : 
+                                                                                trip.user_profile.address
+                                                                            }
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                        <div className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded mt-2 inline-block">
+                                                            📱 Individual Booking
+                                                        </div>
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap">

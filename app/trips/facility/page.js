@@ -4,17 +4,13 @@ import { useState, useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
 
-export default function FacilityTripsPage() {
+export default function FacilityOverviewPage() {
     const [loading, setLoading] = useState(true);
     const [user, setUser] = useState(null);
-    const [trips, setTrips] = useState([]);
-    const [filteredTrips, setFilteredTrips] = useState([]);
-    const [error, setError] = useState(null);
-    const [actionLoading, setActionLoading] = useState({});
-    const [actionMessage, setActionMessage] = useState('');
-    const [statusFilter, setStatusFilter] = useState('all');
-    const [facilityFilter, setFacilityFilter] = useState('all');
     const [facilities, setFacilities] = useState([]);
+    const [facilityStats, setFacilityStats] = useState([]);
+    const [error, setError] = useState(null);
+    const [refreshing, setRefreshing] = useState(false);
     
     const router = useRouter();
     const supabase = createClientComponentClient();
@@ -22,10 +18,6 @@ export default function FacilityTripsPage() {
     useEffect(() => {
         getSession();
     }, []);
-
-    useEffect(() => {
-        filterTrips();
-    }, [trips, statusFilter, facilityFilter]);
 
     async function getSession() {
         try {
@@ -37,7 +29,7 @@ export default function FacilityTripsPage() {
             }
 
             setUser(session.user);
-            await fetchFacilityTrips();
+            await fetchFacilityOverview();
             
         } catch (err) {
             console.error('Session error:', err);
@@ -46,109 +38,96 @@ export default function FacilityTripsPage() {
         }
     }
 
-    async function fetchFacilityTrips() {
+    async function fetchFacilityOverview() {
         try {
-            console.log('🔍 Fetching facility trips...');
+            console.log('🔍 Fetching facility overview...');
+            setRefreshing(true);
             
-            // Fetch trips from facility app (has facility_id) - without problematic joins
+            // Fetch all facilities
+            const { data: facilitiesData, error: facilitiesError } = await supabase
+                .from('facilities')
+                .select('id, name, address, contact_email, phone_number, billing_email')
+                .order('name', { ascending: true });
+
+            if (facilitiesError) throw facilitiesError;
+
+            console.log(`✅ Found ${facilitiesData?.length || 0} facilities`);
+            setFacilities(facilitiesData || []);
+
+            // Fetch all facility trips
             const { data: tripsData, error: tripsError } = await supabase
                 .from('trips')
-                .select(`
-                    *,
-                    facilities(id, name, address, contact_email, phone_number)
-                `)
+                .select('*')
                 .not('facility_id', 'is', null)
-                .order('created_at', { ascending: false })
-                .limit(100);
+                .order('created_at', { ascending: false });
 
             if (tripsError) throw tripsError;
 
             console.log(`✅ Found ${tripsData?.length || 0} facility trips`);
 
-            // Fetch client information separately (to avoid schema relationship issues)
-            let managedClients = [];
-            if (tripsData && tripsData.length > 0) {
-                const managedClientIds = [...new Set(tripsData.filter(trip => trip.managed_client_id).map(trip => trip.managed_client_id))];
+            // Get managed clients count for each facility
+            const facilityStatsPromises = facilitiesData?.map(async (facility) => {
+                const facilityTrips = tripsData?.filter(trip => trip.facility_id === facility.id) || [];
                 
-                if (managedClientIds.length > 0) {
-                    console.log(`🔍 Fetching ${managedClientIds.length} managed clients separately...`);
-                    
-                    // Try managed_clients table first
-                    try {
-                        const { data: mc, error: mcError } = await supabase
-                            .from('managed_clients')
-                            .select('id, first_name, last_name, facility_id')
-                            .in('id', managedClientIds);
-                        
-                        if (!mcError && mc) {
-                            managedClients = mc;
-                            console.log(`   ✅ Fetched ${managedClients.length} managed clients`);
-                        }
-                    } catch (e) {
-                        console.log('   ⚠️ managed_clients table not accessible, trying facility_managed_clients...');
-                        
-                        // Fallback to facility_managed_clients table
-                        try {
-                            const { data: fmc, error: fmcError } = await supabase
-                                .from('facility_managed_clients')
-                                .select('id, first_name, last_name, facility_id')
-                                .in('id', managedClientIds);
-                            
-                            if (!fmcError && fmc) {
-                                managedClients = fmc;
-                                console.log(`   ✅ Fetched ${managedClients.length} managed clients from facility_managed_clients`);
-                            }
-                        } catch (e2) {
-                            console.log('   ⚠️ No client tables accessible');
-                        }
-                    }
-                }
-            }
+                // Get unique clients for this facility
+                const uniqueClientIds = [...new Set(facilityTrips.map(trip => trip.managed_client_id || trip.user_id).filter(Boolean))];
+                
+                // Calculate totals
+                const totalTrips = facilityTrips.length;
+                const pendingTrips = facilityTrips.filter(trip => trip.status === 'pending').length;
+                const upcomingTrips = facilityTrips.filter(trip => trip.status === 'upcoming').length;
+                const completedTrips = facilityTrips.filter(trip => trip.status === 'completed').length;
+                const totalAmount = facilityTrips
+                    .filter(trip => trip.status === 'completed' && trip.price > 0)
+                    .reduce((sum, trip) => sum + parseFloat(trip.price || 0), 0);
 
-            // Enhance trips with client information
-            const enhancedTrips = tripsData?.map(trip => {
-                const enhancedTrip = { ...trip };
-                
-                // Add managed client if exists
-                if (trip.managed_client_id) {
-                    enhancedTrip.managed_clients = managedClients.find(client => client.id === trip.managed_client_id) || null;
-                }
-                
-                return enhancedTrip;
+                return {
+                    ...facility,
+                    clientCount: uniqueClientIds.length,
+                    totalTrips,
+                    pendingTrips,
+                    upcomingTrips,
+                    completedTrips,
+                    totalAmount
+                };
             }) || [];
 
-            // Get unique facilities for filter
-            const uniqueFacilities = [...new Set(enhancedTrips?.map(trip => trip.facilities).filter(Boolean))];
-            setFacilities(uniqueFacilities);
-
-            setTrips(enhancedTrips);
+            const facilityStatsResults = await Promise.all(facilityStatsPromises);
+            setFacilityStats(facilityStatsResults);
+            
             setLoading(false);
+            setRefreshing(false);
 
         } catch (err) {
-            console.error('Error fetching facility trips:', err);
-            setError('Failed to load facility trips: ' + err.message);
+            console.error('Error fetching facility overview:', err);
+            setError('Failed to load facility overview: ' + err.message);
             setLoading(false);
+            setRefreshing(false);
         }
     }
 
-    function filterTrips() {
-        let filtered = trips;
+    // Calculate overall statistics
+    const overallStats = {
+        totalFacilities: facilityStats.length,
+        totalTrips: facilityStats.reduce((sum, f) => sum + f.totalTrips, 0),
+        pendingTrips: facilityStats.reduce((sum, f) => sum + f.pendingTrips, 0),
+        upcomingTrips: facilityStats.reduce((sum, f) => sum + f.upcomingTrips, 0),
+        completedTrips: facilityStats.reduce((sum, f) => sum + f.completedTrips, 0),
+        totalAmount: facilityStats.reduce((sum, f) => sum + f.totalAmount, 0)
+    };
 
-        if (statusFilter !== 'all') {
-            filtered = filtered.filter(trip => trip.status === statusFilter);
-        }
+    const handleMonthlyInvoice = (facilityId) => {
+        // Generate URL for current month by default
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const monthlyUrl = `/invoice/facility-monthly/${facilityId}-${year}-${month}`;
+        router.push(monthlyUrl);
+    };
 
-        if (facilityFilter !== 'all') {
-            filtered = filtered.filter(trip => trip.facility_id === facilityFilter);
-        }
-
-        setFilteredTrips(filtered);
-    }
-
-    async function handleTripAction(tripId, action) {
-        try {
-            setActionLoading(prev => ({ ...prev, [tripId]: true }));
-            setActionMessage('');
+    const handleRefresh = async () => {
+        await fetchFacilityOverview();
+    };
 
             let newStatus;
             let message;

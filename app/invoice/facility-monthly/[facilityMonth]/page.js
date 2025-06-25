@@ -483,6 +483,75 @@ export default function FacilityMonthlyInvoicePage() {
         }
     };
 
+    // Month navigation handlers
+    const handlePrevMonth = () => {
+        if (!selectedMonth) return;
+
+        const [year, month] = selectedMonth.split('-').map(Number);
+        const prevMonth = new Date(year, month - 1, 1);
+        const newMonth = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}`;
+
+        setSelectedMonth(newMonth);
+        setInvoiceMonth(newMonth);
+        router.push(`/invoices/facility/${facilityInfo.id}-${newMonth}`);
+    };
+
+    const handleNextMonth = () => {
+        if (!selectedMonth) return;
+
+        const [year, month] = selectedMonth.split('-').map(Number);
+        const nextMonth = new Date(year, month, 1);
+        const newMonth = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}`;
+
+        setSelectedMonth(newMonth);
+        setInvoiceMonth(newMonth);
+        router.push(`/invoices/facility/${facilityInfo.id}-${newMonth}`);
+    };
+
+    // Month selection handler
+    const handleMonthSelect = (e) => {
+        const selectedValue = e.target.value;
+        setSelectedMonth(selectedValue);
+        setInvoiceMonth(selectedValue);
+        router.push(`/invoices/facility/${facilityInfo.id}-${selectedValue}`);
+    };
+
+    // Fetch available months for the facility
+    useEffect(() => {
+        async function fetchAvailableMonths() {
+            if (!facilityInfo) return;
+
+            try {
+                const { data: monthsData, error: monthsError } = await supabase
+                    .from('facility_payment_status')
+                    .select('invoice_month, invoice_year')
+                    .eq('facility_id', facilityInfo.id)
+                    .order('invoice_year', { ascending: false })
+                    .order('invoice_month', { ascending: false });
+
+                if (monthsError) throw monthsError;
+
+                const formattedMonths = monthsData.map(item => {
+                    const year = item.invoice_year;
+                    const month = String(item.invoice_month).padStart(2, '0');
+                    return `${year}-${month}`;
+                });
+
+                setAvailableMonths(formattedMonths);
+                
+                // Set the initially selected month to the latest available month
+                if (formattedMonths.length > 0 && !selectedMonth) {
+                    setSelectedMonth(formattedMonths[0]);
+                    setInvoiceMonth(formattedMonths[0]);
+                }
+            } catch (err) {
+                console.error('Error fetching available months:', err);
+            }
+        }
+
+        fetchAvailableMonths();
+    }, [facilityInfo, supabase]);
+
     if (loading) {
         return (
             <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -527,6 +596,122 @@ export default function FacilityMonthlyInvoicePage() {
 
     return (
         <div className="min-h-screen bg-gray-50 print:bg-white">
+            {/* Month Filter Header - Hidden on Print */}
+            <div className="print:hidden bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
+                <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                            <h1 className="text-lg font-semibold text-gray-900">
+                                📄 Monthly Invoice - {facilityInfo?.name}
+                            </h1>
+                        </div>
+                        
+                        <div className="flex items-center space-x-4">
+                            {/* Month Navigation */}
+                            <div className="flex items-center space-x-2">
+                                <button
+                                    onClick={() => {
+                                        if (!invoiceMonth) return;
+                                        const [year, month] = invoiceMonth.split('-');
+                                        const prevDate = new Date(parseInt(year), parseInt(month) - 2, 1);
+                                        const prevMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+                                        const newUrl = `/invoice/facility-monthly/${facilityInfo.id}-${prevMonth}`;
+                                        router.push(newUrl);
+                                    }}
+                                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                                >
+                                    ← Previous Month
+                                </button>
+                                
+                                {/* Month Dropdown */}
+                                <select
+                                    value={invoiceMonth}
+                                    onChange={(e) => {
+                                        const selectedMonth = e.target.value;
+                                        if (selectedMonth && facilityInfo) {
+                                            const newUrl = `/invoice/facility-monthly/${facilityInfo.id}-${selectedMonth}`;
+                                            router.push(newUrl);
+                                        }
+                                    }}
+                                    className="border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                >
+                                    {/* Generate last 12 months */}
+                                    {Array.from({ length: 12 }, (_, i) => {
+                                        const date = new Date();
+                                        date.setMonth(date.getMonth() - i);
+                                        const yearMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                                        const displayName = date.toLocaleDateString('en-US', {
+                                            month: 'long',
+                                            year: 'numeric'
+                                        });
+                                        return (
+                                            <option key={yearMonth} value={yearMonth}>
+                                                {displayName}
+                                            </option>
+                                        );
+                                    })}
+                                </select>
+                                
+                                <button
+                                    onClick={() => {
+                                        if (!invoiceMonth) return;
+                                        const [year, month] = invoiceMonth.split('-');
+                                        const nextDate = new Date(parseInt(year), parseInt(month), 1);
+                                        const nextMonth = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}`;
+                                        const newUrl = `/invoice/facility-monthly/${facilityInfo.id}-${nextMonth}`;
+                                        router.push(newUrl);
+                                    }}
+                                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                                >
+                                    Next Month →
+                                </button>
+                            </div>
+                            
+                            {/* Action Buttons */}
+                            <div className="flex items-center space-x-2">
+                                <button
+                                    onClick={handleTogglePaymentStatus}
+                                    disabled={updatingPaymentStatus}
+                                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                                        paymentStatus?.status === 'PAID'
+                                            ? 'bg-red-100 hover:bg-red-200 text-red-700'
+                                            : 'bg-green-100 hover:bg-green-200 text-green-700'
+                                    } disabled:opacity-50`}
+                                >
+                                    {updatingPaymentStatus 
+                                        ? '⏳ Updating...' 
+                                        : paymentStatus?.status === 'PAID' 
+                                            ? '❌ Mark Unpaid' 
+                                            : '✅ Mark Paid'
+                                    }
+                                </button>
+                                
+                                <button
+                                    onClick={() => window.print()}
+                                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                                >
+                                    🖨️ Print Invoice
+                                </button>
+                                
+                                <button
+                                    onClick={() => router.push('/trips/facility')}
+                                    className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                                >
+                                    ← Back to Overview
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {/* Status Messages */}
+                    {invoiceSent && (
+                        <div className="mt-4 p-3 bg-green-100 border border-green-300 text-green-700 rounded-md">
+                            ✅ Monthly invoice sent successfully!
+                        </div>
+                    )}
+                </div>
+            </div>
+
             {/* Main Content */}
             <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 print:p-0 print:max-w-none">
                 <div className="bg-white shadow-lg rounded-lg overflow-hidden print:shadow-none print:rounded-none">
