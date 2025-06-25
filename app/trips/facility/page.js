@@ -135,6 +135,58 @@ export default function FacilityOverviewPage() {
         }
     }
 
+    // Test database connection and basic operations
+    const testDatabaseConnection = async () => {
+        try {
+            console.log('🔌 Testing database connection...');
+            
+            // Test 1: Simple query to facilities table
+            const { data: testQuery, error: testError } = await supabase
+                .from('facilities')
+                .select('count(*)')
+                .limit(1);
+            
+            if (testError) {
+                console.error('❌ Database query failed:', testError);
+                alert('Database connection failed: ' + testError.message);
+                return;
+            }
+            
+            console.log('✅ Database connection works!', testQuery);
+            
+            // Test 2: Try to insert a single test facility
+            console.log('📝 Testing facility insertion...');
+            const testFacility = {
+                name: 'Test Facility ' + Date.now(),
+                address: '123 Test Street',
+                contact_email: 'test@example.com',
+                phone_number: '555-0123'
+            };
+            
+            const { data: insertResult, error: insertError } = await supabase
+                .from('facilities')
+                .insert([testFacility])
+                .select()
+                .single();
+            
+            if (insertError) {
+                console.error('❌ Insert failed:', insertError);
+                alert('Insert failed: ' + insertError.message);
+                return;
+            }
+            
+            console.log('✅ Insert successful!', insertResult);
+            alert('Database test successful! Check console for details.');
+            
+            // Clean up by refreshing data
+            await fetchFacilityOverview();
+            
+        } catch (err) {
+            console.error('💥 Test failed:', err);
+            alert('Test failed: ' + err.message);
+        }
+    };
+
     // Calculate overall statistics
     const overallStats = {
         totalFacilities: facilityStats.length,
@@ -160,7 +212,9 @@ export default function FacilityOverviewPage() {
 
     const createTestFacilities = async () => {
         try {
+            console.log('🔄 Create Test Facilities button clicked!');
             setRefreshing(true);
+            setError(null);
             console.log('🏗️ Creating test facilities...');
             
             const testFacilities = [
@@ -187,7 +241,11 @@ export default function FacilityOverviewPage() {
                 }
             ];
             
+            console.log('📝 About to create facilities:', testFacilities.length);
+            
             for (const facilityData of testFacilities) {
+                console.log(`📝 Creating facility: ${facilityData.name}...`);
+                
                 const { data: newFacility, error: createError } = await supabase
                     .from('facilities')
                     .insert([facilityData])
@@ -196,10 +254,12 @@ export default function FacilityOverviewPage() {
                 
                 if (createError) {
                     console.error(`❌ Error creating ${facilityData.name}:`, createError);
+                    throw new Error(`Failed to create ${facilityData.name}: ${createError.message}`);
                 } else {
-                    console.log(`✅ Created: ${newFacility.name}`);
+                    console.log(`✅ Created: ${newFacility.name} with ID: ${newFacility.id}`);
                     
                     // Create a few test trips
+                    console.log(`📋 Creating trips for ${newFacility.name}...`);
                     const testTrips = [
                         {
                             facility_id: newFacility.id,
@@ -220,16 +280,24 @@ export default function FacilityOverviewPage() {
                     ];
                     
                     for (const tripData of testTrips) {
-                        await supabase.from('trips').insert([tripData]);
+                        console.log(`📋 Creating trip: ${tripData.status}...`);
+                        const { error: tripError } = await supabase.from('trips').insert([tripData]);
+                        if (tripError) {
+                            console.error(`❌ Error creating trip:`, tripError);
+                        } else {
+                            console.log(`✅ Created trip: ${tripData.status}`);
+                        }
                     }
                 }
             }
+            
+            console.log('🎉 All test data created successfully!');
             
             // Refresh the data
             await fetchFacilityOverview();
             
         } catch (err) {
-            console.error('Error creating test facilities:', err);
+            console.error('💥 Error creating test facilities:', err);
             setError('Failed to create test facilities: ' + err.message);
         } finally {
             setRefreshing(false);
@@ -500,13 +568,31 @@ export default function FacilityOverviewPage() {
                                     }
                                 </p>
                                 {facilityStats.length === 0 && facilities.length === 0 && (
-                                    <button
-                                        onClick={createTestFacilities}
-                                        disabled={refreshing}
-                                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition-colors disabled:opacity-50"
-                                    >
-                                        {refreshing ? 'Creating Test Data...' : '🏗️ Create Test Facilities & Trips'}
-                                    </button>
+                                    <div className="space-y-4">
+                                        <button
+                                            onClick={() => {
+                                                console.log('🧪 Test button clicked - basic functionality works!');
+                                                alert('Button click detected! Check console for details.');
+                                            }}
+                                            className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors mb-2"
+                                        >
+                                            🧪 Test Button Click
+                                        </button>
+                                        <br />
+                                        <button
+                                            onClick={testDatabaseConnection}
+                                            className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg transition-colors mr-2"
+                                        >
+                                            🔌 Test Database
+                                        </button>
+                                        <button
+                                            onClick={createTestFacilities}
+                                            disabled={refreshing}
+                                            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition-colors disabled:opacity-50"
+                                        >
+                                            {refreshing ? 'Creating Test Data...' : '🏗️ Create Test Facilities & Trips'}
+                                        </button>
+                                    </div>
                                 )}
                             </div>
                         )}
