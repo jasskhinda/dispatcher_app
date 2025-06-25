@@ -140,11 +140,11 @@ export default function FacilityOverviewPage() {
         try {
             console.log('🔌 Testing database connection...');
             
-            // Test 1: Simple query to facilities table
+            // Test 1: Simple query to facilities table (fixed syntax)
             const { data: testQuery, error: testError } = await supabase
                 .from('facilities')
-                .select('count(*)')
-                .limit(1);
+                .select('id, name')
+                .limit(5);
             
             if (testError) {
                 console.error('❌ Database query failed:', testError);
@@ -153,33 +153,17 @@ export default function FacilityOverviewPage() {
             }
             
             console.log('✅ Database connection works!', testQuery);
+            console.log(`📊 Found ${testQuery?.length || 0} existing facilities`);
             
-            // Test 2: Try to insert a single test facility
-            console.log('📝 Testing facility insertion...');
-            const testFacility = {
-                name: 'Test Facility ' + Date.now(),
-                address: '123 Test Street',
-                contact_email: 'test@example.com',
-                phone_number: '555-0123'
-            };
-            
-            const { data: insertResult, error: insertError } = await supabase
-                .from('facilities')
-                .insert([testFacility])
-                .select()
-                .single();
-            
-            if (insertError) {
-                console.error('❌ Insert failed:', insertError);
-                alert('Insert failed: ' + insertError.message);
-                return;
+            if (testQuery && testQuery.length > 0) {
+                alert(`Database connection successful! Found ${testQuery.length} existing facilities. Check console for details.`);
+                console.log('🏥 Existing facilities:', testQuery);
+                
+                // Just refresh the display since facilities already exist
+                await fetchFacilityOverview();
+            } else {
+                alert('Database connection works but no facilities found. Will need to create test data.');
             }
-            
-            console.log('✅ Insert successful!', insertResult);
-            alert('Database test successful! Check console for details.');
-            
-            // Clean up by refreshing data
-            await fetchFacilityOverview();
             
         } catch (err) {
             console.error('💥 Test failed:', err);
@@ -215,64 +199,49 @@ export default function FacilityOverviewPage() {
             console.log('🔄 Create Test Facilities button clicked!');
             setRefreshing(true);
             setError(null);
-            console.log('🏗️ Creating test facilities...');
             
-            const testFacilities = [
-                {
-                    name: 'CareBridge Living',
-                    address: '123 Healthcare Drive, Toronto, ON M5V 3A8',
-                    contact_email: 'admin@carebridge.com',
-                    billing_email: 'billing@carebridge.com',
-                    phone_number: '(416) 555-0123'
-                },
-                {
-                    name: 'Sunset Senior Care',
-                    address: '456 Sunset Boulevard, Toronto, ON M6H 2K9',
-                    contact_email: 'info@sunsetcare.com',
-                    billing_email: 'billing@sunsetcare.com',
-                    phone_number: '(416) 555-0456'
-                },
-                {
-                    name: 'Maple Grove Medical Center',
-                    address: '789 Maple Street, Toronto, ON M4B 1X2',
-                    contact_email: 'contact@maplegrove.com',
-                    billing_email: 'billing@maplegrove.com',
-                    phone_number: '(416) 555-0789'
-                }
-            ];
+            // First, check if facilities already exist
+            console.log('🔍 Checking for existing facilities...');
+            const { data: existingFacilities, error: checkError } = await supabase
+                .from('facilities')
+                .select('id, name, address, contact_email, phone_number, billing_email')
+                .order('name', { ascending: true });
             
-            console.log('📝 About to create facilities:', testFacilities.length);
+            if (checkError) {
+                console.error('❌ Error checking facilities:', checkError);
+                throw new Error(`Failed to check existing facilities: ${checkError.message}`);
+            }
             
-            for (const facilityData of testFacilities) {
-                console.log(`📝 Creating facility: ${facilityData.name}...`);
+            console.log(`📊 Found ${existingFacilities?.length || 0} existing facilities`);
+            
+            if (existingFacilities && existingFacilities.length > 0) {
+                console.log('✅ Facilities already exist! Creating test trips for existing facilities...');
                 
-                const { data: newFacility, error: createError } = await supabase
-                    .from('facilities')
-                    .insert([facilityData])
-                    .select()
-                    .single();
-                
-                if (createError) {
-                    console.error(`❌ Error creating ${facilityData.name}:`, createError);
-                    throw new Error(`Failed to create ${facilityData.name}: ${createError.message}`);
-                } else {
-                    console.log(`✅ Created: ${newFacility.name} with ID: ${newFacility.id}`);
+                // Create test trips for existing facilities instead of creating new facilities
+                for (const facility of existingFacilities.slice(0, 3)) { // Use first 3 facilities
+                    console.log(`📋 Creating trips for existing facility: ${facility.name}...`);
                     
-                    // Create a few test trips
-                    console.log(`📋 Creating trips for ${newFacility.name}...`);
                     const testTrips = [
                         {
-                            facility_id: newFacility.id,
-                            pickup_address: facilityData.address,
+                            facility_id: facility.id,
+                            pickup_address: facility.address || '123 Main St',
                             destination_address: '999 Hospital Way, Toronto, ON',
                             pickup_time: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
                             status: 'pending',
                             price: 45.00
                         },
                         {
-                            facility_id: newFacility.id,
-                            pickup_address: facilityData.address,
+                            facility_id: facility.id,
+                            pickup_address: facility.address || '123 Main St',
                             destination_address: '555 Medical Plaza, Toronto, ON',
+                            pickup_time: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+                            status: 'upcoming',
+                            price: 35.00
+                        },
+                        {
+                            facility_id: facility.id,
+                            pickup_address: facility.address || '123 Main St',
+                            destination_address: '777 Pharmacy Drive, Toronto, ON',
                             pickup_time: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
                             status: 'completed',
                             price: 50.00
@@ -284,16 +253,55 @@ export default function FacilityOverviewPage() {
                         const { error: tripError } = await supabase.from('trips').insert([tripData]);
                         if (tripError) {
                             console.error(`❌ Error creating trip:`, tripError);
+                            // Continue with other trips even if one fails
                         } else {
                             console.log(`✅ Created trip: ${tripData.status}`);
                         }
                     }
                 }
+                
+                console.log('🎉 Test trips created for existing facilities!');
+            } else {
+                // If no facilities exist, try to create them (this might fail due to RLS)
+                console.log('📝 No facilities found, attempting to create new ones...');
+                
+                const testFacilities = [
+                    {
+                        name: 'CareBridge Living',
+                        address: '123 Healthcare Drive, Toronto, ON M5V 3A8',
+                        contact_email: 'admin@carebridge.com',
+                        billing_email: 'billing@carebridge.com',
+                        phone_number: '(416) 555-0123'
+                    },
+                    {
+                        name: 'Sunset Senior Care',
+                        address: '456 Sunset Boulevard, Toronto, ON M6H 2K9',
+                        contact_email: 'info@sunsetcare.com',
+                        billing_email: 'billing@sunsetcare.com',
+                        phone_number: '(416) 555-0456'
+                    }
+                ];
+                
+                for (const facilityData of testFacilities) {
+                    console.log(`📝 Attempting to create facility: ${facilityData.name}...`);
+                    
+                    const { data: newFacility, error: createError } = await supabase
+                        .from('facilities')
+                        .insert([facilityData])
+                        .select()
+                        .single();
+                    
+                    if (createError) {
+                        console.error(`❌ Error creating ${facilityData.name}:`, createError);
+                        throw new Error(`Failed to create ${facilityData.name}: ${createError.message}. This might be due to permissions - facilities may need to be created by an admin user.`);
+                    } else {
+                        console.log(`✅ Created: ${newFacility.name} with ID: ${newFacility.id}`);
+                    }
+                }
             }
             
-            console.log('🎉 All test data created successfully!');
-            
-            // Refresh the data
+            // Refresh the data to show the results
+            console.log('🔄 Refreshing facility overview...');
             await fetchFacilityOverview();
             
         } catch (err) {
