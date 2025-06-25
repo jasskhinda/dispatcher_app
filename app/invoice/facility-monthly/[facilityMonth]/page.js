@@ -25,28 +25,31 @@ export default function FacilityMonthlyInvoicePage() {
     useEffect(() => {
         async function fetchMonthlyInvoiceData() {
             try {
+                console.log('🔍 Step 1: Starting fetchMonthlyInvoiceData...');
                 setLoading(true);
                 
                 // Check authentication
+                console.log('🔍 Step 2: Checking authentication...');
                 const { data: { session }, error: sessionError } = await supabase.auth.getSession();
                 
                 if (sessionError) {
-                    console.error('Session error:', sessionError);
+                    console.error('❌ Step 2 FAILED: Session error:', sessionError);
                     setError('Authentication error');
                     setLoading(false);
                     return;
                 }
 
                 if (!session) {
-                    console.log('No session found, redirecting to login');
+                    console.log('❌ Step 2 FAILED: No session found, redirecting to login');
                     router.push('/login');
                     return;
                 }
 
-                console.log('✅ User authenticated:', session.user.email);
+                console.log('✅ Step 2: User authenticated:', session.user.email);
                 setUser(session.user);
 
                 // Parse the facilityMonth parameter to extract facility ID and target month
+                console.log('🔍 Step 3: Parsing facilityMonth parameter...');
                 // Format expected: facilityId-YYYY-MM
                 let facilityId = null;
                 let targetMonth = null;
@@ -54,7 +57,7 @@ export default function FacilityMonthlyInvoicePage() {
                 console.log('🔍 Parsing facilityMonth parameter:', facilityMonth);
                 
                 if (!facilityMonth) {
-                    console.error('❌ No facilityMonth parameter provided');
+                    console.error('❌ Step 3 FAILED: No facilityMonth parameter provided');
                     setError('Invalid invoice URL format');
                     setLoading(false);
                     return;
@@ -63,7 +66,7 @@ export default function FacilityMonthlyInvoicePage() {
                 // Split on the last two dashes to handle facility IDs that might contain dashes
                 const parts = facilityMonth.split('-');
                 if (parts.length < 3) {
-                    console.error('❌ Invalid facilityMonth format:', facilityMonth);
+                    console.error('❌ Step 3 FAILED: Invalid facilityMonth format:', facilityMonth);
                     setError('Invalid invoice URL format. Expected format: facilityId-YYYY-MM');
                     setLoading(false);
                     return;
@@ -75,40 +78,41 @@ export default function FacilityMonthlyInvoicePage() {
                 facilityId = parts.join('-'); // Rejoin remaining parts as facility ID
                 targetMonth = `${yearPart}-${monthPart}`;
                 
-                console.log(`✅ Parsed facility ID: ${facilityId}, target month: ${targetMonth}`);
+                console.log(`✅ Step 3: Parsed facility ID: ${facilityId}, target month: ${targetMonth}`);
 
                 // Enhanced debugging for facility lookup
-                console.log('🔍 About to query facility with ID:', facilityId);
+                console.log('🔍 Step 4: About to query facility with ID:', facilityId);
                 console.log('🔍 Facility ID length:', facilityId.length);
                 console.log('🔍 Facility ID type:', typeof facilityId);
 
                 // Get facility information
+                console.log('🔍 Step 5: Querying facility information...');
                 const { data: facility, error: facilityError } = await supabase
                     .from('facilities')
                     .select('id, name, contact_email, phone_number, address, billing_email')
                     .eq('id', facilityId)
                     .single();
 
-                console.log('🔍 Facility query result:', { facility, error: facilityError });
+                console.log('🔍 Step 5: Facility query result:', { facility, error: facilityError });
 
                 if (facilityError || !facility) {
-                    console.error('❌ Facility not found:', facilityError);
+                    console.error('❌ Step 5 RESULT: Facility not found:', facilityError);
                     
                     // Enhanced error debugging: try to find any facilities with similar IDs
-                    console.log('🔍 Searching for similar facility IDs...');
+                    console.log('🔍 Step 5a: Searching for similar facility IDs...');
                     const { data: allFacilities, error: allError } = await supabase
                         .from('facilities')
                         .select('id, name')
                         .limit(10);
                     
                     if (!allError && allFacilities) {
-                        console.log('📊 Available facilities:', allFacilities);
+                        console.log('📊 Step 5a: Available facilities:', allFacilities);
                         const matchingFacilities = allFacilities.filter(f => f.id.includes('e1b94bde'));
-                        console.log('🎯 Facilities with matching prefix:', matchingFacilities);
+                        console.log('🎯 Step 5a: Facilities with matching prefix:', matchingFacilities);
                     }
                     
                     // 🆘 FALLBACK: Create a placeholder facility for invoicing
-                    console.log('🆘 Creating fallback facility for invoicing purposes...');
+                    console.log('🆘 Step 5b: Creating fallback facility for invoicing purposes...');
                     const fallbackFacility = {
                         id: facilityId,
                         name: 'CareBridge Living', // Known facility name from the system
@@ -119,7 +123,7 @@ export default function FacilityMonthlyInvoicePage() {
                     };
                     
                     // 🔧 PERMANENT FIX: Try to create the facility record in the database
-                    console.log('🔧 Attempting to create missing facility record...');
+                    console.log('🔧 Step 5c: Attempting to create missing facility record...');
                     try {
                         const { data: createdFacility, error: createError } = await supabase
                             .from('facilities')
@@ -139,32 +143,31 @@ export default function FacilityMonthlyInvoicePage() {
                             .single();
                         
                         if (createError) {
-                            console.log('⚠️ Could not create facility record (may already exist):', createError.message);
-                            console.log('📝 Using fallback facility data for invoice display');
+                            console.log('⚠️ Step 5c: Could not create facility record (may already exist):', createError.message);
+                            console.log('📝 Step 5c: Using fallback facility data for invoice display');
                         } else {
-                            console.log('✅ Successfully created facility record:', createdFacility);
+                            console.log('✅ Step 5c: Successfully created facility record:', createdFacility);
                             // Use the created facility instead of fallback
                             setFacilityInfo(createdFacility);
                         }
                     } catch (createErr) {
-                        console.log('⚠️ Facility creation failed, using fallback:', createErr.message);
+                        console.log('⚠️ Step 5c: Facility creation failed, using fallback:', createErr.message);
                     }
                     
                     // Always set fallback info in case creation failed
                     if (!facilityInfo) {
                         setFacilityInfo(fallbackFacility);
                     }
-                    console.log('✅ Using facility info for invoice generation');
+                    console.log('✅ Step 5: Using facility info for invoice generation');
                 } else {
                     setFacilityInfo(facility);
-                    console.log('✅ Facility info loaded:', facility.name);
+                    console.log('✅ Step 5: Facility info loaded:', facility.name);
                 }
 
-                setFacilityInfo(facility);
                 setInvoiceMonth(targetMonth);
-                console.log('✅ Facility info loaded:', facility.name);
 
                 // Get all trips for this facility for the target month
+                console.log('🔍 Step 6: Preparing date range for trips query...');
                 const [year, month] = targetMonth.split('-');
                 const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
                 const endDate = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59, 999);
@@ -175,52 +178,74 @@ export default function FacilityMonthlyInvoicePage() {
                 console.log(`🔍 Fetching all trips for facility ${facilityId} for month ${targetMonth}`);
                 console.log(`📅 Date range: ${startISO} to ${endISO}`);
 
-                const { data: trips, error: tripsError } = await supabase
-                    .from('trips')
-                    .select(`
-                        id,
-                        pickup_address,
-                        destination_address,
-                        pickup_time,
-                        price,
-                        status,
-                        wheelchair_type,
-                        is_round_trip,
-                        additional_passengers,
-                        managed_client_id,
-                        user_id,
-                        managed_client:facility_managed_clients(first_name, last_name, phone_number, email),
-                        user_profile:profiles(first_name, last_name, phone_number, email)
-                    `)
-                    .eq('facility_id', facilityId)
-                    .gte('pickup_time', startISO)
-                    .lte('pickup_time', endISO)
-                    .in('status', ['completed', 'upcoming', 'pending', 'confirmed'])
-                    .order('pickup_time', { ascending: false });
+                let tripsQuery;
+                try {
+                    console.log('🔍 Step 6: Building trips query...');
+                    tripsQuery = supabase
+                        .from('trips')
+                        .select(`
+                            id,
+                            pickup_address,
+                            destination_address,
+                            pickup_time,
+                            price,
+                            status,
+                            wheelchair_type,
+                            is_round_trip,
+                            additional_passengers,
+                            managed_client_id,
+                            user_id,
+                            managed_client:facility_managed_clients(first_name, last_name, phone_number, email),
+                            user_profile:profiles(first_name, last_name, phone_number, email)
+                        `)
+                        .eq('facility_id', facilityId)
+                        .gte('pickup_time', startISO)
+                        .lte('pickup_time', endISO)
+                        .in('status', ['completed', 'upcoming', 'pending', 'confirmed'])
+                        .order('pickup_time', { ascending: false });
+                    
+                    console.log('✅ Step 6: Trips query built successfully');
+                } catch (queryBuildError) {
+                    console.error('❌ Step 6 FAILED: Error building trips query:', queryBuildError);
+                    throw queryBuildError;
+                }
+
+                console.log('🔍 Step 7: Executing trips query...');
+                const { data: trips, error: tripsError } = await tripsQuery;
 
                 if (tripsError) {
-                    console.error('❌ Error fetching trips:', tripsError);
+                    console.error('❌ Step 7 FAILED: Error fetching trips:', tripsError);
+                    console.error('❌ Trip error details:', JSON.stringify(tripsError, null, 2));
                     setError(`Failed to fetch trips: ${tripsError.message}`);
                     setLoading(false);
                     return;
                 }
 
-                console.log(`✅ Found ${trips?.length || 0} trips for the month`);
+                console.log(`✅ Step 7: Found ${trips?.length || 0} trips for the month`);
+                console.log('🔍 Sample trip data:', trips?.[0] || 'No trips found');
 
                 // Process trips and calculate totals (need to do this after facility info is set)
+                console.log('🔍 Step 8: Processing and storing trips...');
                 setFacilityTrips(trips || []);
                 
                 // Calculate total for billable trips only  
+                console.log('🔍 Step 9: Calculating billable amount...');
                 const billableAmount = (trips || [])
                     .filter(trip => trip.status === 'completed' && trip.price > 0)
                     .reduce((sum, trip) => sum + parseFloat(trip.price || 0), 0);
                 
+                console.log(`✅ Step 9: Calculated billable amount: $${billableAmount.toFixed(2)}`);
                 setTotalAmount(billableAmount);
+                
+                console.log('✅ Step 10: All processing complete, setting loading to false');
                 setLoading(false);
 
             } catch (err) {
-                console.error('Error in monthly invoice page:', err);
-                setError('Failed to load monthly invoice details');
+                console.error('💥 CRITICAL ERROR in monthly invoice page:', err);
+                console.error('💥 Error stack:', err.stack);
+                console.error('💥 Error message:', err.message);
+                console.error('💥 Error details:', JSON.stringify(err, null, 2));
+                setError(`Failed to load monthly invoice details: ${err.message}`);
                 setLoading(false);
             }
         }
