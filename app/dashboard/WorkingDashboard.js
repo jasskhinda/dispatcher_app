@@ -71,8 +71,9 @@ export default function WorkingDashboard() {
                 .limit(50);
 
             if (tripsError) {
-                console.error('Trips error:', tripsError);
-                console.log('Falling back to basic trip query...');
+                console.error('❌ Trips error:', tripsError);
+                console.error('❌ Trips error details:', JSON.stringify(tripsError, null, 2));
+                console.log('⚠️ Falling back to basic trip query...');
                 
                 // Fallback: Try basic query without joins - SHOW NEWEST FIRST
                 const { data: basicTrips, error: basicError } = await supabase
@@ -82,18 +83,28 @@ export default function WorkingDashboard() {
                     .limit(50);
                 
                 if (basicError) {
-                    console.error('Basic trips error:', basicError);
+                    console.error('❌ Basic trips error:', basicError);
                     setTrips([]);
                 } else {
+                    console.log(`✅ Loaded ${basicTrips?.length || 0} trips via fallback query`);
                     // Enhance basic trips with client information
                     const enhancedTrips = await enhanceTripsWithClientInfo(basicTrips);
                     setTrips(enhancedTrips || []);
                 }
             } else {
+                console.log(`✅ Main query succeeded! Loaded ${tripsData?.length || 0} trips`);
+                // Check if facility data is included
+                const tripsWithFacilities = tripsData?.filter(trip => trip.facility) || [];
+                console.log(`📊 Trips with facility data: ${tripsWithFacilities.length}/${tripsData?.length || 0}`);
+                
+                if (tripsWithFacilities.length > 0) {
+                    console.log('🏥 Sample facility data:', tripsWithFacilities[0].facility);
+                }
+                
                 // Enhance trips with managed client information manually
                 const enhancedTrips = await enhanceTripsWithClientInfo(tripsData);
                 setTrips(enhancedTrips || []);
-                console.log(`✅ Loaded ${enhancedTrips?.length || 0} trips with enhanced client data`);
+                console.log(`✅ Final enhanced trips count: ${enhancedTrips?.length || 0}`);
                 
                 // DEBUG: Show sample trip data structure
                 if (enhancedTrips && enhancedTrips.length > 0) {
@@ -344,14 +355,23 @@ export default function WorkingDashboard() {
         if (trip.facility_id) {
             tripSource = 'Facility';
             
+            console.log('🏥 Processing facility trip:', {
+                facility_id: trip.facility_id,
+                has_facility_data: !!trip.facility,
+                facility_data: trip.facility
+            });
+            
             if (trip.facility) {
                 // Professional facility display with multiple fallbacks
                 if (trip.facility.name) {
                     facilityInfo = trip.facility.name;
+                    console.log('✅ Using facility name:', facilityInfo);
                 } else if (trip.facility.contact_email) {
                     facilityInfo = trip.facility.contact_email;
+                    console.log('⚠️ Using facility contact_email as name:', facilityInfo);
                 } else {
                     facilityInfo = `Facility ${trip.facility_id.slice(0, 8)}`;
+                    console.log('❌ Using facility ID fallback:', facilityInfo);
                 }
                 
                 // Add facility contact information
@@ -362,6 +382,7 @@ export default function WorkingDashboard() {
                 }
             } else {
                 facilityInfo = `Facility ${trip.facility_id.slice(0, 8)}`;
+                console.log('❌ No facility data available, using ID fallback:', facilityInfo);
             }
         }
 
