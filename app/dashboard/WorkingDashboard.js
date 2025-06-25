@@ -59,12 +59,12 @@ export default function WorkingDashboard() {
             setUser(session.user);
 
             // Fetch trips with enhanced client and facility information - SHOW NEWEST FIRST
-            // Note: Using manual enhancement instead of joins due to potential FK constraints
+            // Note: Using correct relationship syntax for user profiles
             const { data: tripsData, error: tripsError } = await supabase
                 .from('trips')
                 .select(`
                     *,
-                    user_profile:profiles!trips_user_id_fkey(first_name, last_name, phone_number, email),
+                    user_profile:profiles(first_name, last_name, phone_number),
                     facility:facilities(id, name, contact_email, phone_number)
                 `)
                 .order('created_at', { ascending: false })
