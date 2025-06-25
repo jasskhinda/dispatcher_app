@@ -1,108 +1,301 @@
-import { redirect } from 'next/navigation';
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+'use client';
 
-// Professional Invoice Details Page for Trip
-export default async function TripInvoiceDetailPage({ params }) {
-    const { tripId } = params;
+import { useEffect, useState } from 'react';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
+
+// Professional Invoice Details Page for Trip - Client Component
+export default function TripInvoiceDetailPage() {
+    const [loading, setLoading] = useState(true);
+    const [user, setUser] = useState(null);
+    const [trip, setTrip] = useState(null);
+    const [error, setError] = useState(null);
+    const [existingInvoice, setExistingInvoice] = useState(null);
     
-    try {
-        // Create server component client
-        const supabase = createServerComponentClient({ cookies });
+    const router = useRouter();
+    const params = useParams();
+    const tripId = params.tripId;
+    const supabase = createClientComponentClient();
 
-        // Check authentication
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-            redirect('/login');
+    useEffect(() => {
+        async function fetchData() {
+            try {
+                setLoading(true);
+                
+                // Check authentication
+                const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+                
+                if (sessionError) {
+                    console.error('Session error:', sessionError);
+                    setError('Authentication error');
+                    setLoading(false);
+                    return;
+                }
+
+                if (!session) {
+                    console.log('No session found, redirecting to login');
+                    router.push('/login');
+                    return;
+                }
+
+                console.log('✅ User authenticated:', session.user.email);
+                setUser(session.user);
+
+                // First, try to fetch trip with basic information only
+                console.log('🔍 Fetching trip with ID:', tripId);
+                
+                const { data: basicTrip, error: basicError } = await supabase
+                    .from('trips')
+                    .select('*')
+                    .eq('id', tripId)
+                    .single();
+
+                if (basicError) {
+                    console.error('❌ Basic trip query failed:', basicError);
+                    setError(`Trip not found: ${basicError.message}`);
+                    setLoading(false);
+                    return;
+                }
+
+                console.log('✅ Basic trip data loaded:', basicTrip);
+                
+                // Now enhance with related data
+                let enhancedTrip = { ...basicTrip };
+                
+                // Try to fetch user profile if user_id exists
+                if (basicTrip.user_id) {
+                    try {
+                        const { data: userProfile } = await supabase
+                            .from('profiles')
+                            .select('first_name, last_name, phone_number, email')
+                            .eq('id', basicTrip.user_id)
+                            .single();
+                        
+                        if (userProfile) {
+                            enhancedTrip.user_profile = userProfile;
+                            console.log('✅ User profile loaded');
+                        }
+                    } catch (err) {
+                        console.log('⚠️ Could not load user profile:', err.message);
+                    }
+                }
+                
+                // Try to fetch facility if facility_id exists
+                if (basicTrip.facility_id) {
+                    try {
+                        const { data: facility } = await supabase
+                            .from('facilities')
+                            .select('id, name, contact_email, phone_number, address')
+                            .eq('id', basicTrip.facility_id)
+                            .single();
+                        
+                        if (facility) {
+                            enhancedTrip.facility = facility;
+                            console.log('✅ Facility data loaded');
+                        }
+                    } catch (err) {
+                        console.log('⚠️ Could not load facility:', err.message);
+                    }
+                }
+                
+                // Try to fetch managed client if managed_client_id exists
+                if (basicTrip.managed_client_id) {
+                    try {
+                        // Try facility_managed_clients first
+                        const { data: managedClient } = await supabase
+                            .from('facility_managed_clients')
+                            .select('first_name, last_name, phone_number, email')
+                            .eq('id', basicTrip.managed_client_id)
+                            .single();
+                        
+                        if (managedClient) {
+                            enhancedTrip.managed_client = managedClient;
+                            console.log('✅ Managed client data loaded');
+                        }
+                    } catch (err) {
+                        console.log('⚠️ Could not load managed client:', err.message);
+                    }
+                }
+                
+                setTrip(enhancedTrip);
+                console.log('✅ Enhanced trip data ready');
+
+                // Check if invoice already exists for this trip
+                const { data: invoiceData } = await supabase
+                    .from('invoices')
+                    .select('*')
+                    .eq('trip_id', tripId)
+                    .single();
+
+                if (invoiceData) {
+                    setExistingInvoice(invoiceData);
+                }
+
+                setLoading(false);
+
+            } catch (err) {
+                console.error('Error in invoice detail page:', err);
+                setError('Failed to load invoice details');
+                setLoading(false);
+            }
         }
 
-        // Get user profile
-        let userProfile = null;
-        try {
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', session.user.id)
-                .single();
+        if (tripId) {
+            fetchData();
+        }
+    }, [tripId, router, supabase]);
 
-            userProfile = error ? {
-                id: session.user.id,
-                email: session.user.email,
-                role: 'dispatcher'
-            } : data;
-        } catch (error) {
-            console.error('Error fetching user profile:', error);
-            userProfile = {
-                id: session.user.id,
-                email: session.user.email,
-                role: 'dispatcher'
+    // Enhanced client information display
+    const getClientInfo = () => {
+        if (!trip) return { name: 'Unknown Client', phone: '', email: '', type: 'Unknown' };
+        
+        // Check for managed client (facility app bookings)
+        if (trip.managed_client_id && trip.managed_client) {
+            return {
+                name: `${trip.managed_client.first_name || ''} ${trip.managed_client.last_name || ''}`.trim() || 'Managed Client',
+                phone: trip.managed_client.phone_number || '',
+                email: trip.managed_client.email || '',
+                type: 'Facility Client'
             };
         }
+        
+        // Check for direct user bookings
+        if (trip.user_id && trip.user_profile) {
+            return {
+                name: `${trip.user_profile.first_name || ''} ${trip.user_profile.last_name || ''}`.trim() || 'Individual Client',
+                phone: trip.user_profile.phone_number || '',
+                email: trip.user_profile.email || '',
+                type: 'Individual Client'
+            };
+        }
+        
+        // Fallback to passenger name from trip
+        if (trip.passenger_name) {
+            return {
+                name: trip.passenger_name,
+                phone: trip.passenger_phone || '',
+                email: '',
+                type: 'Trip Passenger'
+            };
+        }
+        
+        return {
+            name: 'Unknown Client',
+            phone: '',
+            email: '',
+            type: 'Unknown'
+        };
+    };
 
-        // Fetch trip with enhanced client and facility information
-        const { data: trip, error: tripError } = await supabase
-            .from('trips')
-            .select(`
-                *,
-                user_profile:profiles(first_name, last_name, phone_number, email),
-                facility:facilities(id, name, contact_email, phone_number, address)
-            `)
-            .eq('id', tripId)
-            .single();
+    // Get facility information for display
+    const getFacilityInfo = () => {
+        if (trip?.facility) {
+            return {
+                name: trip.facility.name || 'Unknown Facility',
+                phone: trip.facility.phone_number || '',
+                email: trip.facility.contact_email || '',
+                address: trip.facility.address || ''
+            };
+        }
+        return null;
+    };
 
-        if (tripError || !trip) {
-            console.error('Error fetching trip:', tripError);
-            return (
-                <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                    <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6">
-                        <div className="text-center">
-                            <div className="text-red-500 text-6xl mb-4">📄</div>
-                            <h1 className="text-xl font-bold text-gray-900 mb-4">Trip Not Found</h1>
-                            <p className="text-gray-600 mb-6">The requested trip could not be found or you don't have permission to view it.</p>
-                            <a href="/dashboard" className="inline-block bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700">
-                                Back to Dashboard
-                            </a>
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-gray-50">
+                {/* Header Skeleton */}
+                <div className="bg-white shadow-sm border-b">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                        <div className="flex justify-between items-center py-6">
+                            <div className="flex items-center space-x-4">
+                                <div className="w-6 h-6 bg-gray-200 rounded animate-pulse"></div>
+                                <div>
+                                    <div className="h-8 bg-gray-200 rounded w-48 animate-pulse"></div>
+                                    <div className="h-4 bg-gray-200 rounded w-24 mt-2 animate-pulse"></div>
+                                </div>
+                            </div>
+                            <div className="flex space-x-3">
+                                <div className="h-10 bg-gray-200 rounded w-20 animate-pulse"></div>
+                                <div className="h-10 bg-gray-200 rounded w-32 animate-pulse"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
-            );
-        }
+                {/* Content Skeleton */}
+                <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                    <div className="bg-white shadow-lg rounded-lg overflow-hidden">
+                        <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-8">
+                            <div className="space-y-4">
+                                <div className="h-8 bg-white/20 rounded w-64 animate-pulse"></div>
+                                <div className="h-4 bg-white/20 rounded w-48 animate-pulse"></div>
+                                <div className="h-4 bg-white/20 rounded w-52 animate-pulse"></div>
+                            </div>
+                        </div>
+                        <div className="p-8 space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div className="space-y-3">
+                                    <div className="h-6 bg-gray-200 rounded w-24 animate-pulse"></div>
+                                    <div className="h-4 bg-gray-200 rounded w-48 animate-pulse"></div>
+                                    <div className="h-4 bg-gray-200 rounded w-40 animate-pulse"></div>
+                                </div>
+                                <div className="space-y-3">
+                                    <div className="h-6 bg-gray-200 rounded w-28 animate-pulse"></div>
+                                    <div className="h-4 bg-gray-200 rounded w-32 animate-pulse"></div>
+                                    <div className="h-4 bg-gray-200 rounded w-36 animate-pulse"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
-        // Enhanced client information
-        const getClientInfo = () => {
-            if (trip.managed_client_id) {
-                // For managed clients, we might need to fetch from a different table
-                return {
-                    name: 'Managed Client',
-                    phone: '',
-                    email: '',
-                    type: 'Managed Client'
-                };
-            } else if (trip.user_profile) {
-                return {
-                    name: `${trip.user_profile.first_name || ''} ${trip.user_profile.last_name || ''}`.trim() || 'Unknown Client',
-                    phone: trip.user_profile.phone_number || '',
-                    email: trip.user_profile.email || '',
-                    type: 'Individual Client'
-                };
-            }
-            return {
-                name: 'Unknown Client',
-                phone: '',
-                email: '',
-                type: 'Unknown'
-            };
-        };
+    if (error) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6">
+                    <div className="text-center">
+                        <div className="text-red-500 text-6xl mb-4">📄</div>
+                        <h1 className="text-xl font-bold text-gray-900 mb-4">Trip Not Found</h1>
+                        <p className="text-gray-600 mb-6">{error}</p>
+                        <div className="space-y-3">
+                            <a href="/dashboard" className="block bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700">
+                                Back to Dashboard
+                            </a>
+                            <button 
+                                onClick={() => window.location.reload()} 
+                                className="block w-full bg-gray-100 text-gray-700 px-6 py-2 rounded-md hover:bg-gray-200"
+                            >
+                                Try Again
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
-        const clientInfo = getClientInfo();
-        const facilityInfo = trip.facility;
+    if (!trip) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6">
+                    <div className="text-center">
+                        <div className="text-red-500 text-6xl mb-4">📄</div>
+                        <h1 className="text-xl font-bold text-gray-900 mb-4">Trip Not Found</h1>
+                        <p className="text-gray-600 mb-6">The requested trip could not be found or you don't have permission to view it.</p>
+                        <a href="/dashboard" className="inline-block bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700">
+                            Back to Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
-        // Check if invoice already exists for this trip
-        const { data: existingInvoice } = await supabase
-            .from('invoices')
-            .select('*')
-            .eq('trip_id', tripId)
-            .single();
+    const clientInfo = getClientInfo();
+    const facilityInfo = getFacilityInfo();
 
         return (
             <div className="min-h-screen bg-gray-50 print:bg-white">
@@ -434,9 +627,4 @@ export default async function TripInvoiceDetailPage({ params }) {
                 </div>
             </div>
         );
-
-    } catch (error) {
-        console.error('Error in trip invoice detail page:', error);
-        redirect('/login?error=server_error');
-    }
 }
