@@ -19,7 +19,7 @@ export default function FacilityMonthlyInvoicePage() {
     
     const router = useRouter();
     const params = useParams();
-    const invoiceId = params.tripId; // This will be facility_id or month identifier
+    const facilityMonth = params.facilityMonth; // This will be in format: facilityId-YYYY-MM
     const supabase = createClientComponentClient();
 
     useEffect(() => {
@@ -46,34 +46,36 @@ export default function FacilityMonthlyInvoicePage() {
                 console.log('✅ User authenticated:', session.user.email);
                 setUser(session.user);
 
-                // Parse the invoice ID to determine if it's a facility ID or trip ID
-                // For monthly billing, we'll use format: facilityId-YYYY-MM
-                // But for now, let's check if it's a trip ID first, then extract facility
-                
+                // Parse the facilityMonth parameter to extract facility ID and target month
+                // Format expected: facilityId-YYYY-MM
                 let facilityId = null;
                 let targetMonth = null;
                 
-                console.log('🔍 Parsing invoice identifier:', invoiceId);
+                console.log('🔍 Parsing facilityMonth parameter:', facilityMonth);
                 
-                // First, try to get the trip to extract facility_id
-                const { data: tripData, error: tripError } = await supabase
-                    .from('trips')
-                    .select('facility_id, pickup_time')
-                    .eq('id', invoiceId)
-                    .single();
-
-                if (tripData && tripData.facility_id) {
-                    facilityId = tripData.facility_id;
-                    // Extract month from the trip's pickup_time
-                    const tripDate = new Date(tripData.pickup_time);
-                    targetMonth = `${tripDate.getFullYear()}-${String(tripDate.getMonth() + 1).padStart(2, '0')}`;
-                    console.log(`✅ Found facility ${facilityId} for month ${targetMonth} from trip`);
-                } else {
-                    console.log('❌ Trip not found or no facility_id, trying direct facility approach');
-                    setError('Invalid invoice identifier or not a facility booking');
+                if (!facilityMonth) {
+                    console.error('❌ No facilityMonth parameter provided');
+                    setError('Invalid invoice URL format');
                     setLoading(false);
                     return;
                 }
+                
+                // Split on the last two dashes to handle facility IDs that might contain dashes
+                const parts = facilityMonth.split('-');
+                if (parts.length < 3) {
+                    console.error('❌ Invalid facilityMonth format:', facilityMonth);
+                    setError('Invalid invoice URL format. Expected format: facilityId-YYYY-MM');
+                    setLoading(false);
+                    return;
+                }
+                
+                // Extract year and month (last two parts)
+                const monthPart = parts.pop();
+                const yearPart = parts.pop();
+                facilityId = parts.join('-'); // Rejoin remaining parts as facility ID
+                targetMonth = `${yearPart}-${monthPart}`;
+                
+                console.log(`✅ Parsed facility ID: ${facilityId}, target month: ${targetMonth}`);
 
                 // Get facility information
                 const { data: facility, error: facilityError } = await supabase
@@ -187,10 +189,10 @@ export default function FacilityMonthlyInvoicePage() {
             }
         }
 
-        if (invoiceId) {
+        if (facilityMonth) {
             fetchMonthlyInvoiceData();
         }
-    }, [invoiceId, router, supabase]);
+    }, [facilityMonth, router, supabase]);
 
     // Get display month name
     const getMonthDisplayName = () => {
@@ -564,8 +566,26 @@ export default function FacilityMonthlyInvoicePage() {
                                         <li>• Electronic transfer (preferred)</li>
                                         <li>• Company check</li>
                                         <li>• Credit card (processing fee applies)</li>
-                                        <li>• Contact for payment portal access</li>
+                                        <li>• Online payment portal available</li>
                                     </ul>
+                                    
+                                    <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                        <h5 className="font-medium text-blue-900 mb-2">🌐 Online Payment Portal</h5>
+                                        <p className="text-sm text-blue-800 mb-3">
+                                            Facilities can now pay their monthly invoices online through the Facility App billing dashboard.
+                                        </p>
+                                        <a 
+                                            href={`${process.env.NEXT_PUBLIC_FACILITY_APP_URL || 'http://localhost:3001'}/dashboard/billing`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center text-sm bg-blue-600 text-white px-3 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                                        >
+                                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                            </svg>
+                                            Access Payment Portal
+                                        </a>
+                                    </div>
                                 </div>
                             </div>
                         </div>
