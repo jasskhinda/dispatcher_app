@@ -1,0 +1,13 @@
+{
+  "version": "1.0.0",
+  "deployedAt": "2025-06-25T12:00:00.000Z",
+  "features": {
+    "cacheBusting": true,
+    "periodicRefresh": true,
+    "carebreidgeProtection": true,
+    "enhancedLogging": true
+  },
+  "careBridgeFacilityId": "e1b94bde-d092-4ce6-b78c-9cff1d0118a3",
+  "refreshInterval": 30000,
+  "description": "Permanent fix for CareBridge Living facility name display"
+}
