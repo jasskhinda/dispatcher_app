@@ -95,10 +95,29 @@ export default function WorkingDashboard() {
                 console.log(`✅ Main query succeeded! Loaded ${tripsData?.length || 0} trips`);
                 // Check if facility data is included
                 const tripsWithFacilities = tripsData?.filter(trip => trip.facility) || [];
+                const tripsWithFacilityId = tripsData?.filter(trip => trip.facility_id) || [];
+                console.log(`📊 Trips with facility_id: ${tripsWithFacilityId.length}/${tripsData?.length || 0}`);
                 console.log(`📊 Trips with facility data: ${tripsWithFacilities.length}/${tripsData?.length || 0}`);
                 
                 if (tripsWithFacilities.length > 0) {
                     console.log('🏥 Sample facility data:', tripsWithFacilities[0].facility);
+                }
+                
+                // Show specific debugging for facility ID e1b94bde-d092-4ce6-b78c-9cff1d0118a3
+                const targetTrips = tripsData?.filter(trip => trip.facility_id === 'e1b94bde-d092-4ce6-b78c-9cff1d0118a3') || [];
+                if (targetTrips.length > 0) {
+                    console.log('🎯 FOUND TARGET FACILITY TRIPS:', targetTrips.length);
+                    targetTrips.forEach((trip, index) => {
+                        console.log(`   Trip ${index + 1}:`, {
+                            trip_id: trip.id,
+                            facility_id: trip.facility_id,
+                            has_facility_data: !!trip.facility,
+                            facility_name: trip.facility?.name || '(missing)',
+                            facility_data: trip.facility
+                        });
+                    });
+                } else {
+                    console.log('🔍 No trips found for target facility ID: e1b94bde-d092-4ce6-b78c-9cff1d0118a3');
                 }
                 
                 // Enhance trips with managed client information manually
@@ -365,14 +384,17 @@ export default function WorkingDashboard() {
                 // Professional facility display with multiple fallbacks
                 if (trip.facility.name) {
                     facilityInfo = trip.facility.name;
-                    console.log('✅ Using facility name:', facilityInfo);
+                    console.log('✅ Using facility name:', facilityInfo, 'for facility ID:', trip.facility_id);
                 } else if (trip.facility.contact_email) {
                     facilityInfo = trip.facility.contact_email;
-                    console.log('⚠️ Using facility contact_email as name:', facilityInfo);
+                    console.log('⚠️ Using facility contact_email as name:', facilityInfo, 'for facility ID:', trip.facility_id);
                 } else {
                     facilityInfo = `Facility ${trip.facility_id.slice(0, 8)}`;
-                    console.log('❌ Using facility ID fallback:', facilityInfo);
+                    console.log('❌ Using facility ID fallback:', facilityInfo, 'for facility ID:', trip.facility_id);
                 }
+                
+                // Add enhanced debugging for the facility data
+                console.log('🔍 Complete facility data:', JSON.stringify(trip.facility, null, 2));
                 
                 // Add facility contact information
                 if (trip.facility.phone_number) {
@@ -382,7 +404,8 @@ export default function WorkingDashboard() {
                 }
             } else {
                 facilityInfo = `Facility ${trip.facility_id.slice(0, 8)}`;
-                console.log('❌ No facility data available, using ID fallback:', facilityInfo);
+                console.log('❌ No facility data available for facility_id:', trip.facility_id, 'using ID fallback:', facilityInfo);
+                console.log('❌ This means the JOIN failed or the facility record doesn\'t exist');
             }
         }
 
