@@ -74,13 +74,13 @@ body {
   /* Optimize colors for printing */
   .print-friendly {
     -webkit-print-color-adjust: exact;
-    color-adjust: exact;
+    print-color-adjust: exact;
   }
   
   /* Ensure backgrounds print correctly */
   .print-bg {
     -webkit-print-color-adjust: exact;
-    color-adjust: exact;
+    print-color-adjust: exact;
   }
   
   /* Make text more readable in print */

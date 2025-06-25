@@ -1,10 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function IndividualBookingInvoicePage() {
+// Force dynamic rendering for this page
+export const dynamic = 'force-dynamic';
+
+function IndividualBookingInvoiceContent() {
     const [loading, setLoading] = useState(true);
     const [user, setUser] = useState(null);
     const [trip, setTrip] = useState(null);
@@ -405,5 +408,24 @@ export default function IndividualBookingInvoicePage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+function LoadingSkeleton() {
+    return (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+            <div className="bg-white p-8 rounded-lg shadow text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p className="text-gray-600">Loading invoice page...</p>
+            </div>
+        </div>
+    );
+}
+
+export default function IndividualBookingInvoicePage() {
+    return (
+        <Suspense fallback={<LoadingSkeleton />}>
+            <IndividualBookingInvoiceContent />
+        </Suspense>
     );
 }
