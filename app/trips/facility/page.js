@@ -129,59 +129,12 @@ export default function FacilityOverviewPage() {
         await fetchFacilityOverview();
     };
 
-            let newStatus;
-            let message;
-            let updateData = {
-                id: tripId,
-                updated_at: new Date().toISOString()
-            };
-
-            switch (action) {
-                case 'approve':
-                    newStatus = 'upcoming';
-                    message = '✅ Trip approved successfully';
-                    updateData.status = newStatus;
-                    break;
-                case 'reject':
-                    newStatus = 'cancelled';
-                    message = '❌ Trip rejected';
-                    updateData.status = newStatus;
-                    updateData.cancellation_reason = 'Rejected by dispatcher';
-                    break;
-                case 'complete':
-                    newStatus = 'completed';
-                    message = '🎉 Trip marked as completed';
-                    updateData.status = newStatus;
-                    break;
-            }
-
-            const { error } = await supabase
-                .from('trips')
-                .update(updateData)
-                .eq('id', tripId);
-
-            if (error) throw error;
-
-            // Update local state
-            setTrips(prevTrips => 
-                prevTrips.map(trip => 
-                    trip.id === tripId 
-                        ? { ...trip, status: newStatus, updated_at: new Date().toISOString() }
-                        : trip
-                )
-            );
-
-            setActionMessage(message);
-            setTimeout(() => setActionMessage(''), 3000);
-
-        } catch (err) {
-            console.error(`Error ${action}ing trip:`, err);
-            setActionMessage(`Error: ${err.message}`);
-            setTimeout(() => setActionMessage(''), 5000);
-        } finally {
-            setActionLoading(prev => ({ ...prev, [tripId]: false }));
-        }
-    }
+    const formatCurrency = (amount) => {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD'
+        }).format(amount);
+    };
 
     const formatDate = (dateString) => {
         if (!dateString) return 'N/A';
