@@ -26,6 +26,12 @@ export default function WorkingDashboard() {
         getSession();
     }, []);
 
+    // Add a refresh function to force update statistics
+    const refreshTrips = async () => {
+        console.log('🔄 Manual refresh triggered');
+        await getSession();
+    };
+
     // Filter trips whenever trips or filter changes
     useEffect(() => {
         filterTrips();
@@ -69,17 +75,19 @@ export default function WorkingDashboard() {
             const cacheKey = Date.now();
             console.log(`🔄 Cache-busting query with key: ${cacheKey}`);
 
-            // Fetch trips with enhanced client and facility information - SHOW NEWEST FIRST
-            // Note: Using correct relationship syntax for user profiles
+            // Fetch trips from ALL databases/apps with enhanced client and facility information
+            // This will include trips from BookingCCT, facility_app, and any other sources
+            console.log('🔍 Fetching trips from all sources...');
+            
             const { data: tripsData, error: tripsError } = await supabase
                 .from('trips')
                 .select(`
                     *,
-                    user_profile:profiles(first_name, last_name, phone_number),
+                    user_profile:profiles(first_name, last_name, phone_number, email),
                     facility:facilities(id, name, contact_email, phone_number)
                 `)
                 .order('created_at', { ascending: false })
-                .limit(50);
+                .limit(200); // Increased limit to show more trips from all sources
 
             if (tripsError) {
                 console.error('❌ Trips error:', tripsError);
@@ -91,19 +99,49 @@ export default function WorkingDashboard() {
                     .from('trips')
                     .select('*')
                     .order('created_at', { ascending: false })
-                    .limit(50);
+                    .limit(200);
                 
                 if (basicError) {
                     console.error('❌ Basic trips error:', basicError);
                     setTrips([]);
                 } else {
-                    console.log(`✅ Loaded ${basicTrips?.length || 0} trips via fallback query`);
+                    console.log(`✅ Loaded ${basicTrips?.length || 0} trips via fallback query from all sources`);
                     // Enhance basic trips with client information
                     const enhancedTrips = await enhanceTripsWithClientInfo(basicTrips);
                     setTrips(enhancedTrips || []);
                 }
             } else {
-                console.log(`✅ Main query succeeded! Loaded ${tripsData?.length || 0} trips`);
+                console.log(`✅ Main query succeeded! Loaded ${tripsData?.length || 0} trips from all sources`);
+                
+                // Count trips by source with detailed breakdown
+                const facilityTrips = tripsData?.filter(trip => trip.facility_id) || [];
+                const individualTrips = tripsData?.filter(trip => !trip.facility_id && trip.user_id) || [];
+                const unknownTrips = tripsData?.filter(trip => !trip.facility_id && !trip.user_id) || [];
+                
+                console.log(`📊 Detailed trip sources breakdown:`);
+                console.log(`   - Facility app trips (has facility_id): ${facilityTrips.length}`);
+                console.log(`   - Booking app trips (has user_id, no facility_id): ${individualTrips.length}`);
+                console.log(`   - Unknown source trips (no facility_id or user_id): ${unknownTrips.length}`);
+                console.log(`   - Total trips: ${tripsData?.length || 0}`);
+                
+                // Show sample data from each source
+                if (facilityTrips.length > 0) {
+                    console.log(`🏥 Sample facility trip:`, {
+                        id: facilityTrips[0].id,
+                        facility_id: facilityTrips[0].facility_id,
+                        managed_client_id: facilityTrips[0].managed_client_id,
+                        source: 'Facility App'
+                    });
+                }
+                
+                if (individualTrips.length > 0) {
+                    console.log(`👤 Sample booking app trip:`, {
+                        id: individualTrips[0].id,
+                        user_id: individualTrips[0].user_id,
+                        created_at: individualTrips[0].created_at,
+                        source: 'Booking App'
+                    });
+                }
                 
                 // Check if facility data is included
                 const tripsWithFacilities = tripsData?.filter(trip => trip.facility) || [];
@@ -148,7 +186,8 @@ export default function WorkingDashboard() {
                             has_user_profile: !!enhancedTrips[0].user_profile,
                             has_managed_client: !!enhancedTrips[0].managed_client,
                             has_facility: !!enhancedTrips[0].facility,
-                            pickup_address: enhancedTrips[0].pickup_address?.substring(0, 50) + '...'
+                            pickup_address: enhancedTrips[0].pickup_address?.substring(0, 50) + '...',
+                            source: enhancedTrips[0].facility_id ? 'Facility App' : 'Booking App'
                         }
                     });
                 }
@@ -482,7 +521,7 @@ export default function WorkingDashboard() {
         let clientPhone = '';
         let facilityInfo = '';
         let facilityContact = '';
-        let tripSource = 'Individual';
+        let tripSource = 'Booking App'; // Default to Booking App for individual bookings
 
         console.log('🔍 Processing trip for client resolution:', {
             trip_id: trip.id,
@@ -492,14 +531,15 @@ export default function WorkingDashboard() {
             has_user_profile: !!trip.user_profile,
             has_managed_client: !!trip.managed_client,
             has_facility: !!trip.facility,
-            pickup_address: trip.pickup_address?.substring(0, 50) + '...'
+            pickup_address: trip.pickup_address?.substring(0, 50) + '...',
+            determined_source: trip.facility_id ? 'Facility App' : 'Booking App'
         });
 
         // Determine trip source and facility information first
         if (trip.facility_id) {
-            tripSource = 'Facility';
+            tripSource = 'Facility App';
             
-            console.log('🏥 Processing facility trip:', {
+            console.log('🏥 Processing facility app trip:', {
                 facility_id: trip.facility_id,
                 has_facility_data: !!trip.facility,
                 facility_data: trip.facility
@@ -595,28 +635,37 @@ export default function WorkingDashboard() {
                 clientName = `${location} Client (Managed) - ${shortId}`;
                 console.log('⚠️ Managed client fallback used:', clientName);
             }
-        } else if (trip.user_id) {
-            console.log('👤 Individual user trip detected:', {
+        } else {
+            console.log('👤 Processing booking app trip (no facility_id):', {
                 user_id: trip.user_id,
                 has_user_profile: !!trip.user_profile,
                 user_profile_fields: trip.user_profile ? Object.keys(trip.user_profile) : 'none'
             });
             
-            // Regular user booking
-            if (trip.user_profile && trip.user_profile.first_name) {
-                clientName = `${trip.user_profile.first_name} ${trip.user_profile.last_name || ''}`.trim();
-                clientPhone = trip.user_profile.phone_number || trip.user_profile.email || '';
-                console.log('✅ Individual user name resolved:', clientName);
+            // This is an individual booking from the booking app
+            if (trip.user_id) {
+                // Regular user booking
+                if (trip.user_profile && trip.user_profile.first_name) {
+                    clientName = `${trip.user_profile.first_name} ${trip.user_profile.last_name || ''}`.trim();
+                    clientPhone = trip.user_profile.phone_number || trip.user_profile.email || '';
+                    console.log('✅ Booking app user profile resolved:', clientName);
+                } else {
+                    // User without profile data - try to make it more descriptive
+                    const location = extractLocationFromAddress(trip.pickup_address);
+                    const shortId = trip.user_id.slice(0, 8);
+                    clientName = `${location} Client - ${shortId}`;
+                    console.log('⚠️ Booking app user fallback used:', clientName);
+                }
+            } else if (trip.client_name) {
+                // Fallback to any client_name field that might exist
+                clientName = trip.client_name;
+                tripSource = 'Unknown';
             } else {
-                // User without profile data - try to make it more descriptive
-                const location = extractLocationFromAddress(trip.pickup_address);
-                const shortId = trip.user_id.slice(0, 8);
-                clientName = `${location} Client - ${shortId}`;
-                console.log('⚠️ Individual user fallback used:', clientName);
+                // Unknown trip source
+                clientName = 'Unknown Client';
+                tripSource = 'Unknown';
+                console.log('❌ Unknown trip source - no identifiable client info');
             }
-        } else if (trip.client_name) {
-            // Fallback to any client_name field that might exist
-            clientName = trip.client_name;
         }
 
         return {
@@ -814,12 +863,12 @@ export default function WorkingDashboard() {
                                 Welcome, Dispatcher
                             </span>
                             <div className="flex space-x-2">
-                                <a 
-                                    href="/billing" 
-                                    className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors text-sm"
+                                <button
+                                    onClick={refreshTrips}
+                                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors text-sm"
                                 >
-                                    💰 Billing Overview
-                                </a>
+                                    🔄 Refresh Data
+                                </button>
                                 <a 
                                     href="/invoices" 
                                     className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors text-sm"
@@ -848,7 +897,8 @@ export default function WorkingDashboard() {
                             </div>
                             <div className="ml-4">
                                 <p className="text-sm font-medium text-gray-500">Total Trips</p>
-                                <p className="text-2xl font-semibold text-gray-900">{trips.length}</p>
+                                <p className="text-2xl font-semibold text-gray-900">{filteredTrips.length}</p>
+                                <p className="text-xs text-gray-400">All sources: {trips.length} total</p>
                             </div>
                         </div>
                     </div>
@@ -863,8 +913,9 @@ export default function WorkingDashboard() {
                             <div className="ml-4">
                                 <p className="text-sm font-medium text-gray-500">Pending</p>
                                 <p className="text-2xl font-semibold text-gray-900">
-                                    {trips.filter(t => t.status === 'pending').length}
+                                    {filteredTrips.filter(t => t.status === 'pending').length}
                                 </p>
+                                <p className="text-xs text-gray-400">Awaiting approval</p>
                             </div>
                         </div>
                     </div>
@@ -879,8 +930,9 @@ export default function WorkingDashboard() {
                             <div className="ml-4">
                                 <p className="text-sm font-medium text-gray-500">Upcoming</p>
                                 <p className="text-2xl font-semibold text-gray-900">
-                                    {trips.filter(t => t.status === 'upcoming').length}
+                                    {filteredTrips.filter(t => t.status === 'upcoming').length}
                                 </p>
+                                <p className="text-xs text-gray-400">Scheduled</p>
                             </div>
                         </div>
                     </div>
@@ -895,18 +947,91 @@ export default function WorkingDashboard() {
                             <div className="ml-4">
                                 <p className="text-sm font-medium text-gray-500">Completed</p>
                                 <p className="text-2xl font-semibold text-gray-900">
-                                    {trips.filter(t => t.status === 'completed').length}
+                                    {filteredTrips.filter(t => t.status === 'completed').length}
                                 </p>
+                                <p className="text-xs text-gray-400">Finished trips</p>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Recent Trips with Actions */}
+                {/* Trip Management Navigation */}
+                <div className="bg-white rounded-lg shadow p-6 mb-8">
+                    <h2 className="text-xl font-semibold text-gray-900 mb-4">🚗 Trip Management</h2>
+                    <p className="text-gray-600 mb-6">Manage trips from different sources with dedicated interfaces</p>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+                            <div className="flex items-center mb-4">
+                                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
+                                    <span className="text-blue-600 text-2xl">🏥</span>
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-semibold text-gray-900">Facility Trips</h3>
+                                    <p className="text-sm text-gray-500">From facility applications</p>
+                                </div>
+                            </div>
+                            <div className="mb-4">
+                                <div className="flex justify-between text-sm mb-2">
+                                    <span className="text-gray-600">Total:</span>
+                                    <span className="font-medium">{trips.filter(t => t.facility_id).length}</span>
+                                </div>
+                                <div className="flex justify-between text-sm mb-2">
+                                    <span className="text-gray-600">Pending:</span>
+                                    <span className="font-medium text-yellow-600">{trips.filter(t => t.facility_id && t.status === 'pending').length}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-gray-600">Upcoming:</span>
+                                    <span className="font-medium text-blue-600">{trips.filter(t => t.facility_id && t.status === 'upcoming').length}</span>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => router.push('/trips/facility')}
+                                className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
+                            >
+                                Manage Facility Trips →
+                            </button>
+                        </div>
+                        
+                        <div className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+                            <div className="flex items-center mb-4">
+                                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mr-4">
+                                    <span className="text-green-600 text-2xl">👤</span>
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-semibold text-gray-900">Individual Trips</h3>
+                                    <p className="text-sm text-gray-500">From booking applications</p>
+                                </div>
+                            </div>
+                            <div className="mb-4">
+                                <div className="flex justify-between text-sm mb-2">
+                                    <span className="text-gray-600">Total:</span>
+                                    <span className="font-medium">{trips.filter(t => !t.facility_id && t.user_id).length}</span>
+                                </div>
+                                <div className="flex justify-between text-sm mb-2">
+                                    <span className="text-gray-600">Pending:</span>
+                                    <span className="font-medium text-yellow-600">{trips.filter(t => !t.facility_id && t.user_id && t.status === 'pending').length}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-gray-600">Upcoming:</span>
+                                    <span className="font-medium text-blue-600">{trips.filter(t => !t.facility_id && t.user_id && t.status === 'upcoming').length}</span>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => router.push('/trips/individual')}
+                                className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
+                            >
+                                Manage Individual Trips →
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Recent Trips Overview */}
                 <div className="bg-white rounded-lg shadow">
                     <div className="px-6 py-4 border-b border-gray-200">
                         <div className="flex justify-between items-center">
-                            <h2 className="text-lg font-semibold text-gray-900">Trip Management</h2>
+                            <h2 className="text-lg font-semibold text-gray-900">Recent Trips Overview</h2>
                             
                             {/* Trip Filter */}
                             <div className="flex items-center space-x-4">
@@ -1103,20 +1228,20 @@ export default function WorkingDashboard() {
                     </div>
 
                     <div className="bg-white rounded-lg shadow p-6 text-center">
-                        <div className="text-yellow-500 text-4xl mb-3">💳</div>
+                        <div className="text-yellow-500 text-4xl mb-3">🏥</div>
                         <h3 className="text-lg font-semibold text-gray-900 mb-2">Facility Billing</h3>
                         <p className="text-gray-600 text-sm mb-4">Manage monthly facility invoices and payments</p>
                         <a href="/dashboard/facility-billing" className="inline-block bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 text-sm">
-                            Billing Dashboard
+                            Facility Billing
                         </a>
                     </div>
                     
                     <div className="bg-white rounded-lg shadow p-6 text-center">
-                        <div className="text-purple-500 text-4xl mb-3">🗺️</div>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Map View</h3>
-                        <p className="text-gray-600 text-sm mb-4">See trip locations on map</p>
-                        <a href="/map" className="inline-block bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600 text-sm">
-                            Open Map
+                        <div className="text-purple-500 text-4xl mb-3">💳</div>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Individual Billing</h3>
+                        <p className="text-gray-600 text-sm mb-4">Create invoices for individual bookings</p>
+                        <a href="/trips/individual" className="inline-block bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600 text-sm">
+                            Individual Trips
                         </a>
                     </div>
                 </div>
