@@ -102,63 +102,63 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Access denied - Dispatcher only' }, { status: 403 });
     }
     
-    const body = await request.json();
-    const { 
-      user_id, 
-      trip_id, 
-      amount, 
-      description, 
-      notes,
-      due_days = 30
-    } = body;
+    const invoiceData = await request.json();
     
-    // Validate required fields
-    if (!user_id || !amount) {
-      return NextResponse.json({ error: 'user_id and amount are required' }, { status: 400 });
+    // Get trip details to determine booking source
+    const { data: trip, error: tripError } = await supabase
+      .from('trips')
+      .select(`
+        *,
+        facility:facilities(name, contact_email),
+        user_profile:profiles(first_name, last_name, email)
+      `)
+      .eq('id', invoiceData.trip_id)
+      .single();
+    
+    if (tripError) {
+      return NextResponse.json({ error: 'Trip not found' }, { status: 404 });
     }
     
+    // Determine booking source and client details
+    let bookingSource = 'unknown';
+    let clientEmail = '';
+    let facilityId = null;
+    
+    if (trip.managed_client_id && trip.facility_id) {
+      bookingSource = 'facility_app';
+      facilityId = trip.facility_id;
+      clientEmail = trip.facility?.contact_email || '';
+    } else if (trip.user_id) {
+      bookingSource = 'booking_app';
+      clientEmail = trip.user_profile?.email || '';
+    }
+
     // Generate invoice number
     const date = new Date();
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-    const invoice_number = `DISP-${year}${month}${day}-${random}`;
+    const invoice_number = `CCT-${year}${month}${day}-${random}`;
     
-    // Calculate due date
-    const due_date = new Date();
-    due_date.setDate(due_date.getDate() + due_days);
-    
-    // Get trip details for description if trip_id provided
-    let tripDetails = null;
-    if (trip_id) {
-      const { data: trip } = await supabase
-        .from('trips')
-        .select('pickup_address, destination_address, pickup_time')
-        .eq('id', trip_id)
-        .single();
-      tripDetails = trip;
-    }
-    
-    // Create auto-description if not provided
-    const auto_description = description || (tripDetails ? 
-      `Transportation service: ${tripDetails.pickup_address} → ${tripDetails.destination_address}` :
-      'Transportation service'
-    );
-    
-    // Create invoice
+    // Create invoice record
     const { data: invoice, error: invoiceError } = await supabase
       .from('invoices')
       .insert({
-        user_id,
-        trip_id: trip_id || null,
         invoice_number,
-        amount: parseFloat(amount),
-        status: 'pending',
+        trip_id: invoiceData.trip_id,
+        user_id: trip.user_id,
+        facility_id: facilityId,
+        amount: invoiceData.amount || trip.price || 0,
+        status: invoiceData.status || 'sent',
+        payment_status: invoiceData.payment_status || 'pending',
+        client_email: clientEmail,
+        booking_source: bookingSource,
         issue_date: new Date().toISOString(),
-        due_date: due_date.toISOString(),
-        description: auto_description,
-        notes
+        sent_at: invoiceData.sent_at || new Date().toISOString(),
+        due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        description: `Transportation service: ${trip.pickup_address} → ${trip.destination_address}`,
+        created_by: session.user.id
       })
       .select(`
         *,
@@ -172,26 +172,37 @@ export async function POST(request) {
           id,
           pickup_address,
           destination_address,
-          pickup_time
+          pickup_time,
+          status
         )
       `)
       .single();
-    
+
     if (invoiceError) {
-      return NextResponse.json({ error: invoiceError.message }, { status: 500 });
+      console.error('Error creating invoice:', invoiceError);
+      return NextResponse.json({ error: 'Failed to create invoice' }, { status: 500 });
     }
-    
-    // Update trip with invoice_id if trip_id was provided
-    if (trip_id) {
-      await supabase
-        .from('trips')
-        .update({ invoice_id: invoice.id })
-        .eq('id', trip_id);
-    }
-    
-    return NextResponse.json({ invoice });
+
+    // Update trip with invoice reference
+    await supabase
+      .from('trips')
+      .update({ invoice_id: invoice.id })
+      .eq('id', trip.id);
+
+    // Log invoice creation for ecosystem notification
+    console.log(`📧 Invoice ${invoice_number} created for ${bookingSource} booking:`, {
+      invoice_id: invoice.id,
+      trip_id: trip.id,
+      booking_source: bookingSource,
+      facility: trip.facility?.name,
+      client_email: clientEmail,
+      amount: invoice.amount
+    });
+
+    return NextResponse.json(invoice);
+
   } catch (error) {
-    console.error('Error creating invoice:', error);
+    console.error('Error in invoice creation:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

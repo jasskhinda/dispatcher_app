@@ -12,6 +12,8 @@ export default function TripInvoiceDetailPage() {
     const [trip, setTrip] = useState(null);
     const [error, setError] = useState(null);
     const [existingInvoice, setExistingInvoice] = useState(null);
+    const [sendingInvoice, setSendingInvoice] = useState(false);
+    const [invoiceSent, setInvoiceSent] = useState(false);
     
     const router = useRouter();
     const params = useParams();
@@ -148,7 +150,7 @@ export default function TripInvoiceDetailPage() {
 
     // Enhanced client information display
     const getClientInfo = () => {
-        if (!trip) return { name: 'Unknown Client', phone: '', email: '', type: 'Unknown' };
+        if (!trip) return { name: 'Unknown Client', phone: '', email: '', type: 'Unknown', source: 'Unknown' };
         
         // Check for managed client (facility app bookings)
         if (trip.managed_client_id && trip.managed_client) {
@@ -156,17 +158,19 @@ export default function TripInvoiceDetailPage() {
                 name: `${trip.managed_client.first_name || ''} ${trip.managed_client.last_name || ''}`.trim() || 'Managed Client',
                 phone: trip.managed_client.phone_number || '',
                 email: trip.managed_client.email || '',
-                type: 'Facility Client'
+                type: 'Facility Client',
+                source: 'facility_app'
             };
         }
         
-        // Check for direct user bookings
+        // Check for direct user bookings (BookingCCT app)
         if (trip.user_id && trip.user_profile) {
             return {
                 name: `${trip.user_profile.first_name || ''} ${trip.user_profile.last_name || ''}`.trim() || 'Individual Client',
                 phone: trip.user_profile.phone_number || '',
                 email: trip.user_profile.email || '',
-                type: 'Individual Client'
+                type: 'Individual Client',
+                source: 'booking_app'
             };
         }
         
@@ -176,7 +180,8 @@ export default function TripInvoiceDetailPage() {
                 name: trip.passenger_name,
                 phone: trip.passenger_phone || '',
                 email: '',
-                type: 'Trip Passenger'
+                type: 'Trip Passenger',
+                source: 'legacy'
             };
         }
         
@@ -184,7 +189,8 @@ export default function TripInvoiceDetailPage() {
             name: 'Unknown Client',
             phone: '',
             email: '',
-            type: 'Unknown'
+            type: 'Unknown',
+            source: 'unknown'
         };
     };
 
@@ -199,6 +205,69 @@ export default function TripInvoiceDetailPage() {
             };
         }
         return null;
+    };
+
+    // Get payment status based on trip and invoice data
+    const getPaymentStatus = () => {
+        if (existingInvoice) {
+            return existingInvoice.payment_status === 'paid' ? 'PAID' : 'DUE';
+        }
+        // Default based on trip status
+        return trip?.status === 'completed' ? 'DUE' : 'PENDING';
+    };
+
+    // Send invoice to appropriate app dashboard
+    const handleSendInvoice = async () => {
+        if (!trip || sendingInvoice) return;
+
+        setSendingInvoice(true);
+        try {
+            const clientInfo = getClientInfo();
+            
+            // Create or update invoice record
+            const invoiceData = {
+                trip_id: tripId,
+                status: 'sent',
+                payment_status: 'pending',
+                sent_at: new Date().toISOString(),
+                amount: trip.price || 0,
+                client_email: clientInfo.email,
+                booking_source: clientInfo.source
+            };
+
+            let response;
+            if (existingInvoice) {
+                // Update existing invoice
+                response = await fetch(`/api/invoices/${existingInvoice.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(invoiceData)
+                });
+            } else {
+                // Create new invoice
+                response = await fetch('/api/invoices', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(invoiceData)
+                });
+            }
+
+            if (response.ok) {
+                const updatedInvoice = await response.json();
+                setExistingInvoice(updatedInvoice);
+                setInvoiceSent(true);
+                
+                // Show success message
+                setTimeout(() => setInvoiceSent(false), 3000);
+            } else {
+                throw new Error('Failed to send invoice');
+            }
+        } catch (err) {
+            console.error('Error sending invoice:', err);
+            setError('Failed to send invoice');
+        } finally {
+            setSendingInvoice(false);
+        }
     };
 
     if (loading) {
@@ -321,10 +390,38 @@ export default function TripInvoiceDetailPage() {
                                 >
                                     🖨️ Print
                                 </button>
-                                {!existingInvoice && (
-                                    <button className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700">
-                                        ✅ Generate Invoice
+                                {getPaymentStatus() === 'DUE' && trip?.status === 'completed' && (
+                                    <button 
+                                        onClick={handleSendInvoice}
+                                        disabled={sendingInvoice}
+                                        className={`inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
+                                            sendingInvoice 
+                                                ? 'bg-gray-400 cursor-not-allowed' 
+                                                : 'bg-blue-600 hover:bg-blue-700'
+                                        }`}
+                                    >
+                                        {sendingInvoice ? (
+                                            <>
+                                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                                Sending...
+                                            </>
+                                        ) : (
+                                            <>📧 Send Invoice</>
+                                        )}
                                     </button>
+                                )}
+                                {getPaymentStatus() === 'PAID' && (
+                                    <span className="inline-flex items-center px-4 py-2 border border-green-300 rounded-md shadow-sm text-sm font-medium text-green-700 bg-green-50">
+                                        ✅ Paid
+                                    </span>
+                                )}
+                                {invoiceSent && (
+                                    <span className="inline-flex items-center px-4 py-2 border border-green-300 rounded-md shadow-sm text-sm font-medium text-green-700 bg-green-50">
+                                        ✅ Invoice Sent
+                                    </span>
                                 )}
                             </div>
                         </div>
@@ -376,28 +473,33 @@ export default function TripInvoiceDetailPage() {
                                 {/* Bill To Section */}
                                 <div>
                                     <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">Bill To:</h3>
-                                    {facilityInfo ? (
-                                        // Facility Booking
-                                        <div className="space-y-2">
+                                    {clientInfo.source === 'facility_app' ? (
+                                        // Facility App Booking
+                                        <div className="space-y-3">
                                             <div className="bg-blue-50 p-4 rounded-lg border-l-4 border-blue-400">
                                                 <p className="text-xs font-semibold text-blue-800 uppercase tracking-wide mb-2">
-                                                    🏥 Facility Booking
+                                                    👤 Facility Booking {facilityInfo ? `(${facilityInfo.name})` : ''}
                                                 </p>
-                                                <p className="font-semibold text-gray-900">{facilityInfo.name}</p>
-                                                {facilityInfo.address && <p className="text-gray-600">{facilityInfo.address}</p>}
-                                                {facilityInfo.contact_email && <p className="text-gray-600">📧 {facilityInfo.contact_email}</p>}
-                                                {facilityInfo.phone_number && <p className="text-gray-600">📞 {facilityInfo.phone_number}</p>}
+                                                {facilityInfo && (
+                                                    <div className="mb-3">
+                                                        <p className="font-semibold text-gray-900">{facilityInfo.name}</p>
+                                                        {facilityInfo.address && <p className="text-gray-600">{facilityInfo.address}</p>}
+                                                        {facilityInfo.email && <p className="text-gray-600">📧 {facilityInfo.email}</p>}
+                                                        {facilityInfo.phone && <p className="text-gray-600">📞 {facilityInfo.phone}</p>}
+                                                    </div>
+                                                )}
                                             </div>
-                                            {clientInfo.name !== 'Unknown Client' && (
-                                                <div className="mt-3 p-3 bg-gray-50 rounded">
-                                                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Client:</p>
+                                            {clientInfo.name !== 'Unknown Client' && clientInfo.name !== 'Managed Client' && (
+                                                <div className="p-3 bg-gray-50 rounded">
+                                                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Client Details:</p>
                                                     <p className="font-medium text-gray-900">{clientInfo.name}</p>
+                                                    {clientInfo.email && <p className="text-gray-600 text-sm">📧 {clientInfo.email}</p>}
                                                     {clientInfo.phone && <p className="text-gray-600 text-sm">📞 {clientInfo.phone}</p>}
                                                 </div>
                                             )}
                                         </div>
                                     ) : (
-                                        // Individual Booking
+                                        // Individual Booking (BookingCCT App)
                                         <div className="space-y-2">
                                             <div className="bg-green-50 p-4 rounded-lg border-l-4 border-green-400">
                                                 <p className="text-xs font-semibold text-green-800 uppercase tracking-wide mb-2">
@@ -446,6 +548,14 @@ export default function TripInvoiceDetailPage() {
                                                 'bg-gray-100 text-gray-800'
                                             }`}>
                                                 {trip.status.charAt(0).toUpperCase() + trip.status.slice(1)}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-600">Payment Status:</span>
+                                            <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                                                getPaymentStatus() === 'PAID' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                                            }`}>
+                                                {getPaymentStatus()}
                                             </span>
                                         </div>
                                         {trip.driver_name && (
@@ -577,38 +687,89 @@ export default function TripInvoiceDetailPage() {
                                 </div>
                             )}
 
-                            {/* Payment Status */}
+                            {/* Payment Status & Invoice Actions */}
                             <div className="border-t pt-6">
-                                <div className="flex justify-between items-center">
+                                <div className="flex justify-between items-center mb-4">
                                     <div>
-                                        <h3 className="text-lg font-semibold text-gray-900">Payment Status</h3>
+                                        <h3 className="text-lg font-semibold text-gray-900">Payment & Invoice Status</h3>
                                         <p className="text-sm text-gray-500">
                                             {existingInvoice ? 
-                                                `Invoice generated on ${new Date(existingInvoice.created_at).toLocaleDateString()}` :
-                                                'Invoice not yet generated'
+                                                `Invoice sent on ${new Date(existingInvoice.sent_at || existingInvoice.created_at).toLocaleDateString()}` :
+                                                'Ready to send invoice to client'
                                             }
                                         </p>
                                     </div>
                                     <div className="text-right">
-                                        {existingInvoice ? (
-                                            <span className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${
-                                                existingInvoice.status === 'paid' 
-                                                    ? 'bg-green-100 text-green-800' 
-                                                    : existingInvoice.status === 'cancelled'
-                                                    ? 'bg-red-100 text-red-800'
-                                                    : 'bg-yellow-100 text-yellow-800'
-                                            }`}>
-                                                {existingInvoice.status === 'paid' ? '✅ Paid' : 
-                                                 existingInvoice.status === 'cancelled' ? '❌ Cancelled' : 
-                                                 '⏳ Pending Payment'}
-                                            </span>
-                                        ) : (
-                                            <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
-                                                📋 Ready for Invoicing
-                                            </span>
-                                        )}
+                                        <span className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${
+                                            getPaymentStatus() === 'PAID'
+                                                ? 'bg-green-100 text-green-800' 
+                                                : getPaymentStatus() === 'DUE'
+                                                ? 'bg-yellow-100 text-yellow-800'
+                                                : 'bg-gray-100 text-gray-800'
+                                        }`}>
+                                            {getPaymentStatus() === 'PAID' ? '✅ PAID' : 
+                                             getPaymentStatus() === 'DUE' ? '💳 DUE' : 
+                                             '⏳ PENDING'}
+                                        </span>
                                     </div>
                                 </div>
+
+                                {/* Invoice Instructions */}
+                                {getPaymentStatus() === 'DUE' && trip?.status === 'completed' && (
+                                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                        <div className="flex items-start space-x-3">
+                                            <div className="text-blue-500 text-lg">💡</div>
+                                            <div>
+                                                <h4 className="font-medium text-blue-900 mb-2">Invoice Delivery</h4>
+                                                <p className="text-sm text-blue-700 mb-3">
+                                                    {clientInfo.source === 'facility_app' ? (
+                                                        <>This invoice will be sent to the <strong>Facility App</strong> where {facilityInfo?.name || 'the facility'} can view it in their billing dashboard.</>
+                                                    ) : (
+                                                        <>This invoice will be sent to the <strong>Booking App</strong> where {clientInfo.name} can view it in their personal dashboard.</>
+                                                    )}
+                                                </p>
+                                                {!existingInvoice && (
+                                                    <button 
+                                                        onClick={handleSendInvoice}
+                                                        disabled={sendingInvoice}
+                                                        className={`inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
+                                                            sendingInvoice 
+                                                                ? 'bg-gray-400 cursor-not-allowed' 
+                                                                : 'bg-blue-600 hover:bg-blue-700'
+                                                        }`}
+                                                    >
+                                                        {sendingInvoice ? (
+                                                            <>
+                                                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                                </svg>
+                                                                Sending Invoice...
+                                                            </>
+                                                        ) : (
+                                                            <>📧 Send Invoice to {clientInfo.source === 'facility_app' ? 'Facility' : 'Client'}</>
+                                                        )}
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Payment Success Message */}
+                                {getPaymentStatus() === 'PAID' && (
+                                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                                        <div className="flex items-center space-x-3">
+                                            <div className="text-green-500 text-lg">✅</div>
+                                            <div>
+                                                <h4 className="font-medium text-green-900">Payment Received</h4>
+                                                <p className="text-sm text-green-700">
+                                                    This invoice has been marked as paid. Thank you for your business!
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

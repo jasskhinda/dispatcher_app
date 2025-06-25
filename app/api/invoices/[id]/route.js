@@ -96,12 +96,18 @@ export async function PUT(request, { params }) {
     }
     
     const body = await request.json();
-    const { status, payment_date, payment_method, notes } = body;
+    const { status, payment_status, payment_date, payment_method, notes } = body;
     
     // Validate status
-    const validStatuses = ['pending', 'paid', 'cancelled', 'overdue'];
+    const validStatuses = ['pending', 'sent', 'paid', 'cancelled', 'overdue'];
+    const validPaymentStatuses = ['pending', 'paid', 'failed', 'refunded'];
+    
     if (status && !validStatuses.includes(status)) {
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
+    }
+    
+    if (payment_status && !validPaymentStatuses.includes(payment_status)) {
+      return NextResponse.json({ error: 'Invalid payment status' }, { status: 400 });
     }
     
     // Prepare update data
@@ -110,6 +116,7 @@ export async function PUT(request, { params }) {
     };
     
     if (status) updateData.status = status;
+    if (payment_status) updateData.payment_status = payment_status;
     if (payment_date) updateData.payment_date = payment_date;
     if (payment_method) updateData.payment_method = payment_method;
     if (notes !== undefined) updateData.notes = notes;
