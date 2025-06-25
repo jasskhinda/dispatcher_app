@@ -42,28 +42,57 @@ export default function FacilityOverviewPage() {
         try {
             console.log('🔍 Fetching facility overview...');
             setRefreshing(true);
+            setError(null);
             
-            // Fetch all facilities
+            // First, let's check if the facilities table exists and get some debug info
+            console.log('🔧 DEBUG: Checking database connection...');
+            
+            // Fetch all facilities with enhanced debugging
+            console.log('🔧 DEBUG: Querying facilities table...');
             const { data: facilitiesData, error: facilitiesError } = await supabase
                 .from('facilities')
                 .select('id, name, address, contact_email, phone_number, billing_email')
                 .order('name', { ascending: true });
 
-            if (facilitiesError) throw facilitiesError;
+            if (facilitiesError) {
+                console.error('❌ Facilities query error:', facilitiesError);
+                throw facilitiesError;
+            }
 
             console.log(`✅ Found ${facilitiesData?.length || 0} facilities`);
+            console.log('🔧 DEBUG: Facility data:', facilitiesData);
             setFacilities(facilitiesData || []);
 
-            // Fetch all facility trips
+            // Fetch all facility trips with enhanced debugging
+            console.log('🔧 DEBUG: Querying trips table...');
             const { data: tripsData, error: tripsError } = await supabase
                 .from('trips')
                 .select('*')
                 .not('facility_id', 'is', null)
                 .order('created_at', { ascending: false });
 
-            if (tripsError) throw tripsError;
+            if (tripsError) {
+                console.error('❌ Trips query error:', tripsError);
+                throw tripsError;
+            }
 
             console.log(`✅ Found ${tripsData?.length || 0} facility trips`);
+            console.log('🔧 DEBUG: Sample trip data:', tripsData?.slice(0, 2));
+            
+            // If no facilities found, show helpful message
+            if (!facilitiesData || facilitiesData.length === 0) {
+                console.log('⚠️ No facilities found in database');
+                console.log('💡 This might be because:');
+                console.log('   1. No facilities have been created yet');
+                console.log('   2. Database connection issue');
+                console.log('   3. Table doesn\'t exist');
+                
+                // Still continue to show empty state properly
+                setFacilityStats([]);
+                setLoading(false);
+                setRefreshing(false);
+                return;
+            }
 
             // Get managed clients count for each facility
             const facilityStatsPromises = facilitiesData?.map(async (facility) => {
@@ -127,6 +156,84 @@ export default function FacilityOverviewPage() {
 
     const handleRefresh = async () => {
         await fetchFacilityOverview();
+    };
+
+    const createTestFacilities = async () => {
+        try {
+            setRefreshing(true);
+            console.log('🏗️ Creating test facilities...');
+            
+            const testFacilities = [
+                {
+                    name: 'CareBridge Living',
+                    address: '123 Healthcare Drive, Toronto, ON M5V 3A8',
+                    contact_email: 'admin@carebridge.com',
+                    billing_email: 'billing@carebridge.com',
+                    phone_number: '(416) 555-0123'
+                },
+                {
+                    name: 'Sunset Senior Care',
+                    address: '456 Sunset Boulevard, Toronto, ON M6H 2K9',
+                    contact_email: 'info@sunsetcare.com',
+                    billing_email: 'billing@sunsetcare.com',
+                    phone_number: '(416) 555-0456'
+                },
+                {
+                    name: 'Maple Grove Medical Center',
+                    address: '789 Maple Street, Toronto, ON M4B 1X2',
+                    contact_email: 'contact@maplegrove.com',
+                    billing_email: 'billing@maplegrove.com',
+                    phone_number: '(416) 555-0789'
+                }
+            ];
+            
+            for (const facilityData of testFacilities) {
+                const { data: newFacility, error: createError } = await supabase
+                    .from('facilities')
+                    .insert([facilityData])
+                    .select()
+                    .single();
+                
+                if (createError) {
+                    console.error(`❌ Error creating ${facilityData.name}:`, createError);
+                } else {
+                    console.log(`✅ Created: ${newFacility.name}`);
+                    
+                    // Create a few test trips
+                    const testTrips = [
+                        {
+                            facility_id: newFacility.id,
+                            pickup_address: facilityData.address,
+                            destination_address: '999 Hospital Way, Toronto, ON',
+                            pickup_time: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+                            status: 'pending',
+                            price: 45.00
+                        },
+                        {
+                            facility_id: newFacility.id,
+                            pickup_address: facilityData.address,
+                            destination_address: '555 Medical Plaza, Toronto, ON',
+                            pickup_time: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+                            status: 'completed',
+                            price: 50.00
+                        }
+                    ];
+                    
+                    for (const tripData of testTrips) {
+                        await supabase.from('trips').insert([tripData]);
+                    }
+                }
+            }
+            
+            // Refresh the data
+            await fetchFacilityOverview();
+            
+        } catch (err) {
+            console.error('Error creating test facilities:', err);
+            setError('Failed to create test facilities: ' + err.message);
+        } finally {
+            setRefreshing(false);
+        }
     };
 
     const formatCurrency = (amount) => {
@@ -195,6 +302,15 @@ export default function FacilityOverviewPage() {
                             >
                                 {refreshing ? '🔄 Refreshing...' : '🔄 Refresh'}
                             </button>
+                            {facilityStats.length === 0 && !loading && (
+                                <button
+                                    onClick={createTestFacilities}
+                                    disabled={refreshing}
+                                    className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg transition-colors text-sm disabled:opacity-50"
+                                >
+                                    {refreshing ? 'Creating...' : '🏗️ Create Test Data'}
+                                </button>
+                            )}
                             <button
                                 onClick={() => router.push('/dashboard')}
                                 className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors text-sm"
@@ -376,10 +492,22 @@ export default function FacilityOverviewPage() {
                         ) : (
                             <div className="text-center py-12">
                                 <div className="text-gray-400 text-6xl mb-4">🏥</div>
-                                <p className="text-gray-500 text-lg">No facilities found</p>
-                                <p className="text-gray-400 text-sm">
-                                    Facilities with trips will appear here.
+                                <p className="text-gray-500 text-lg mb-2">No facilities found</p>
+                                <p className="text-gray-400 text-sm mb-6">
+                                    {facilityStats.length === 0 && facilities.length === 0 
+                                        ? "No facilities exist in the database yet. Create some test data to get started!"
+                                        : "Facilities with trips will appear here."
+                                    }
                                 </p>
+                                {facilityStats.length === 0 && facilities.length === 0 && (
+                                    <button
+                                        onClick={createTestFacilities}
+                                        disabled={refreshing}
+                                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition-colors disabled:opacity-50"
+                                    >
+                                        {refreshing ? 'Creating Test Data...' : '🏗️ Create Test Facilities & Trips'}
+                                    </button>
+                                )}
                             </div>
                         )}
                     </div>
