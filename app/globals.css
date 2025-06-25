@@ -48,3 +48,50 @@ body {
   background-color: hsl(var(--brand-background));
   color: hsl(var(--brand-text));
 }
+
+/* Print-specific styles for invoice pages */
+@media print {
+  /* Hide navigation and non-essential elements when printing */
+  .no-print {
+    display: none !important;
+  }
+  
+  /* Optimize page layout for printing */
+  @page {
+    margin: 0.5in;
+    size: A4;
+  }
+  
+  /* Ensure proper page breaks */
+  .print-page-break {
+    page-break-before: always;
+  }
+  
+  .print-no-break {
+    page-break-inside: avoid;
+  }
+  
+  /* Optimize colors for printing */
+  .print-friendly {
+    -webkit-print-color-adjust: exact;
+    color-adjust: exact;
+  }
+  
+  /* Ensure backgrounds print correctly */
+  .print-bg {
+    -webkit-print-color-adjust: exact;
+    color-adjust: exact;
+  }
+  
+  /* Make text more readable in print */
+  body {
+    font-size: 12pt;
+    line-height: 1.4;
+  }
+  
+  /* Simplify gradients for print */
+  .print-gradient {
+    background: #4f46e5 !important;
+    color: white !important;
+  }
+}

@@ -13,6 +13,12 @@ export default function WorkingDashboard() {
     const [actionLoading, setActionLoading] = useState({});
     const [actionMessage, setActionMessage] = useState('');
     const [tripFilter, setTripFilter] = useState('all'); // 'all', 'facility', 'individual'
+    
+    // Enhanced button interaction states
+    const [showRejectModal, setShowRejectModal] = useState(false);
+    const [rejectingTripId, setRejectingTripId] = useState(null);
+    const [rejectionNotes, setRejectionNotes] = useState('');
+    
     const router = useRouter();
     const supabase = createClientComponentClient();
 
@@ -167,25 +173,48 @@ export default function WorkingDashboard() {
     }
 
     async function handleTripAction(tripId, action) {
+        // Handle approve action with confirmation
+        if (action === 'approve') {
+            if (!confirm('Are you sure you want to approve this trip? This will make it available for driver assignment.')) {
+                return; // User cancelled
+            }
+        }
+        
+        // Handle reject action with modal for notes
+        if (action === 'reject') {
+            setRejectingTripId(tripId);
+            setShowRejectModal(true);
+            return; // Open modal instead of immediate processing
+        }
+        
+        // Handle complete action with confirmation
+        if (action === 'complete') {
+            if (!confirm('Are you sure you want to mark this trip as completed? This will make it ready for billing.')) {
+                return; // User cancelled
+            }
+        }
+        
         try {
             setActionLoading(prev => ({ ...prev, [tripId]: true }));
             setActionMessage('');
 
             let newStatus;
             let message;
+            let updateData = {
+                status: null,
+                updated_at: new Date().toISOString()
+            };
 
             switch (action) {
                 case 'approve':
                     newStatus = 'upcoming';
                     message = 'Trip approved successfully!';
-                    break;
-                case 'reject':
-                    newStatus = 'cancelled';
-                    message = 'Trip rejected successfully!';
+                    updateData.status = newStatus;
                     break;
                 case 'complete':
                     newStatus = 'completed';
                     message = 'Trip completed successfully!';
+                    updateData.status = newStatus;
                     break;
                 default:
                     throw new Error('Invalid action');
@@ -194,10 +223,7 @@ export default function WorkingDashboard() {
             // Update trip status in database
             const { error: updateError } = await supabase
                 .from('trips')
-                .update({ 
-                    status: newStatus,
-                    updated_at: new Date().toISOString()
-                })
+                .update(updateData)
                 .eq('id', tripId);
 
             if (updateError) {
@@ -222,6 +248,56 @@ export default function WorkingDashboard() {
             setTimeout(() => setActionMessage(''), 5000);
         } finally {
             setActionLoading(prev => ({ ...prev, [tripId]: false }));
+        }
+    }
+
+    // Handle rejection with notes
+    async function handleRejectWithNotes() {
+        if (!rejectingTripId) return;
+        
+        try {
+            setActionLoading(prev => ({ ...prev, [rejectingTripId]: true }));
+            setActionMessage('');
+
+            const updateData = {
+                status: 'cancelled',
+                cancellation_reason: rejectionNotes.trim() || 'Rejected by dispatcher',
+                updated_at: new Date().toISOString()
+            };
+
+            // Update trip status in database
+            const { error: updateError } = await supabase
+                .from('trips')
+                .update(updateData)
+                .eq('id', rejectingTripId);
+
+            if (updateError) {
+                throw updateError;
+            }
+
+            // Update local state
+            setTrips(prev => prev.map(trip => 
+                trip.id === rejectingTripId 
+                    ? { ...trip, status: 'cancelled', cancellation_reason: updateData.cancellation_reason, updated_at: new Date().toISOString() }
+                    : trip
+            ));
+
+            setActionMessage('Trip rejected successfully!');
+            
+            // Clear message after 3 seconds
+            setTimeout(() => setActionMessage(''), 3000);
+
+            // Close modal
+            setShowRejectModal(false);
+            setRejectingTripId(null);
+            setRejectionNotes('');
+
+        } catch (err) {
+            console.error('Error rejecting trip:', err);
+            setActionMessage(`Error: ${err.message}`);
+            setTimeout(() => setActionMessage(''), 5000);
+        } finally {
+            setActionLoading(prev => ({ ...prev, [rejectingTripId]: false }));
         }
     }
 
@@ -948,16 +1024,16 @@ export default function WorkingDashboard() {
                                                                 <button 
                                                                     onClick={() => handleTripAction(trip.id, 'approve')}
                                                                     disabled={actionLoading[trip.id]}
-                                                                    className="text-green-600 hover:text-green-900 bg-green-50 hover:bg-green-100 px-3 py-1 rounded text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
                                                                 >
-                                                                    {actionLoading[trip.id] ? '...' : 'Approve'}
+                                                                    {actionLoading[trip.id] ? 'Approving...' : 'Approve'}
                                                                 </button>
                                                                 <button 
                                                                     onClick={() => handleTripAction(trip.id, 'reject')}
                                                                     disabled={actionLoading[trip.id]}
-                                                                    className="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 px-3 py-1 rounded text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
                                                                 >
-                                                                    {actionLoading[trip.id] ? '...' : 'Reject'}
+                                                                    {actionLoading[trip.id] ? 'Processing...' : 'Reject'}
                                                                 </button>
                                                             </>
                                                         )}
@@ -965,22 +1041,28 @@ export default function WorkingDashboard() {
                                                             <button 
                                                                 onClick={() => handleTripAction(trip.id, 'complete')}
                                                                 disabled={actionLoading[trip.id]}
-                                                                className="text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
                                                             >
-                                                                {actionLoading[trip.id] ? '...' : 'Complete'}
+                                                                {actionLoading[trip.id] ? 'Completing...' : 'Complete'}
                                                             </button>
                                                         )}
                                                         {trip.status === 'completed' && (
-                                                            <button 
-                                                                onClick={() => handleCreateInvoice(trip)}
-                                                                disabled={actionLoading[trip.id]}
-                                                                className="text-purple-600 hover:text-purple-900 bg-purple-50 hover:bg-purple-100 px-3 py-1 rounded text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                                            <a
+                                                                href={`/invoice/${trip.id}`}
+                                                                className="inline-flex items-center bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 shadow-sm"
                                                             >
-                                                                {actionLoading[trip.id] ? 'Creating...' : 'Create Invoice'}
-                                                            </button>
+                                                                📄 Invoice Details
+                                                            </a>
                                                         )}
                                                         {trip.status === 'cancelled' && (
-                                                            <span className="text-red-600 text-xs">❌ Rejected</span>
+                                                            <div className="text-red-600 text-xs">
+                                                                <div className="font-semibold">❌ Rejected</div>
+                                                                {trip.cancellation_reason && (
+                                                                    <div className="text-gray-500 mt-1 max-w-xs">
+                                                                        {trip.cancellation_reason}
+                                                                    </div>
+                                                                )}
+                                                            </div>
                                                         )}
                                                     </div>
                                                 </td>
@@ -1030,6 +1112,59 @@ export default function WorkingDashboard() {
                     </div>
                 </div>
             </div>
+
+            {/* Rejection Modal */}
+            {showRejectModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                            🚫 Reject Trip
+                        </h3>
+                        <p className="text-gray-600 mb-4">
+                            Are you sure you want to reject this trip? Please provide a reason for the rejection.
+                        </p>
+                        
+                        <div className="mb-6">
+                            <label htmlFor="rejectionNotes" className="block text-sm font-medium text-gray-700 mb-2">
+                                Reason for rejection *
+                            </label>
+                            <textarea
+                                id="rejectionNotes"
+                                value={rejectionNotes}
+                                onChange={(e) => setRejectionNotes(e.target.value)}
+                                className="w-full p-3 border border-gray-300 rounded-md resize-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                                placeholder="Please explain why this trip is being rejected..."
+                                rows={4}
+                                required
+                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                                This reason will be visible to the facility and client.
+                            </p>
+                        </div>
+                        
+                        <div className="flex justify-end space-x-3">
+                            <button
+                                onClick={() => {
+                                    setShowRejectModal(false);
+                                    setRejectingTripId(null);
+                                    setRejectionNotes('');
+                                }}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors duration-200"
+                                disabled={actionLoading[rejectingTripId]}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleRejectWithNotes}
+                                disabled={!rejectionNotes.trim() || actionLoading[rejectingTripId]}
+                                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                            >
+                                {actionLoading[rejectingTripId] ? 'Rejecting...' : 'Confirm Rejection'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
