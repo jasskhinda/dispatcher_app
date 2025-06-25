@@ -194,9 +194,7 @@ export default function FacilityMonthlyInvoicePage() {
                             is_round_trip,
                             additional_passengers,
                             managed_client_id,
-                            user_id,
-                            managed_client:facility_managed_clients(first_name, last_name, phone_number, email),
-                            user_profile:profiles(first_name, last_name, phone_number, email)
+                            user_id
                         `)
                         .eq('facility_id', facilityId)
                         .gte('pickup_time', startISO)
@@ -224,13 +222,95 @@ export default function FacilityMonthlyInvoicePage() {
                 console.log(`✅ Step 7: Found ${trips?.length || 0} trips for the month`);
                 console.log('🔍 Sample trip data:', trips?.[0] || 'No trips found');
 
-                // Process trips and calculate totals (need to do this after facility info is set)
-                console.log('🔍 Step 8: Processing and storing trips...');
-                setFacilityTrips(trips || []);
+                // Step 8: Fetch client information separately (to avoid schema relationship issues)
+                console.log('🔍 Step 8: Fetching client information separately...');
+                let userProfiles = [];
+                let managedClients = [];
+
+                if (trips && trips.length > 0) {
+                    // Get unique user IDs and managed client IDs
+                    const userIds = [...new Set(trips.filter(trip => trip.user_id).map(trip => trip.user_id))];
+                    const managedClientIds = [...new Set(trips.filter(trip => trip.managed_client_id).map(trip => trip.managed_client_id))];
+
+                    console.log(`   - User IDs to fetch: ${userIds.length}`);
+                    console.log(`   - Managed Client IDs to fetch: ${managedClientIds.length}`);
+
+                    // Fetch user profiles
+                    if (userIds.length > 0) {
+                        const { data: profiles, error: profilesError } = await supabase
+                            .from('profiles')
+                            .select('id, first_name, last_name, phone_number, email')
+                            .in('id', userIds);
+                        
+                        if (!profilesError && profiles) {
+                            userProfiles = profiles;
+                            console.log(`   ✅ Fetched ${userProfiles.length} user profiles`);
+                        }
+                    }
+
+                    // Fetch managed clients (try multiple tables for compatibility)
+                    if (managedClientIds.length > 0) {
+                        try {
+                            // Try facility_managed_clients first
+                            const { data: fmc, error: fmcError } = await supabase
+                                .from('facility_managed_clients')
+                                .select('id, first_name, last_name, phone_number, email')
+                                .in('id', managedClientIds);
+                            
+                            if (!fmcError && fmc && fmc.length > 0) {
+                                managedClients = fmc;
+                                console.log(`   ✅ Fetched ${managedClients.length} managed clients from facility_managed_clients`);
+                            }
+                        } catch (e) {
+                            console.log('   ⚠️ facility_managed_clients table not accessible');
+                        }
+
+                        // Try managed_clients table if no results from facility_managed_clients
+                        if (managedClients.length === 0) {
+                            try {
+                                const { data: mc, error: mcError } = await supabase
+                                    .from('managed_clients')
+                                    .select('id, first_name, last_name, phone_number, email')
+                                    .in('id', managedClientIds);
+                                
+                                if (!mcError && mc) {
+                                    managedClients = mc;
+                                    console.log(`   ✅ Fetched ${managedClients.length} managed clients from managed_clients`);
+                                }
+                            } catch (e) {
+                                console.log('   ⚠️ managed_clients table not accessible');
+                            }
+                        }
+                    }
+
+                    // Enhance trips with client information
+                    console.log('🔍 Step 8b: Combining trips with client data...');
+                    const enhancedTrips = trips.map(trip => {
+                        const enhancedTrip = { ...trip };
+                        
+                        // Add user profile if exists
+                        if (trip.user_id) {
+                            enhancedTrip.user_profile = userProfiles.find(profile => profile.id === trip.user_id) || null;
+                        }
+                        
+                        // Add managed client if exists
+                        if (trip.managed_client_id) {
+                            enhancedTrip.managed_client = managedClients.find(client => client.id === trip.managed_client_id) || null;
+                        }
+                        
+                        return enhancedTrip;
+                    });
+
+                    console.log(`✅ Step 8: Enhanced ${enhancedTrips.length} trips with client information`);
+                    setFacilityTrips(enhancedTrips);
+                } else {
+                    setFacilityTrips([]);
+                }
                 
                 // Calculate total for billable trips only  
                 console.log('🔍 Step 9: Calculating billable amount...');
-                const billableAmount = (trips || [])
+                const enhancedTrips = facilityTrips.length > 0 ? facilityTrips : (trips || []);
+                const billableAmount = enhancedTrips
                     .filter(trip => trip.status === 'completed' && trip.price > 0)
                     .reduce((sum, trip) => sum + parseFloat(trip.price || 0), 0);
                 
