@@ -379,8 +379,20 @@ export default function TripInvoiceDetailPage() {
                                     </svg>
                                 </a>
                                 <div>
-                                    <h1 className="text-2xl font-bold text-gray-900">Invoice Details</h1>
-                                    <p className="text-sm text-gray-500">Trip #{trip.id.slice(0, 8)}</p>
+                                    <h1 className="text-2xl font-bold text-gray-900">
+                                        Invoice Details
+                                        {clientInfo.source === 'facility_app' && facilityInfo && (
+                                            <span className="text-blue-600"> - {facilityInfo.name}</span>
+                                        )}
+                                    </h1>
+                                    <p className="text-sm text-gray-500">
+                                        Trip #{trip.id.slice(0, 8)}
+                                        {clientInfo.source === 'facility_app' && (
+                                            <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
+                                                🏥 Facility Booking
+                                            </span>
+                                        )}
+                                    </p>
                                 </div>
                             </div>
                             <div className="flex space-x-3">
@@ -437,6 +449,12 @@ export default function TripInvoiceDetailPage() {
                                 <div>
                                     <h2 className="text-3xl font-bold mb-2">CCT Transportation</h2>
                                     <p className="text-blue-100">Professional Transportation Services</p>
+                                    {clientInfo.source === 'facility_app' && facilityInfo && (
+                                        <div className="mt-3 bg-white/10 rounded-lg p-3">
+                                            <p className="text-sm text-blue-200">Service for:</p>
+                                            <p className="text-lg font-semibold text-white">{facilityInfo.name}</p>
+                                        </div>
+                                    )}
                                     <div className="mt-4 text-sm">
                                         <p>📧 billing@ccttransportation.com</p>
                                         <p>📞 (416) 555-0123</p>
@@ -478,12 +496,12 @@ export default function TripInvoiceDetailPage() {
                                         <div className="space-y-3">
                                             <div className="bg-blue-50 p-4 rounded-lg border-l-4 border-blue-400">
                                                 <p className="text-xs font-semibold text-blue-800 uppercase tracking-wide mb-2">
-                                                    👤 Facility Booking {facilityInfo ? `(${facilityInfo.name})` : ''}
+                                                    🏥 Facility Booking
                                                 </p>
                                                 {facilityInfo && (
-                                                    <div className="mb-3">
-                                                        <p className="font-semibold text-gray-900">{facilityInfo.name}</p>
-                                                        {facilityInfo.address && <p className="text-gray-600">{facilityInfo.address}</p>}
+                                                    <div className="mb-3 p-3 bg-white rounded border border-blue-200">
+                                                        <p className="text-lg font-bold text-blue-900 mb-1">{facilityInfo.name}</p>
+                                                        {facilityInfo.address && <p className="text-gray-700">{facilityInfo.address}</p>}
                                                         {facilityInfo.email && <p className="text-gray-600">📧 {facilityInfo.email}</p>}
                                                         {facilityInfo.phone && <p className="text-gray-600">📞 {facilityInfo.phone}</p>}
                                                     </div>
