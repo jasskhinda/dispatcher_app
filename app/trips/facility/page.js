@@ -199,41 +199,27 @@ export default function FacilityOverviewPage() {
 
             console.log('✅ Facility stats calculated:', facilityStatsResults);
             
-            // Validate data accuracy against facility app
-            validateDataAccuracy(facilityStatsResults);
+            // Debug: Check for data accuracy with facility app
+            const carebridgeFacility = facilityStatsResults.find(f => f.name.includes('CareBridge'));
+            if (carebridgeFacility) {
+                console.log('\n🔍 DATA ACCURACY CHECK:');
+                console.log(`Expected: 14 trips, $676.80 (from facility app)`);
+                console.log(`Actual: ${carebridgeFacility.totalTrips} trips, $${carebridgeFacility.totalAmount.toFixed(2)}`);
+                
+                const tripsDiff = carebridgeFacility.totalTrips - 14;
+                const amountDiff = carebridgeFacility.totalAmount - 676.80;
+                
+                if (Math.abs(tripsDiff) > 0 || Math.abs(amountDiff) > 0.01) {
+                    console.log(`⚠️ Discrepancy detected - trips: ${tripsDiff}, amount: $${amountDiff.toFixed(2)}`);
+                } else {
+                    console.log('✅ Data matches facility app!');
+                }
+            }
             
             setFacilities(facilityStatsResults);
             setFacilityStats(facilityStatsResults);
             setLoading(false);
             setRefreshing(false);
-
-            // Validate data accuracy against facility app expectations
-            const validateDataAccuracy = (facilityStats) => {
-                const carebridgeFacility = facilityStats.find(f => f.name.includes('CareBridge'));
-                if (carebridgeFacility) {
-                    console.log('\n🔍 DATA ACCURACY VALIDATION:');
-                    console.log('Expected (from facility app): 14 trips, $676.80');
-                    console.log(`Actual (dispatcher app): ${carebridgeFacility.totalTrips} trips, $${carebridgeFacility.totalAmount.toFixed(2)}`);
-                    
-                    const tripsDiff = carebridgeFacility.totalTrips - 14;
-                    const amountDiff = carebridgeFacility.totalAmount - 676.80;
-                    
-                    if (Math.abs(tripsDiff) > 0) {
-                        console.log(`⚠️ Trip count discrepancy: ${tripsDiff > 0 ? '+' : ''}${tripsDiff}`);
-                    }
-                    if (Math.abs(amountDiff) > 0.01) {
-                        console.log(`⚠️ Amount discrepancy: ${amountDiff > 0 ? '+' : ''}$${amountDiff.toFixed(2)}`);
-                    }
-                    
-                    if (Math.abs(tripsDiff) <= 0 && Math.abs(amountDiff) <= 0.01) {
-                        console.log('✅ Data matches facility app expectations!');
-                    } else {
-                        console.log('🔧 Data needs adjustment to match facility app');
-                    }
-                }
-            };
-
-            validateDataAccuracy(facilityStatsResults);
 
         } catch (err) {
             console.error('Error fetching facility overview:', err);
@@ -242,6 +228,32 @@ export default function FacilityOverviewPage() {
             setRefreshing(false);
         }
     }
+
+    // Validate data accuracy against facility app expectations
+    const validateDataAccuracy = (facilityStats) => {
+        const carebridgeFacility = facilityStats.find(f => f.name.includes('CareBridge'));
+        if (carebridgeFacility) {
+            console.log('\n🔍 DATA ACCURACY VALIDATION:');
+            console.log('Expected (from facility app): 14 trips, $676.80');
+            console.log(`Actual (dispatcher app): ${carebridgeFacility.totalTrips} trips, $${carebridgeFacility.totalAmount.toFixed(2)}`);
+            
+            const tripsDiff = carebridgeFacility.totalTrips - 14;
+            const amountDiff = carebridgeFacility.totalAmount - 676.80;
+            
+            if (Math.abs(tripsDiff) > 0) {
+                console.log(`⚠️ Trip count discrepancy: ${tripsDiff > 0 ? '+' : ''}${tripsDiff}`);
+            }
+            if (Math.abs(amountDiff) > 0.01) {
+                console.log(`⚠️ Amount discrepancy: ${amountDiff > 0 ? '+' : ''}$${amountDiff.toFixed(2)}`);
+            }
+            
+            if (Math.abs(tripsDiff) <= 0 && Math.abs(amountDiff) <= 0.01) {
+                console.log('✅ Data matches facility app expectations!');
+            } else {
+                console.log('🔧 Data needs adjustment to match facility app');
+            }
+        }
+    };
 
     // Test database connection and basic operations
     const testDatabaseConnection = async () => {
