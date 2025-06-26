@@ -781,7 +781,7 @@ export default function FacilityOverviewPage() {
                                                         onClick={() => handleMonthlyInvoice(facility.id)}
                                                         className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md transition-colors shadow-sm mb-2 w-full"
                                                     >
-                                                        📄 Monthly Invoice
+                                                        Invoice $ Trips
                                                     </button>
                                                     <div className="text-xs text-gray-500 text-center">
                                                         View current month billing
