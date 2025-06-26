@@ -1,4 +1,3 @@
-@ -1,4 +1,6 @@
 @import "tailwindcss";
 @tailwind base;
 @tailwind components;
@@ -6,25 +5,41 @@
 
 :root {
   /* Original Colors - For Reference */
-@ -20,13 +22,6 @@
+  --background: #f8f9fa;
+  --foreground: #222f3e;
+  --accent: #5fbfc0;
+  --button-text: #fff;
+  --card-background: #fff;
+  --border-color: #dde5e7;
+  --primary: #5fbfc0;
+  --primary-hover: #4aa5a6;
+  --secondary: #e0f4f5;
   --secondary-hover: #4aa5a6;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    /* Original Colors - For Reference */
-@ -57,15 +52,43 @@ body {
+    --background: #181c1f;
+    --foreground: #e0f4f5;
+    --accent: #5fbfc0;
+    --button-text: #181c1f;
+    --card-background: #222f3e;
+    --border-color: #3f5e63;
+    --primary: #5fbfc0;
+    --primary-hover: #4aa5a6;
+    --secondary: #e0f4f5;
+    --secondary-hover: #4aa5a6;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, sans-serif;
+}
 
 /* Custom utility classes for the Compassionate Care Transportation color scheme */
 .btn-primary {
-  @apply bg-[#5fbfc0] text-white hover:bg-[#4aa5a6] focus:ring-[#5fbfc0]/50;
   background-color: #5fbfc0;
   color: white;
   border: none;
@@ -38,7 +53,6 @@
 }
 
 .btn-secondary {
-  @apply bg-transparent border border-[#5fbfc0] text-[#5fbfc0] hover:bg-[#5fbfc0]/10 focus:ring-[#5fbfc0]/50;
   background-color: transparent;
   border: 1px solid #5fbfc0;
   color: #5fbfc0;
@@ -52,7 +66,6 @@
 }
 
 .card {
-  @apply bg-[#F8F9FA] dark:bg-[#1A1A1A] border border-[#DDE5E7] dark:border-[#333333] rounded-lg shadow-sm;
   background-color: #F8F9FA;
   border: 1px solid #DDE5E7;
   border-radius: 0.5rem;
