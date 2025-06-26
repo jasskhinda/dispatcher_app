@@ -1,11 +1,14 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 
 export async function POST(request) {
-  const supabase = createRouteHandlerClient();
+  const supabase = createRouteHandlerClient({ cookies });
   
   try {
     const { tripId } = await request.json();
+    
+    console.log('Send reminder request for trip:', tripId);
     
     if (!tripId) {
       return NextResponse.json({ error: 'Trip ID is required' }, { status: 400 });
@@ -14,6 +17,7 @@ export async function POST(request) {
     // Get user session and verify dispatcher access
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
+      console.error('No session found for reminder request');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -25,8 +29,11 @@ export async function POST(request) {
       .single();
 
     if (tripError || !trip) {
+      console.error('Trip not found for reminder:', tripId, tripError);
       return NextResponse.json({ error: 'Trip not found' }, { status: 404 });
     }
+
+    console.log('Trip status for reminder:', trip.status);
 
     // Only send reminders for payment failed trips
     if (trip.status !== 'payment_failed') {
@@ -37,7 +44,9 @@ export async function POST(request) {
 
     // Send reminder to BookingCCT app
     try {
-      const reminderResponse = await fetch(`${process.env.BOOKING_APP_URL || 'http://localhost:3000'}/api/trips/payment-reminder`, {
+      const bookingAppUrl = process.env.BOOKING_APP_URL || 'https://booking.compassionatecaretransportation.com';
+      
+      const reminderResponse = await fetch(`${bookingAppUrl}/api/trips/payment-reminder`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -47,6 +56,8 @@ export async function POST(request) {
           userEmail: trip.user_email || trip.passenger_email,
           amount: trip.price
         }),
+        // Add timeout to prevent hanging
+        signal: AbortSignal.timeout(10000) // 10 second timeout
       });
 
       const reminderResult = await reminderResponse.json();
