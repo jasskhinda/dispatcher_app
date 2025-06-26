@@ -64,11 +64,11 @@ export async function POST(request) {
 }
 
 async function handleApprove(supabase, trip) {
-  // Update trip to approved status
+  // First set to approved_pending_payment status
   const { data: updatedTrip, error: updateError } = await supabase
     .from('trips')
     .update({
-      status: 'upcoming',
+      status: 'approved_pending_payment',
       driver_name: 'Assigned Driver',
       vehicle: 'Standard Accessible Vehicle',
       updated_at: new Date().toISOString()
@@ -97,39 +97,61 @@ async function handleApprove(supabase, trip) {
 
       if (chargeResponse.ok && chargeResult.success) {
         console.log('✅ Payment charged successfully for trip:', trip.id);
+        
+        // Update trip status to "paid_in_progress" since payment was successful
+        const { data: paidTrip, error: paymentUpdateError } = await supabase
+          .from('trips')
+          .update({
+            status: 'paid_in_progress',
+            payment_status: 'paid',
+            payment_intent_id: chargeResult.paymentIntent.id,
+            charged_at: new Date().toISOString(),
+            payment_amount: chargeResult.trip.amount
+          })
+          .eq('id', trip.id)
+          .select()
+          .single();
+
+        if (paymentUpdateError) {
+          console.error('Failed to update trip with payment info:', paymentUpdateError);
+        }
+
         return NextResponse.json({
           success: true,
-          trip: updatedTrip,
+          trip: paidTrip || updatedTrip,
           payment: {
             charged: true,
             status: 'paid',
             amount: chargeResult.trip.amount,
             paymentIntentId: chargeResult.paymentIntent.id
           },
-          message: 'Trip approved and payment charged successfully'
+          message: 'Trip approved and payment processed successfully - Status: PAID & IN PROGRESS'
         });
       } else {
         console.error('❌ Payment charging failed:', chargeResult);
         
-        // Update trip with payment failure but keep it approved
-        await supabase
+        // Update trip with payment failure status
+        const { data: failedTrip, error: failureUpdateError } = await supabase
           .from('trips')
           .update({
+            status: 'payment_failed',
             payment_status: 'failed',
             payment_error: chargeResult.error || 'Payment charge failed'
           })
-          .eq('id', trip.id);
+          .eq('id', trip.id)
+          .select()
+          .single();
 
         return NextResponse.json({
           success: true,
-          trip: updatedTrip,
+          trip: failedTrip || updatedTrip,
           payment: {
             charged: false,
             status: 'failed',
             error: chargeResult.error || 'Payment charge failed'
           },
-          warning: 'Trip approved but payment charging failed. Please handle payment manually.',
-          message: 'Trip approved with payment charging issue'
+          warning: 'Trip approved but payment failed. Client needs to retry payment.',
+          message: 'Trip approved but payment failed'
         });
       }
     } catch (paymentError) {

@@ -155,11 +155,12 @@ export default function FacilityOverviewPage() {
                 const totalTrips = facilityTrips.length;
                 const pendingTrips = facilityTrips.filter(trip => trip.status === 'pending').length;
                 const upcomingTrips = facilityTrips.filter(trip => trip.status === 'upcoming').length;
+                const inProcessTrips = facilityTrips.filter(trip => trip.status === 'in_process').length;
                 const completedTrips = facilityTrips.filter(trip => trip.status === 'completed').length;
                 const confirmedTrips = facilityTrips.filter(trip => trip.status === 'confirmed').length;
                 const cancelledTrips = facilityTrips.filter(trip => trip.status === 'cancelled').length;
                 const otherTrips = facilityTrips.filter(trip => 
-                    !['pending', 'upcoming', 'completed', 'confirmed', 'cancelled'].includes(trip.status)
+                    !['pending', 'upcoming', 'in_process', 'completed', 'confirmed', 'cancelled'].includes(trip.status)
                 ).length;
                 
                 // FIXED: Match facility app billing logic - only completed trips with valid prices
@@ -212,6 +213,7 @@ export default function FacilityOverviewPage() {
                     totalTrips,
                     pendingTrips,
                     upcomingTrips,
+                    inProcessTrips,
                     completedTrips,
                     confirmedTrips,
                     cancelledTrips,
@@ -324,6 +326,7 @@ export default function FacilityOverviewPage() {
         totalTrips: facilityStats.reduce((sum, f) => sum + f.totalTrips, 0),
         pendingTrips: facilityStats.reduce((sum, f) => sum + f.pendingTrips, 0),
         upcomingTrips: facilityStats.reduce((sum, f) => sum + f.upcomingTrips, 0),
+        inProcessTrips: facilityStats.reduce((sum, f) => sum + (f.inProcessTrips || 0), 0),
         completedTrips: facilityStats.reduce((sum, f) => sum + f.completedTrips, 0),
         confirmedTrips: facilityStats.reduce((sum, f) => sum + (f.confirmedTrips || 0), 0),
         cancelledTrips: facilityStats.reduce((sum, f) => sum + (f.cancelledTrips || 0), 0),
@@ -559,6 +562,14 @@ export default function FacilityOverviewPage() {
                         </div>
                     )}
 
+                    {overallStats.inProcessTrips > 0 && (
+                        <div className="bg-white rounded-lg shadow p-6 text-center">
+                            <div className="text-3xl font-bold text-blue-600 mb-2">{overallStats.inProcessTrips}</div>
+                            <div className="text-sm font-medium text-gray-700">In Process</div>
+                            <div className="text-xs text-gray-500 mt-1">Paid & Active</div>
+                        </div>
+                    )}
+
                     {overallStats.cancelledTrips > 0 && (
                         <div className="bg-white rounded-lg shadow p-6 text-center">
                             <div className="text-3xl font-bold text-red-600 mb-2">{overallStats.cancelledTrips}</div>
@@ -604,6 +615,7 @@ export default function FacilityOverviewPage() {
                                                 const statusColors = {
                                                     'pending': 'bg-yellow-100 text-yellow-800',
                                                     'upcoming': 'bg-blue-100 text-blue-800',
+                                                    'in_process': 'bg-blue-600 text-white',
                                                     'completed': 'bg-green-100 text-green-800',
                                                     'confirmed': 'bg-teal-100 text-teal-800',
                                                     'cancelled': 'bg-red-100 text-red-800',
@@ -694,7 +706,7 @@ export default function FacilityOverviewPage() {
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap">
-                                                    <div className="grid grid-cols-3 gap-1 text-xs">
+                                                    <div className="grid grid-cols-4 gap-1 text-xs">
                                                         <div className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-center">
                                                             <div className="font-bold">{facility.pendingTrips}</div>
                                                             <div>Pending</div>
@@ -703,6 +715,12 @@ export default function FacilityOverviewPage() {
                                                             <div className="font-bold">{facility.upcomingTrips}</div>
                                                             <div>Upcoming</div>
                                                         </div>
+                                                        {facility.inProcessTrips > 0 && (
+                                                            <div className="bg-blue-600 text-white px-2 py-1 rounded text-center">
+                                                                <div className="font-bold">{facility.inProcessTrips}</div>
+                                                                <div>In Process</div>
+                                                            </div>
+                                                        )}
                                                         <div className="bg-green-100 text-green-800 px-2 py-1 rounded text-center">
                                                             <div className="font-bold">{facility.completedTrips}</div>
                                                             <div>Completed</div>
@@ -722,7 +740,7 @@ export default function FacilityOverviewPage() {
                                                         {facility.otherTrips > 0 && (
                                                             <div 
                                                                 className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-center cursor-help" 
-                                                                title={facility.statusBreakdown ? `Other statuses: ${Object.entries(facility.statusBreakdown).filter(([status]) => !['pending', 'upcoming', 'completed', 'confirmed', 'cancelled'].includes(status)).map(([status, count]) => `${count} ${status}`).join(', ')}` : 'Other statuses'}
+                                                                title={facility.statusBreakdown ? `Other statuses: ${Object.entries(facility.statusBreakdown).filter(([status]) => !['pending', 'upcoming', 'in_process', 'completed', 'confirmed', 'cancelled'].includes(status)).map(([status, count]) => `${count} ${status}`).join(', ')}` : 'Other statuses'}
                                                             >
                                                                 <div className="font-bold">{facility.otherTrips}</div>
                                                                 <div>Other</div>
@@ -731,12 +749,12 @@ export default function FacilityOverviewPage() {
                                                     </div>
                                                     
                                                     {/* Show detailed breakdown if there are unusual statuses */}
-                                                    {facility.statusBreakdown && Object.keys(facility.statusBreakdown).some(status => !['pending', 'upcoming', 'completed', 'confirmed', 'cancelled'].includes(status)) && (
+                                                    {facility.statusBreakdown && Object.keys(facility.statusBreakdown).some(status => !['pending', 'upcoming', 'in_process', 'completed', 'confirmed', 'cancelled'].includes(status)) && (
                                                         <div className="mt-2 pt-2 border-t border-gray-200">
                                                             <div className="text-xs text-gray-600 font-medium mb-1">Detailed Status:</div>
                                                             <div className="flex flex-wrap gap-1">
                                                                 {Object.entries(facility.statusBreakdown)
-                                                                    .filter(([status]) => !['pending', 'upcoming', 'completed', 'confirmed', 'cancelled'].includes(status))
+                                                                    .filter(([status]) => !['pending', 'upcoming', 'in_process', 'completed', 'confirmed', 'cancelled'].includes(status))
                                                                     .map(([status, count]) => (
                                                                         <span 
                                                                             key={status} 

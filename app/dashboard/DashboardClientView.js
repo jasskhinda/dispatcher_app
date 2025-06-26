@@ -24,7 +24,7 @@ export default function DashboardClientView({ user, userProfile, trips: initialT
   // Count pending trips that need attention
   const pendingTripsCount = trips.filter(trip => trip.status === 'pending').length;
 
-  const statusOptions = ['all', 'pending', 'upcoming', 'in_progress', 'completed', 'cancelled'];
+  const statusOptions = ['all', 'pending', 'upcoming', 'in_process', 'in_progress', 'completed', 'cancelled'];
 
   // Helper functions for enhanced client name resolution
   const getClientName = (trip) => {
@@ -480,10 +480,11 @@ export default function DashboardClientView({ user, userProfile, trips: initialT
                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
                           ${trip.status === 'completed' ? 'bg-brand-completed/20 text-brand-completed' : 
                             trip.status === 'in_progress' ? 'bg-brand-inProgress/20 text-brand-inProgress' : 
+                            trip.status === 'in_process' ? 'bg-blue-100 text-blue-800' : 
                             trip.status === 'cancelled' ? 'bg-brand-cancelled/20 text-brand-cancelled' : 
                             trip.status === 'upcoming' ? 'bg-brand-upcoming/20 text-brand-upcoming' : 
                             'bg-brand-pending/20 text-brand-pending'}`}>
-                          {trip.status || 'pending'}
+                          {trip.status === 'in_process' ? 'In Process (Paid)' : trip.status || 'pending'}
                         </span>
                       </td>
                       <td className="px-2 py-3 text-sm">
@@ -547,6 +548,18 @@ export default function DashboardClientView({ user, userProfile, trips: initialT
                           >
                             {approving === trip.id ? 'Completing...' : 'Complete'}
                           </button>
+                        )}
+                        {trip.status === 'in_process' && (
+                          <div className="space-y-1">
+                            <div className="text-blue-600 text-xs">💳 Payment Processed</div>
+                            <button
+                              onClick={() => handleCompleteTrip(trip.id)}
+                              disabled={approving === trip.id}
+                              className="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded bg-green-600 text-white hover:bg-green-700 transition-colors focus:outline-none focus:ring-1 focus:ring-green-500 disabled:opacity-50"
+                            >
+                              {approving === trip.id ? 'Completing...' : 'Complete Trip'}
+                            </button>
+                          </div>
                         )}
                         {trip.status === 'cancelled' && (
                           <div className="text-red-600 text-xs">

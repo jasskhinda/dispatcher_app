@@ -250,11 +250,31 @@ function IndividualBookingInvoiceContent() {
                                         trip?.status === 'completed' ? 'bg-green-100 text-green-800' :
                                         trip?.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                                         trip?.status === 'upcoming' ? 'bg-blue-100 text-blue-800' :
+                                        trip?.status === 'in_process' ? 'bg-blue-100 text-blue-800' :
                                         'bg-gray-100 text-gray-800'
                                     }`}>
-                                        {trip?.status}
+                                        {trip?.status === 'in_process' ? 'In Process (Paid)' : trip?.status}
                                     </span>
                                 </div>
+                                {/* Payment Status for Paid Trips */}
+                                {(trip?.payment_status === 'paid' || trip?.status === 'in_process') && (
+                                    <div>
+                                        <span className="text-sm font-medium text-gray-700">Payment Status:</span>
+                                        <span className="ml-2 px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                                            ✅ Paid
+                                        </span>
+                                        {trip?.charged_at && (
+                                            <div className="ml-2 mt-1 text-xs text-gray-500">
+                                                Charged: {new Date(trip.charged_at).toLocaleDateString()} at {new Date(trip.charged_at).toLocaleTimeString()}
+                                            </div>
+                                        )}
+                                        {trip?.payment_amount && (
+                                            <div className="ml-2 text-xs text-gray-500">
+                                                Amount: {formatCurrency(trip.payment_amount)}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                                 <div>
                                     <span className="text-sm font-medium text-gray-700">Pickup Time:</span>
                                     <span className="ml-2 text-sm text-gray-900">{formatDate(trip?.pickup_time)}</span>
@@ -288,9 +308,68 @@ function IndividualBookingInvoiceContent() {
                     </div>
                 </div>
 
+                {/* Enhanced Cost Breakdown for Paid Trips */}
+                {(trip?.payment_status === 'paid' || trip?.status === 'in_process') && (
+                    <div className="bg-white rounded-lg shadow p-6 mb-8">
+                        <h2 className="text-xl font-semibold text-gray-900 mb-4">💳 Payment Details & Cost Breakdown</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-3">Service Details</h3>
+                                <div className="space-y-3">
+                                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                                        <span className="text-sm font-medium text-gray-700">Base Transportation</span>
+                                        <span className="text-sm font-semibold text-gray-900">{formatCurrency(trip.price || 0)}</span>
+                                    </div>
+                                    {trip?.wheelchair_type && (
+                                        <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+                                            <span className="text-sm font-medium text-blue-700">♿ Wheelchair Accessible ({trip.wheelchair_type})</span>
+                                            <span className="text-sm font-semibold text-blue-800">Included</span>
+                                        </div>
+                                    )}
+                                    {trip?.is_round_trip && (
+                                        <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                                            <span className="text-sm font-medium text-green-700">🔄 Round Trip Service</span>
+                                            <span className="text-sm font-semibold text-green-800">Included</span>
+                                        </div>
+                                    )}
+                                    {trip?.additional_passengers > 0 && (
+                                        <div className="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
+                                            <span className="text-sm font-medium text-purple-700">👥 Additional Passengers ({trip.additional_passengers})</span>
+                                            <span className="text-sm font-semibold text-purple-800">Included</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-3">Payment Information</h3>
+                                <div className="space-y-3">
+                                    {trip?.payment_intent_id && (
+                                        <div>
+                                            <span className="text-sm font-medium text-gray-700">Payment ID:</span>
+                                            <div className="text-sm text-gray-900 font-mono mt-1">{trip.payment_intent_id}</div>
+                                        </div>
+                                    )}
+                                    {trip?.charged_at && (
+                                        <div>
+                                            <span className="text-sm font-medium text-gray-700">Payment Date:</span>
+                                            <div className="text-sm text-gray-900 mt-1">{formatDate(trip.charged_at)}</div>
+                                        </div>
+                                    )}
+                                    <div className="border-t pt-3">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-lg font-semibold text-gray-900">Total Paid:</span>
+                                            <span className="text-lg font-bold text-green-600">{formatCurrency(trip.payment_amount || trip.price || 0)}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Client Information */}
                 <div className="bg-white rounded-lg shadow p-6 mb-8">
-                    <h2 className="text-xl font-semibold text-gray-900 mb-4">Client Information</h2>
+                    <h2 className="text-xl font-semibold text-gray-900 mb-4">👤 Client Information</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-2">Contact Details</h3>
@@ -312,13 +391,39 @@ function IndividualBookingInvoiceContent() {
                                     <span className="text-sm font-medium text-gray-700">Phone:</span>
                                     <span className="ml-2 text-sm text-gray-900">{userProfile?.phone_number || 'Phone not available'}</span>
                                 </div>
+                                {/* Additional client details for paid trips */}
+                                {(trip?.payment_status === 'paid' || trip?.status === 'in_process') && userProfile?.stripe_customer_id && (
+                                    <div>
+                                        <span className="text-sm font-medium text-gray-700">Customer ID:</span>
+                                        <span className="ml-2 text-sm text-gray-500 font-mono">{userProfile.stripe_customer_id.slice(0, 12)}...</span>
+                                    </div>
+                                )}
                             </div>
                         </div>
                         
                         <div>
-                            <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-2">Billing Address</h3>
-                            <div className="text-sm text-gray-900">
-                                {userProfile?.address || 'Address not available'}
+                            <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-2">Billing Information</h3>
+                            <div className="space-y-2">
+                                <div className="text-sm text-gray-900">
+                                    {userProfile?.address || 'Address not available'}
+                                </div>
+                                {/* Trip booking source */}
+                                <div className="mt-3 p-2 bg-gray-50 rounded">
+                                    <span className="text-xs font-medium text-gray-500">Booking Source:</span>
+                                    <div className="text-sm text-gray-900">Individual Booking (BookingCCT App)</div>
+                                </div>
+                                {/* Trip completion info for paid trips */}
+                                {(trip?.payment_status === 'paid' || trip?.status === 'in_process') && (
+                                    <div className="mt-2 p-2 bg-green-50 rounded">
+                                        <span className="text-xs font-medium text-green-600">Payment Status:</span>
+                                        <div className="text-sm text-green-800 font-semibold">✅ Payment Processed Successfully</div>
+                                        {trip?.charged_at && (
+                                            <div className="text-xs text-green-600 mt-1">
+                                                Processed: {new Date(trip.charged_at).toLocaleDateString()}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -337,10 +442,10 @@ function IndividualBookingInvoiceContent() {
                                 {generating ? (
                                     <div className="flex items-center">
                                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                        Generating Invoice...
+                                        Creating Invoice...
                                     </div>
                                 ) : (
-                                    '📄 Generate Invoice'
+                                    '📄 Create Detailed Invoice'
                                 )}
                             </button>
                         )}
