@@ -590,7 +590,7 @@ export default function TripInvoiceDetailPage() {
                                     <div className="mt-4 text-sm">
                                         <p>📧 billing@compassionatecaretransportation.com</p>
                                         <p>📞 (416) 555-0123</p>
-                                        <p>📍 Toronto, Ontario, Canada</p>
+                                        <p>📍 Dublin, Ohio, USA</p>
                                     </div>
                                 </div>
                                 <div className="text-right">

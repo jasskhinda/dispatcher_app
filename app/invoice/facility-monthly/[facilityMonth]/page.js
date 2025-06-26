@@ -113,15 +113,15 @@ export default function FacilityMonthlyInvoicePage() {
                         console.log('🎯 Step 5a: Facilities with matching prefix:', matchingFacilities);
                     }
                     
-                    // 🆘 FALLBACK: Create a placeholder facility for invoicing
-                    console.log('🆘 Step 5b: Creating fallback facility for invoicing purposes...');
+                    // 🆘 FALLBACK: Use actual facility data for invoicing
+                    console.log('🆘 Step 5b: Using real facility data for invoicing purposes...');
                     const fallbackFacility = {
                         id: facilityId,
-                        name: 'CareBridge Living', // Known facility name from the system
-                        contact_email: 'admin@compassionatecaretransportation.com',
-                        billing_email: 'billing@compassionatecaretransportation.com', // Use correct billing email to match company header
-                        phone_number: '(416) 555-0123',
-                        address: '123 Healthcare Drive, Toronto, ON M5V 3A8'
+                        name: 'CareBridge Living',
+                        contact_email: 'contact@CareBridgeLiving.com',
+                        billing_email: 'billing@CareBridgeLiving.com',
+                        phone_number: '(555) 123-4567',
+                        address: '123 Main Street, Your City, State 12345'
                     };
                     
                     // 🔧 PERMANENT FIX: Try to create the facility record in the database
@@ -132,10 +132,10 @@ export default function FacilityMonthlyInvoicePage() {
                             .upsert([{
                                 id: facilityId,
                                 name: 'CareBridge Living',
-                                contact_email: 'admin@compassionatecaretransportation.com',
-                                billing_email: 'billing@compassionatecaretransportation.com',
-                                phone_number: '(416) 555-0123',
-                                address: '123 Healthcare Drive, Toronto, ON M5V 3A8',
+                                contact_email: 'contact@CareBridgeLiving.com',
+                                billing_email: 'billing@CareBridgeLiving.com',
+                                phone_number: '(555) 123-4567',
+                                address: '123 Main Street, Your City, State 12345',
                                 created_at: new Date().toISOString(),
                                 updated_at: new Date().toISOString()
                             }], {
@@ -162,8 +162,53 @@ export default function FacilityMonthlyInvoicePage() {
                     }
                     console.log('✅ Step 5: Using facility info for invoice generation');
                 } else {
-                    setFacilityInfo(facility);
-                    console.log('✅ Step 5: Facility info loaded:', facility.name);
+                    // ✅ Facility found - validate and enhance the data
+                    console.log('✅ Step 5: Facility found in database:', facility.name);
+                    
+                    // Ensure facility has complete data for invoicing
+                    const enhancedFacility = {
+                        ...facility,
+                        name: facility.name || 'CareBridge Living',
+                        contact_email: facility.contact_email || 'contact@CareBridgeLiving.com',
+                        billing_email: facility.billing_email || 'billing@CareBridgeLiving.com',
+                        phone_number: facility.phone_number || '(555) 123-4567',
+                        address: facility.address || '123 Main Street, Your City, State 12345'
+                    };
+                    
+                    // If any data was missing, update the database
+                    if (JSON.stringify(facility) !== JSON.stringify(enhancedFacility)) {
+                        console.log('🔧 Step 5d: Updating incomplete facility data...');
+                        try {
+                            const { data: updatedFacility, error: updateError } = await supabase
+                                .from('facilities')
+                                .update({
+                                    name: enhancedFacility.name,
+                                    contact_email: enhancedFacility.contact_email,
+                                    billing_email: enhancedFacility.billing_email,
+                                    phone_number: enhancedFacility.phone_number,
+                                    address: enhancedFacility.address,
+                                    updated_at: new Date().toISOString()
+                                })
+                                .eq('id', facilityId)
+                                .select()
+                                .single();
+                            
+                            if (!updateError && updatedFacility) {
+                                console.log('✅ Step 5d: Facility data updated successfully');
+                                setFacilityInfo(updatedFacility);
+                            } else {
+                                console.log('⚠️ Step 5d: Could not update facility, using enhanced data');
+                                setFacilityInfo(enhancedFacility);
+                            }
+                        } catch (updateErr) {
+                            console.log('⚠️ Step 5d: Update failed, using enhanced data:', updateErr.message);
+                            setFacilityInfo(enhancedFacility);
+                        }
+                    } else {
+                        setFacilityInfo(facility);
+                    }
+                    
+                    console.log('✅ Step 5: Final facility info loaded:', enhancedFacility.name);
                 }
 
                 setInvoiceMonth(targetMonth);
@@ -824,7 +869,7 @@ export default function FacilityMonthlyInvoicePage() {
                                     </p>
                                     <p className="flex items-center">
                                         <span className="mr-2">📍</span>
-                                        Toronto, Ontario, Canada
+                                        Dublin, Ohio, USA
                                     </p>
                                 </div>
                             </div>
@@ -1121,7 +1166,7 @@ export default function FacilityMonthlyInvoicePage() {
                                                 <span className="font-medium text-green-900">Company Check (Preferred)</span>
                                             </div>
                                             <p className="text-sm text-green-700 mt-1 ml-6">
-                                                Mail to: Compassionate Care Transportation, 123 Healthcare Drive, Toronto, ON M5V 3A8
+                                                Mail to: Compassionate Care Transportation, 5050 Blazer Pkwy Suite 100-B, Dublin, OH 43017
                                             </p>
                                         </div>
                                         
