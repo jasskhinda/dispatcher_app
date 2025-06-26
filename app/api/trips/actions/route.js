@@ -152,28 +152,57 @@ export async function POST(request) {
     // Provide more specific error messages
     let errorMessage = 'Internal server error';
     let errorDetails = error.message;
+    let statusCode = 500;
     
     if (error.message.includes('fetch')) {
       errorMessage = 'Payment system connection failed';
-      errorDetails = 'Unable to connect to payment processing system';
+      errorDetails = 'Unable to connect to payment processing system. Please try again or use manual payment processing.';
+      statusCode = 503; // Service Unavailable
     } else if (error.message.includes('permission')) {
       errorMessage = 'Database permission error';
-      errorDetails = 'Insufficient permissions to update trip';
+      errorDetails = 'Insufficient permissions to update trip. Please contact support if this persists.';
+      statusCode = 403; // Forbidden
     } else if (error.message.includes('authentication')) {
       errorMessage = 'Authentication error';
-      errorDetails = 'User authentication failed';
+      errorDetails = 'User authentication failed. Please try logging out and back in.';
+      statusCode = 401; // Unauthorized
     } else if (error.message.includes('timeout')) {
       errorMessage = 'Request timeout';
-      errorDetails = 'Operation took too long to complete';
+      errorDetails = 'Operation took too long to complete. Please try again.';
+      statusCode = 504; // Gateway Timeout
+    } else if (error.message.includes('status transition')) {
+      errorMessage = 'Invalid trip status';
+      errorDetails = error.message;
+      statusCode = 400; // Bad Request
+    } else if (error.message.includes('not found')) {
+      errorMessage = 'Trip not found';
+      errorDetails = 'The requested trip could not be found.';
+      statusCode = 404; // Not Found
     }
     
+    // Log the error with full details for debugging
+    console.error('🚨 Detailed error information:', {
+      message: errorMessage,
+      details: errorDetails,
+      status: statusCode,
+      timestamp: new Date().toISOString(),
+      requestId,
+      stack: error.stack
+    });
+
+    // Return a user-friendly error response
     return NextResponse.json({
       error: errorMessage,
       details: errorDetails,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
-      timestamp: new Date().toISOString(),
-      endpoint: '/api/trips/actions'
-    }, { status: 500 });
+      requestId,
+      suggestions: [
+        statusCode === 503 ? "Try the manual payment process instead" : null,
+        statusCode === 401 ? "Try logging out and back in" : null,
+        statusCode === 504 ? "Try the action again" : null,
+        "If the problem persists, contact support with the request ID"
+      ].filter(Boolean),
+      timestamp: new Date().toISOString()
+    }, { status: statusCode });
   }
 }
 
@@ -186,15 +215,24 @@ async function handleApprove(supabase, trip) {
     status: trip.status 
   });
 
+  // Validate current status
+  if (trip.status !== 'pending') {
+    return NextResponse.json({
+      error: 'Invalid status transition',
+      details: `Cannot approve trip in status: ${trip.status}. Trip must be in 'pending' status.`
+    }, { status: 400 });
+  }
+
   try {
     // First set to approved_pending_payment status
     const { data: updatedTrip, error: updateError } = await supabase
       .from('trips')
       .update({
         status: 'approved_pending_payment',
-        driver_name: 'Assigned Driver',
-        vehicle: 'Standard Accessible Vehicle',
-        updated_at: new Date().toISOString()
+        driver_name: trip.driver_name || 'Assigned Driver',
+        vehicle: trip.vehicle || 'Standard Accessible Vehicle',
+        updated_at: new Date().toISOString(),
+        approval_notes: `Approved by dispatcher at ${new Date().toLocaleString()}`
       })
       .eq('id', trip.id)
       .select()
@@ -397,24 +435,50 @@ async function handleReject(supabase, trip, reason) {
 }
 
 async function handleComplete(supabase, trip) {
-  const { data: updatedTrip, error: updateError } = await supabase
-    .from('trips')
-    .update({
-      status: 'completed',
-      completed_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', trip.id)
-    .select()
-    .single();
-
-  if (updateError) {
-    throw new Error(`Failed to complete trip: ${updateError.message}`);
+  // Validate current status
+  if (!['paid_in_progress', 'upcoming'].includes(trip.status)) {
+    return NextResponse.json({
+      error: 'Invalid status transition',
+      details: `Cannot complete trip in status: ${trip.status}. Trip must be in 'paid_in_progress' or 'upcoming' status.`
+    }, { status: 400 });
   }
 
-  return NextResponse.json({
-    success: true,
-    trip: updatedTrip,
-    message: 'Trip completed successfully'
-  });
+  console.log('🔄 Starting trip completion process for:', trip.id);
+  console.log('Current trip status:', trip.status);
+
+  try {
+    // Update trip to completed status
+    const { data: updatedTrip, error: updateError } = await supabase
+      .from('trips')
+      .update({
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        completion_notes: `Completed by dispatcher at ${new Date().toLocaleString()}`
+      })
+      .eq('id', trip.id)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error('Failed to update trip to completed status:', updateError);
+      throw new Error(`Failed to complete trip: ${updateError.message}`);
+    }
+
+    console.log('✅ Trip completed successfully:', updatedTrip.id);
+
+    // Return success response
+    return NextResponse.json({
+      success: true,
+      trip: updatedTrip,
+      message: 'Trip completed successfully',
+      details: {
+        previousStatus: trip.status,
+        completedAt: updatedTrip.completed_at
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error in handleComplete:', error);
+    throw error; // Re-throw to be caught by main error handler
+  }
 }
