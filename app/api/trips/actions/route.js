@@ -179,170 +179,188 @@ async function handleApprove(supabase, trip) {
     status: trip.status 
   });
 
-  // First set to approved_pending_payment status
-  const { data: updatedTrip, error: updateError } = await supabase
-    .from('trips')
-    .update({
-      status: 'approved_pending_payment',
-      driver_name: 'Assigned Driver',
-      vehicle: 'Standard Accessible Vehicle',
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', trip.id)
-    .select()
-    .single();
+  try {
+    // First set to approved_pending_payment status
+    const { data: updatedTrip, error: updateError } = await supabase
+      .from('trips')
+      .update({
+        status: 'approved_pending_payment',
+        driver_name: 'Assigned Driver',
+        vehicle: 'Standard Accessible Vehicle',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', trip.id)
+      .select()
+      .single();
 
-  if (updateError) {
-    console.error('❌ Failed to update trip to approved_pending_payment:', updateError);
-    throw new Error(`Failed to approve trip: ${updateError.message}`);
-  }
+    if (updateError) {
+      console.error('❌ Failed to update trip to approved_pending_payment:', updateError);
+      throw new Error(`Failed to approve trip: ${updateError.message}`);
+    }
 
-  console.log('✅ Trip updated to approved_pending_payment status');
+    console.log('✅ Trip updated to approved_pending_payment status');
 
-  // If this is an individual BookingCCT trip (has user_id, no facility_id, and has payment_method_id)
-  if (trip.user_id && !trip.facility_id && trip.payment_method_id) {
-    console.log('🔄 This is an individual trip with payment method - attempting payment processing...');
-    
-    try {
-      const bookingAppUrl = process.env.BOOKING_APP_URL || 'https://booking.compassionatecaretransportation.com';
-      console.log(`🔍 Attempting to charge payment via: ${bookingAppUrl}/api/stripe/charge-payment`);
+    // If this is an individual BookingCCT trip (has user_id, no facility_id, and has payment_method_id)
+    if (trip.user_id && !trip.facility_id && trip.payment_method_id) {
+      console.log('🔄 This is an individual trip with payment method - attempting payment processing...');
       
-      // Call the BookingCCT payment charging API with enhanced error handling
-      const chargeResponse = await fetch(`${bookingAppUrl}/api/stripe/charge-payment`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ tripId: trip.id }),
-        // Add timeout to prevent hanging
-        signal: AbortSignal.timeout(15000) // Increased to 15 seconds
-      });
-
-      // Check if the response is ok before trying to parse JSON
-      if (!chargeResponse.ok) {
-        console.error(`❌ Payment API returned status ${chargeResponse.status}`);
-        const errorText = await chargeResponse.text();
-        console.error(`❌ Payment API error response: ${errorText}`);
-        throw new Error(`Payment API returned ${chargeResponse.status}: ${errorText}`);
-      }
-
-      const chargeResult = await chargeResponse.json();
-
-      if (chargeResult.success) {
-        console.log('✅ Payment charged successfully for trip:', trip.id);
+      try {
+        const bookingAppUrl = process.env.BOOKING_APP_URL || 'https://booking.compassionatecaretransportation.com';
+        console.log(`🔍 Attempting to charge payment via: ${bookingAppUrl}/api/stripe/charge-payment`);
         
-        // Update trip status to "paid_in_progress" since payment was successful
-        const { data: paidTrip, error: paymentUpdateError } = await supabase
+        // Call the BookingCCT payment charging API with enhanced error handling
+        const chargeResponse = await fetch(`${bookingAppUrl}/api/stripe/charge-payment`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ tripId: trip.id }),
+          // Add timeout to prevent hanging
+          signal: AbortSignal.timeout(15000) // Increased to 15 seconds
+        });
+
+        // Check if the response is ok before trying to parse JSON
+        if (!chargeResponse.ok) {
+          console.error(`❌ Payment API returned status ${chargeResponse.status}`);
+          const errorText = await chargeResponse.text();
+          console.error(`❌ Payment API error response: ${errorText}`);
+          
+          // Provide specific error messages based on status codes
+          let errorMessage = `Payment API returned ${chargeResponse.status}`;
+          if (chargeResponse.status === 400) {
+            errorMessage = `Payment validation failed: ${errorText}`;
+          } else if (chargeResponse.status === 401) {
+            errorMessage = 'Payment API authentication failed';
+          } else if (chargeResponse.status === 404) {
+            errorMessage = 'Trip not found in payment system';
+          } else if (chargeResponse.status >= 500) {
+            errorMessage = 'Payment system internal error';
+          }
+          
+          throw new Error(errorMessage);
+        }
+
+        const chargeResult = await chargeResponse.json();
+
+        if (chargeResult.success) {
+          console.log('✅ Payment charged successfully for trip:', trip.id);
+          
+          // Update trip status to "paid_in_progress" since payment was successful
+          const { data: paidTrip, error: paymentUpdateError } = await supabase
+            .from('trips')
+            .update({
+              status: 'paid_in_progress',
+              payment_status: 'paid',
+              payment_intent_id: chargeResult.paymentIntent.id,
+              charged_at: new Date().toISOString(),
+              payment_amount: chargeResult.trip.amount
+            })
+            .eq('id', trip.id)
+            .select()
+            .single();
+
+          if (paymentUpdateError) {
+            console.error('Failed to update trip with payment info:', paymentUpdateError);
+          }
+
+          return NextResponse.json({
+            success: true,
+            trip: paidTrip || updatedTrip,
+            payment: {
+              charged: true,
+              status: 'paid',
+              amount: chargeResult.trip.amount,
+              paymentIntentId: chargeResult.paymentIntent.id
+            },
+            message: 'Trip approved and payment processed successfully - Status: PAID & IN PROGRESS'
+          });
+        } else {
+          console.error('❌ Payment charging failed:', chargeResult);
+          
+          // Update trip with payment failure status
+          const { data: failedTrip, error: failureUpdateError } = await supabase
+            .from('trips')
+            .update({
+              status: 'payment_failed',
+              payment_status: 'failed',
+              payment_error: chargeResult.error || 'Payment charge failed'
+            })
+            .eq('id', trip.id)
+            .select()
+            .single();
+
+          return NextResponse.json({
+            success: true,
+            trip: failedTrip || updatedTrip,
+            payment: {
+              charged: false,
+              status: 'failed',
+              error: chargeResult.error || 'Payment charge failed'
+            },
+            warning: 'Trip approved but payment failed. Client needs to retry payment.',
+            message: 'Trip approved but payment failed'
+          });
+        }
+      } catch (paymentError) {
+        console.error('Payment charging request failed:', paymentError);
+        console.error('Payment error details:', {
+          name: paymentError.name,
+          message: paymentError.message,
+          stack: paymentError.stack
+        });
+        
+        // FALLBACK: If payment processing completely fails, still approve the trip
+        // This ensures dispatchers can approve trips even when payment system is down
+        console.log('🔄 Payment failed - falling back to manual payment approval...');
+        
+        const { data: fallbackTrip, error: fallbackError } = await supabase
           .from('trips')
           .update({
-            status: 'paid_in_progress',
-            payment_status: 'paid',
-            payment_intent_id: chargeResult.paymentIntent.id,
-            charged_at: new Date().toISOString(),
-            payment_amount: chargeResult.trip.amount
+            status: 'upcoming', // Approve without payment for manual handling
+            payment_status: 'pending',
+            payment_error: `Automatic payment failed: ${paymentError.message}. Manual payment required.`,
+            approval_notes: 'Payment system unavailable - approved for manual payment processing'
           })
           .eq('id', trip.id)
           .select()
           .single();
 
-        if (paymentUpdateError) {
-          console.error('Failed to update trip with payment info:', paymentUpdateError);
+        if (fallbackError) {
+          console.error('❌ Fallback approval also failed:', fallbackError);
+          throw new Error(`Both payment processing and fallback approval failed: ${fallbackError.message}`);
         }
 
         return NextResponse.json({
           success: true,
-          trip: paidTrip || updatedTrip,
-          payment: {
-            charged: true,
-            status: 'paid',
-            amount: chargeResult.trip.amount,
-            paymentIntentId: chargeResult.paymentIntent.id
-          },
-          message: 'Trip approved and payment processed successfully - Status: PAID & IN PROGRESS'
-        });
-      } else {
-        console.error('❌ Payment charging failed:', chargeResult);
-        
-        // Update trip with payment failure status
-        const { data: failedTrip, error: failureUpdateError } = await supabase
-          .from('trips')
-          .update({
-            status: 'payment_failed',
-            payment_status: 'failed',
-            payment_error: chargeResult.error || 'Payment charge failed'
-          })
-          .eq('id', trip.id)
-          .select()
-          .single();
-
-        return NextResponse.json({
-          success: true,
-          trip: failedTrip || updatedTrip,
+          trip: fallbackTrip,
           payment: {
             charged: false,
-            status: 'failed',
-            error: chargeResult.error || 'Payment charge failed'
+            status: 'pending',
+            error: 'Payment system unavailable',
+            fallback: true
           },
-          warning: 'Trip approved but payment failed. Client needs to retry payment.',
-          message: 'Trip approved but payment failed'
+          warning: 'Trip approved but payment system is unavailable. Payment must be processed manually.',
+          message: 'Trip approved - manual payment required'
         });
       }
-    } catch (paymentError) {
-      console.error('Payment charging request failed:', paymentError);
-      console.error('Payment error details:', {
-        name: paymentError.name,
-        message: paymentError.message,
-        stack: paymentError.stack
-      });
+    } else {
+      // Facility trip or trip without payment method - no automatic charging
+      console.log('🔄 This is a facility trip or trip without payment method - no automatic charging required');
       
-      // FALLBACK: If payment processing completely fails, still approve the trip
-      // This ensures dispatchers can approve trips even when payment system is down
-      console.log('🔄 Payment failed - falling back to manual payment approval...');
-      
-      const { data: fallbackTrip, error: fallbackError } = await supabase
-        .from('trips')
-        .update({
-          status: 'upcoming', // Approve without payment for manual handling
-          payment_status: 'pending',
-          payment_error: `Automatic payment failed: ${paymentError.message}. Manual payment required.`,
-          approval_notes: 'Payment system unavailable - approved for manual payment processing'
-        })
-        .eq('id', trip.id)
-        .select()
-        .single();
-
-      if (fallbackError) {
-        console.error('❌ Fallback approval also failed:', fallbackError);
-        throw new Error(`Both payment processing and fallback approval failed: ${fallbackError.message}`);
-      }
-
       return NextResponse.json({
         success: true,
-        trip: fallbackTrip,
+        trip: updatedTrip,
         payment: {
           charged: false,
-          status: 'pending',
-          error: 'Payment system unavailable',
-          fallback: true
+          status: 'not_applicable',
+          reason: trip.facility_id ? 'facility_billing' : 'no_payment_method'
         },
-        warning: 'Trip approved but payment system is unavailable. Payment must be processed manually.',
-        message: 'Trip approved - manual payment required'
+        message: 'Trip approved successfully'
       });
     }
-  } else {
-    // Facility trip or trip without payment method - no automatic charging
-    console.log('🔄 This is a facility trip or trip without payment method - no automatic charging required');
-    
-    return NextResponse.json({
-      success: true,
-      trip: updatedTrip,
-      payment: {
-        charged: false,
-        status: 'not_applicable',
-        reason: trip.facility_id ? 'facility_billing' : 'no_payment_method'
-      },
-      message: 'Trip approved successfully'
-    });
+  } catch (error) {
+    console.error('❌ Error in handleApprove:', error);
+    throw error; // Re-throw to be caught by main error handler
   }
 }
 
