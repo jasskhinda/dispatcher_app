@@ -129,6 +129,24 @@ export default function FacilityOverviewPage() {
                 });
                 console.log('   Status breakdown:', statusCounts);
                 
+                // Log any unusual statuses for debugging
+                const knownStatuses = ['pending', 'upcoming', 'completed', 'confirmed', 'cancelled'];
+                const unknownStatuses = Object.keys(statusCounts).filter(status => !knownStatuses.includes(status));
+                if (unknownStatuses.length > 0) {
+                    console.log(`   ⚠️ Unknown statuses found:`, unknownStatuses);
+                    unknownStatuses.forEach(status => {
+                        const tripsWithThisStatus = facilityTrips.filter(trip => trip.status === status);
+                        console.log(`     - "${status}": ${tripsWithThisStatus.length} trips`);
+                        if (tripsWithThisStatus.length > 0) {
+                            console.log(`       Sample trip:`, {
+                                id: tripsWithThisStatus[0].id,
+                                pickup_time: tripsWithThisStatus[0].pickup_time,
+                                created_at: tripsWithThisStatus[0].created_at
+                            });
+                        }
+                    });
+                }
+                
                 // Get unique clients for this facility
                 const uniqueClientIds = [...new Set(facilityTrips.map(trip => trip.managed_client_id || trip.user_id).filter(Boolean))];
                 console.log(`   Unique clients: ${uniqueClientIds.length}`);
@@ -138,6 +156,11 @@ export default function FacilityOverviewPage() {
                 const pendingTrips = facilityTrips.filter(trip => trip.status === 'pending').length;
                 const upcomingTrips = facilityTrips.filter(trip => trip.status === 'upcoming').length;
                 const completedTrips = facilityTrips.filter(trip => trip.status === 'completed').length;
+                const confirmedTrips = facilityTrips.filter(trip => trip.status === 'confirmed').length;
+                const cancelledTrips = facilityTrips.filter(trip => trip.status === 'cancelled').length;
+                const otherTrips = facilityTrips.filter(trip => 
+                    !['pending', 'upcoming', 'completed', 'confirmed', 'cancelled'].includes(trip.status)
+                ).length;
                 
                 // FIXED: Match facility app billing logic - only completed trips with valid prices
                 const billableTrips = facilityTrips.filter(trip => 
@@ -190,6 +213,10 @@ export default function FacilityOverviewPage() {
                     pendingTrips,
                     upcomingTrips,
                     completedTrips,
+                    confirmedTrips,
+                    cancelledTrips,
+                    otherTrips,
+                    statusBreakdown: statusCounts, // Add detailed status breakdown
                     totalAmount
                 };
                 
@@ -298,6 +325,9 @@ export default function FacilityOverviewPage() {
         pendingTrips: facilityStats.reduce((sum, f) => sum + f.pendingTrips, 0),
         upcomingTrips: facilityStats.reduce((sum, f) => sum + f.upcomingTrips, 0),
         completedTrips: facilityStats.reduce((sum, f) => sum + f.completedTrips, 0),
+        confirmedTrips: facilityStats.reduce((sum, f) => sum + (f.confirmedTrips || 0), 0),
+        cancelledTrips: facilityStats.reduce((sum, f) => sum + (f.cancelledTrips || 0), 0),
+        otherTrips: facilityStats.reduce((sum, f) => sum + (f.otherTrips || 0), 0),
         totalAmount: facilityStats.reduce((sum, f) => sum + f.totalAmount, 0)
     };
 
@@ -489,7 +519,7 @@ export default function FacilityOverviewPage() {
                 )}
 
                 {/* Overall Statistics */}
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
                     <div className="bg-white rounded-lg shadow p-6 text-center">
                         <div className="text-3xl font-bold text-blue-600 mb-2">{overallStats.totalFacilities}</div>
                         <div className="text-sm font-medium text-gray-700">Total Facilities</div>
@@ -519,6 +549,31 @@ export default function FacilityOverviewPage() {
                         <div className="text-sm font-medium text-gray-700">Completed</div>
                         <div className="text-xs text-gray-500 mt-1">Finished trips</div>
                     </div>
+
+                    {/* Show additional status cards only if they have values */}
+                    {overallStats.confirmedTrips > 0 && (
+                        <div className="bg-white rounded-lg shadow p-6 text-center">
+                            <div className="text-3xl font-bold text-teal-600 mb-2">{overallStats.confirmedTrips}</div>
+                            <div className="text-sm font-medium text-gray-700">Confirmed</div>
+                            <div className="text-xs text-gray-500 mt-1">Ready for pickup</div>
+                        </div>
+                    )}
+
+                    {overallStats.cancelledTrips > 0 && (
+                        <div className="bg-white rounded-lg shadow p-6 text-center">
+                            <div className="text-3xl font-bold text-red-600 mb-2">{overallStats.cancelledTrips}</div>
+                            <div className="text-sm font-medium text-gray-700">Cancelled</div>
+                            <div className="text-xs text-gray-500 mt-1">Not completed</div>
+                        </div>
+                    )}
+
+                    {overallStats.otherTrips > 0 && (
+                        <div className="bg-white rounded-lg shadow p-6 text-center">
+                            <div className="text-3xl font-bold text-purple-600 mb-2">{overallStats.otherTrips}</div>
+                            <div className="text-sm font-medium text-gray-700">Other Status</div>
+                            <div className="text-xs text-gray-500 mt-1">Various statuses</div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Total Revenue Card */}
@@ -532,6 +587,45 @@ export default function FacilityOverviewPage() {
                         <div className="text-6xl opacity-20">💰</div>
                     </div>
                 </div>
+
+                {/* Detailed Status Breakdown - Only show if there are multiple facilities or complex statuses */}
+                {facilityStats.some(f => f.statusBreakdown && Object.keys(f.statusBreakdown).length > 3) && (
+                    <div className="bg-white rounded-lg shadow p-6 mb-8">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">📊 Detailed Status Breakdown</h3>
+                        <div className="space-y-4">
+                            {facilityStats.map((facility) => {
+                                if (!facility.statusBreakdown || Object.keys(facility.statusBreakdown).length <= 3) return null;
+                                
+                                return (
+                                    <div key={facility.id} className="border-l-4 border-blue-500 pl-4">
+                                        <h4 className="font-medium text-gray-900 mb-2">🏥 {facility.name}</h4>
+                                        <div className="flex flex-wrap gap-2">
+                                            {Object.entries(facility.statusBreakdown).map(([status, count]) => {
+                                                const statusColors = {
+                                                    'pending': 'bg-yellow-100 text-yellow-800',
+                                                    'upcoming': 'bg-blue-100 text-blue-800',
+                                                    'completed': 'bg-green-100 text-green-800',
+                                                    'confirmed': 'bg-teal-100 text-teal-800',
+                                                    'cancelled': 'bg-red-100 text-red-800',
+                                                    'draft': 'bg-gray-100 text-gray-800',
+                                                    'scheduled': 'bg-indigo-100 text-indigo-800',
+                                                    'in_progress': 'bg-orange-100 text-orange-800'
+                                                };
+                                                const colorClass = statusColors[status] || 'bg-purple-100 text-purple-800';
+                                                
+                                                return (
+                                                    <span key={status} className={`px-3 py-1 rounded-full text-xs font-medium ${colorClass}`}>
+                                                        {count} {status.replace('_', ' ')}
+                                                    </span>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
 
                 {/* Facility Overview Table */}
                 <div className="bg-white rounded-lg shadow">
@@ -600,7 +694,7 @@ export default function FacilityOverviewPage() {
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap">
-                                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                                    <div className="grid grid-cols-3 gap-1 text-xs">
                                                         <div className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-center">
                                                             <div className="font-bold">{facility.pendingTrips}</div>
                                                             <div>Pending</div>
@@ -613,11 +707,48 @@ export default function FacilityOverviewPage() {
                                                             <div className="font-bold">{facility.completedTrips}</div>
                                                             <div>Completed</div>
                                                         </div>
-                                                        <div className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-center">
-                                                            <div className="font-bold">{facility.totalTrips - facility.pendingTrips - facility.upcomingTrips - facility.completedTrips}</div>
-                                                            <div>Other</div>
-                                                        </div>
+                                                        {facility.confirmedTrips > 0 && (
+                                                            <div className="bg-teal-100 text-teal-800 px-2 py-1 rounded text-center">
+                                                                <div className="font-bold">{facility.confirmedTrips}</div>
+                                                                <div>Confirmed</div>
+                                                            </div>
+                                                        )}
+                                                        {facility.cancelledTrips > 0 && (
+                                                            <div className="bg-red-100 text-red-800 px-2 py-1 rounded text-center">
+                                                                <div className="font-bold">{facility.cancelledTrips}</div>
+                                                                <div>Cancelled</div>
+                                                            </div>
+                                                        )}
+                                                        {facility.otherTrips > 0 && (
+                                                            <div 
+                                                                className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-center cursor-help" 
+                                                                title={facility.statusBreakdown ? `Other statuses: ${Object.entries(facility.statusBreakdown).filter(([status]) => !['pending', 'upcoming', 'completed', 'confirmed', 'cancelled'].includes(status)).map(([status, count]) => `${count} ${status}`).join(', ')}` : 'Other statuses'}
+                                                            >
+                                                                <div className="font-bold">{facility.otherTrips}</div>
+                                                                <div>Other</div>
+                                                            </div>
+                                                        )}
                                                     </div>
+                                                    
+                                                    {/* Show detailed breakdown if there are unusual statuses */}
+                                                    {facility.statusBreakdown && Object.keys(facility.statusBreakdown).some(status => !['pending', 'upcoming', 'completed', 'confirmed', 'cancelled'].includes(status)) && (
+                                                        <div className="mt-2 pt-2 border-t border-gray-200">
+                                                            <div className="text-xs text-gray-600 font-medium mb-1">Detailed Status:</div>
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {Object.entries(facility.statusBreakdown)
+                                                                    .filter(([status]) => !['pending', 'upcoming', 'completed', 'confirmed', 'cancelled'].includes(status))
+                                                                    .map(([status, count]) => (
+                                                                        <span 
+                                                                            key={status} 
+                                                                            className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs"
+                                                                        >
+                                                                            {count} {status.replace('_', ' ')}
+                                                                        </span>
+                                                                    ))
+                                                                }
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-center">
                                                     <div className="text-lg font-bold text-green-600">
