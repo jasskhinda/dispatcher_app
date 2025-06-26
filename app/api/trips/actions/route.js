@@ -4,12 +4,19 @@ import { cookies } from 'next/headers';
 
 export async function POST(request) {
   const requestId = Math.random().toString(36).substring(7);
-  console.log(`🚀 Trip actions API called [${requestId}]`);
+  console.log(`🚀 Trip actions API called [${requestId}] at ${new Date().toISOString()}`);
   console.log(`📡 Request URL: ${request.url}`);
   console.log(`📡 Request method: ${request.method}`);
-  console.log(`📡 Request headers:`, Object.fromEntries(request.headers.entries()));
   
   try {
+    // Check environment variables first
+    console.log(`🔍 Environment check [${requestId}]:`, {
+      NEXT_PUBLIC_SUPABASE_URL: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      SUPABASE_SERVICE_ROLE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+      BOOKING_APP_URL: process.env.BOOKING_APP_URL || 'not set'
+    });
+    
     // Create Supabase client with proper error handling
     let supabase;
     try {
@@ -215,8 +222,8 @@ async function handleApprove(supabase, trip) {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ tripId: trip.id }),
-          // Add timeout to prevent hanging
-          signal: AbortSignal.timeout(15000) // Increased to 15 seconds
+          // Reduced timeout to prevent long hangs
+          signal: AbortSignal.timeout(8000) // 8 seconds instead of 15
         });
 
         // Check if the response is ok before trying to parse JSON

@@ -95,3 +95,51 @@ body {
     color: white !important;
   }
 }
+
+/* Status badge utility classes */
+.status-badge {
+  display: inline-block;
+  padding: 0.25em 0.75em;
+  border-radius: 9999px;
+  font-size: 0.95em;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  margin-right: 0.5em;
+  margin-bottom: 0.25em;
+}
+
+.status-pending {
+  background: hsl(var(--brand-pending) / 0.15);
+  color: hsl(var(--brand-pending));
+  border: 1px solid hsl(var(--brand-pending));
+}
+.status-approved_pending_payment {
+  background: hsl(var(--brand-upcoming) / 0.12);
+  color: hsl(var(--brand-upcoming));
+  border: 1px solid hsl(var(--brand-upcoming));
+}
+.status-paid_in_progress {
+  background: hsl(var(--brand-in-progress) / 0.15);
+  color: hsl(var(--brand-in-progress));
+  border: 1px solid hsl(var(--brand-in-progress));
+}
+.status-in_process {
+  background: hsl(var(--brand-in-progress) / 0.15);
+  color: hsl(var(--brand-in-progress));
+  border: 1px solid hsl(var(--brand-in-progress));
+}
+.status-completed {
+  background: hsl(var(--brand-completed) / 0.15);
+  color: hsl(var(--brand-completed));
+  border: 1px solid hsl(var(--brand-completed));
+}
+.status-cancelled {
+  background: hsl(var(--brand-cancelled) / 0.15);
+  color: hsl(var(--brand-cancelled));
+  border: 1px solid hsl(var(--brand-cancelled));
+}
+.status-payment_failed {
+  background: hsl(var(--brand-cancelled) / 0.15);
+  color: hsl(var(--brand-cancelled));
+  border: 1px solid hsl(var(--brand-cancelled));
+}
