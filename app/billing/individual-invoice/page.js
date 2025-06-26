@@ -76,9 +76,9 @@ function IndividualBookingInvoiceContent() {
             // Fetch user profile if user_id exists
             if (tripData.user_id) {
                 const { data: profileData, error: profileError } = await supabase
-                    .from('user_profiles')
+                    .from('profiles')
                     .select('*')
-                    .eq('user_id', tripData.user_id)
+                    .eq('id', tripData.user_id)
                     .single();
 
                 if (profileError) {
