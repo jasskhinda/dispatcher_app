@@ -47,10 +47,11 @@ export default function IndividualTripsPage() {
 
     async function fetchIndividualTrips() {
         try {
-            console.log('🔍 Fetching individual trips...');
+            console.log('🔍 Fetching individual trips (BookingCCT app only)...');
             
-            // Fetch trips from booking app (has user_id but no facility_id)
-            const { data: tripsData, error: tripsError } = await supabase
+            // Fetch trips from booking app (has user_id but NO facility_id)
+            // CRITICAL: This query must exclude ALL facility trips
+            const { data: rawTripsData, error: tripsError } = await supabase
                 .from('trips')
                 .select('*')
                 .is('facility_id', null)
@@ -60,7 +61,19 @@ export default function IndividualTripsPage() {
 
             if (tripsError) throw tripsError;
 
-            console.log(`✅ Found ${tripsData?.length || 0} individual trips`);
+            console.log(`✅ Raw query returned ${rawTripsData?.length || 0} trips`);
+
+            // ADDITIONAL SAFETY: Filter out any trips that somehow have facility_id
+            // This handles data inconsistency where trips might have both user_id and facility_id
+            const tripsData = rawTripsData?.filter(trip => {
+                const isIndividualTrip = !trip.facility_id && trip.user_id;
+                if (!isIndividualTrip) {
+                    console.warn(`⚠️ Filtering out non-individual trip: ${trip.id} (facility_id: ${trip.facility_id}, user_id: ${trip.user_id})`);
+                }
+                return isIndividualTrip;
+            }) || [];
+
+            console.log(`✅ After filtering: ${tripsData.length} confirmed individual trips`);
 
             // Get user profiles for the trips separately (to avoid schema relationship issues)
             let userProfiles = [];
@@ -289,143 +302,6 @@ export default function IndividualTripsPage() {
                     </div>
                 )}
 
-                {/* Statistics */}
-                <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-8 gap-6 mb-8">
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <div className="flex items-center">
-                            <div className="flex-shrink-0">
-                                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                                    <span className="text-white text-sm font-medium">T</span>
-                                </div>
-                            </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-500">Total Individual Trips</p>
-                                <p className="text-2xl font-semibold text-gray-900">{filteredTrips.length}</p>
-                                <p className="text-xs text-gray-400">Direct bookings</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <div className="flex items-center">
-                            <div className="flex-shrink-0">
-                                <div className="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center">
-                                    <span className="text-white text-sm font-medium">P</span>
-                                </div>
-                            </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-500">Pending</p>
-                                <p className="text-2xl font-semibold text-gray-900">
-                                    {filteredTrips.filter(t => t.status === 'pending').length}
-                                </p>
-                                <p className="text-xs text-gray-400">Awaiting approval</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <div className="flex items-center">
-                            <div className="flex-shrink-0">
-                                <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
-                                    <span className="text-white text-sm font-medium">A</span>
-                                </div>
-                            </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-500">Approved - Pending Payment</p>
-                                <p className="text-2xl font-semibold text-gray-900">
-                                    {filteredTrips.filter(t => t.status === 'approved_pending_payment').length}
-                                </p>
-                                <p className="text-xs text-gray-400">Processing payment</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <div className="flex items-center">
-                            <div className="flex-shrink-0">
-                                <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-                                    <span className="text-white text-sm font-medium">P</span>
-                                </div>
-                            </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-500">Paid - In Progress</p>
-                                <p className="text-2xl font-semibold text-gray-900">
-                                    {filteredTrips.filter(t => t.status === 'paid_in_progress').length}
-                                </p>
-                                <p className="text-xs text-gray-400">Paid & Active</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <div className="flex items-center">
-                            <div className="flex-shrink-0">
-                                <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center">
-                                    <span className="text-white text-sm font-medium">F</span>
-                                </div>
-                            </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-500">Payment Failed</p>
-                                <p className="text-2xl font-semibold text-gray-900">
-                                    {filteredTrips.filter(t => t.status === 'payment_failed').length}
-                                </p>
-                                <p className="text-xs text-gray-400">Needs retry</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <div className="flex items-center">
-                            <div className="flex-shrink-0">
-                                <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
-                                    <span className="text-white text-sm font-medium">C</span>
-                                </div>
-                            </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-500">Completed</p>
-                                <p className="text-2xl font-semibold text-gray-900">
-                                    {filteredTrips.filter(t => t.status === 'completed').length}
-                                </p>
-                                <p className="text-xs text-gray-400">Finished trips</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <div className="flex items-center">
-                            <div className="flex-shrink-0">
-                                <div className="w-8 h-8 bg-blue-400 rounded-full flex items-center justify-center">
-                                    <span className="text-white text-sm font-medium">U</span>
-                                </div>
-                            </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-500">Upcoming</p>
-                                <p className="text-2xl font-semibold text-gray-900">
-                                    {filteredTrips.filter(t => t.status === 'upcoming').length}
-                                </p>
-                                <p className="text-xs text-gray-400">Scheduled</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <div className="flex items-center">
-                            <div className="flex-shrink-0">
-                                <div className="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center">
-                                    <span className="text-white text-sm font-medium">I</span>
-                                </div>
-                            </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-500">In Process</p>
-                                <p className="text-2xl font-semibold text-gray-900">
-                                    {filteredTrips.filter(t => t.status === 'in_process').length}
-                                </p>
-                                <p className="text-xs text-gray-400">Legacy paid</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
                 {/* Filters and Trip Table */}
                 <div className="bg-white rounded-lg shadow">
                     <div className="px-6 py-4 border-b border-gray-200">
@@ -442,12 +318,10 @@ export default function IndividualTripsPage() {
                                         className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                     >
                                         <option value="all">All Status</option>
-                                        <option value="pending">Pending</option>
-                                        <option value="approved_pending_payment">Approved - Pending Payment</option>
-                                        <option value="paid_in_progress">Paid - In Progress</option>
+                                        <option value="pending">Pending Approval</option>
+                                        <option value="approved_pending_payment">Approved - Processing Payment</option>
+                                        <option value="paid_in_progress">Paid & In Progress</option>
                                         <option value="payment_failed">Payment Failed</option>
-                                        <option value="upcoming">Upcoming</option>
-                                        <option value="in_process">In Process</option>
                                         <option value="completed">Completed</option>
                                         <option value="cancelled">Cancelled</option>
                                     </select>
@@ -538,7 +412,7 @@ export default function IndividualTripsPage() {
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap">
-                                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                                    <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
                                                         trip.status === 'completed' ? 'bg-green-100 text-green-800' :
                                                         trip.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                                                         trip.status === 'approved_pending_payment' ? 'bg-blue-100 text-blue-800' :
@@ -549,10 +423,14 @@ export default function IndividualTripsPage() {
                                                         trip.status === 'cancelled' ? 'bg-red-100 text-red-800' :
                                                         'bg-gray-100 text-gray-800'
                                                     }`}>
-                                                        {trip.status === 'in_process' ? 'In Process (Paid)' : 
-                                                         trip.status === 'approved_pending_payment' ? 'APPROVED - PENDING PAYMENT' :
-                                                         trip.status === 'paid_in_progress' ? 'PAID - IN PROGRESS' :
-                                                         trip.status === 'payment_failed' ? 'PAYMENT FAILED - SEND REMINDER' :
+                                                        {trip.status === 'pending' ? 'Waiting for Approval' : 
+                                                         trip.status === 'approved_pending_payment' ? 'Approved - Processing Payment' :
+                                                         trip.status === 'paid_in_progress' ? 'Paid & In Progress' :
+                                                         trip.status === 'payment_failed' ? 'Payment Failed - Retry Required' :
+                                                         trip.status === 'completed' ? 'Completed' :
+                                                         trip.status === 'cancelled' ? 'Cancelled' :
+                                                         trip.status === 'upcoming' ? 'Approved - Ready to Start' :
+                                                         trip.status === 'in_process' ? 'In Process' :
                                                          trip.status}
                                                     </span>
                                                 </td>
@@ -568,48 +446,32 @@ export default function IndividualTripsPage() {
                                                                     disabled={actionLoading[trip.id]}
                                                                     className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
                                                                 >
-                                                                    {actionLoading[trip.id] ? 'Approving...' : 'Approve'}
+                                                                    {actionLoading[trip.id] ? 'Approving...' : 'APPROVE'}
                                                                 </button>
                                                                 <button 
                                                                     onClick={() => handleTripAction(trip.id, 'reject')}
                                                                     disabled={actionLoading[trip.id]}
                                                                     className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
                                                                 >
-                                                                    {actionLoading[trip.id] ? 'Processing...' : 'Reject'}
+                                                                    {actionLoading[trip.id] ? 'Processing...' : 'REJECT'}
                                                                 </button>
                                                             </>
                                                         )}
-                                                        {trip.status === 'upcoming' && (
-                                                            <button 
-                                                                onClick={() => handleTripAction(trip.id, 'complete')}
-                                                                disabled={actionLoading[trip.id]}
-                                                                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
-                                                            >
-                                                                {actionLoading[trip.id] ? 'Completing...' : 'Complete'}
-                                                            </button>
-                                                        )}
-                                                        {trip.status === 'in_process' && (
+                                                        
+                                                        {trip.status === 'approved_pending_payment' && (
                                                             <>
-                                                                <button 
-                                                                    onClick={() => handleTripAction(trip.id, 'complete')}
-                                                                    disabled={actionLoading[trip.id]}
-                                                                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
-                                                                >
-                                                                    {actionLoading[trip.id] ? 'Completing...' : 'Complete Trip'}
-                                                                </button>
+                                                                <div className="text-blue-600 text-sm bg-blue-100 px-3 py-2 rounded-md flex items-center">
+                                                                    💳 Processing payment...
+                                                                </div>
                                                                 <button
                                                                     onClick={() => router.push(`/billing/individual-invoice?trip_id=${trip.id}`)}
                                                                     className="inline-flex items-center bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 shadow-sm"
                                                                 >
-                                                                    📄 View Invoice
+                                                                    📄 INVOICE DETAILS
                                                                 </button>
                                                             </>
                                                         )}
-                                                        {trip.status === 'approved_pending_payment' && (
-                                                            <div className="text-blue-600 text-xs bg-blue-100 px-2 py-1 rounded">
-                                                                💳 Processing payment...
-                                                            </div>
-                                                        )}
+                                                        
                                                         {trip.status === 'paid_in_progress' && (
                                                             <>
                                                                 <button 
@@ -617,16 +479,17 @@ export default function IndividualTripsPage() {
                                                                     disabled={actionLoading[trip.id]}
                                                                     className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
                                                                 >
-                                                                    {actionLoading[trip.id] ? 'Completing...' : 'Complete Trip'}
+                                                                    {actionLoading[trip.id] ? 'Completing...' : 'COMPLETE'}
                                                                 </button>
                                                                 <button
                                                                     onClick={() => router.push(`/billing/individual-invoice?trip_id=${trip.id}`)}
                                                                     className="inline-flex items-center bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 shadow-sm"
                                                                 >
-                                                                    💳 Invoice Details
+                                                                    💳 INVOICE DETAILS
                                                                 </button>
                                                             </>
                                                         )}
+                                                        
                                                         {trip.status === 'payment_failed' && (
                                                             <>
                                                                 <button 
@@ -634,32 +497,62 @@ export default function IndividualTripsPage() {
                                                                     disabled={actionLoading[trip.id]}
                                                                     className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
                                                                 >
-                                                                    {actionLoading[trip.id] ? 'Sending...' : '📧 Send Reminder'}
+                                                                    {actionLoading[trip.id] ? 'Sending...' : '📧 SEND PAYMENT REMINDER'}
                                                                 </button>
                                                                 <button
                                                                     onClick={() => router.push(`/billing/individual-invoice?trip_id=${trip.id}`)}
                                                                     className="inline-flex items-center bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 shadow-sm"
                                                                 >
-                                                                    💳 Retry Payment
+                                                                    📄 INVOICE DETAILS
                                                                 </button>
                                                             </>
                                                         )}
-                                                        {trip.status === 'completed' && (
-                                                            <button
-                                                                onClick={() => router.push(`/billing/individual-invoice?trip_id=${trip.id}`)}
-                                                                className="inline-flex items-center bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 shadow-sm"
-                                                            >
-                                                                💳 Invoice Details
-                                                            </button>
+                                                        
+                                                        {trip.status === 'upcoming' && (
+                                                            <>
+                                                                <button 
+                                                                    onClick={() => handleTripAction(trip.id, 'complete')}
+                                                                    disabled={actionLoading[trip.id]}
+                                                                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
+                                                                >
+                                                                    {actionLoading[trip.id] ? 'Completing...' : 'COMPLETE'}
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => router.push(`/billing/individual-invoice?trip_id=${trip.id}`)}
+                                                                    className="inline-flex items-center bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 shadow-sm"
+                                                                >
+                                                                    📄 INVOICE DETAILS
+                                                                </button>
+                                                            </>
                                                         )}
+                                                        
+                                                        {trip.status === 'in_process' && (
+                                                            <>
+                                                                <button 
+                                                                    onClick={() => handleTripAction(trip.id, 'complete')}
+                                                                    disabled={actionLoading[trip.id]}
+                                                                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
+                                                                >
+                                                                    {actionLoading[trip.id] ? 'Completing...' : 'COMPLETE'}
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => router.push(`/billing/individual-invoice?trip_id=${trip.id}`)}
+                                                                    className="inline-flex items-center bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 shadow-sm"
+                                                                >
+                                                                    📄 INVOICE DETAILS
+                                                                </button>
+                                                            </>
+                                                        )}
+                                                        
+                                                        {trip.status === 'completed' && (
+                                                            <div className="text-green-600 text-sm bg-green-100 px-3 py-2 rounded-md flex items-center">
+                                                                ✅ Trip Completed
+                                                            </div>
+                                                        )}
+                                                        
                                                         {trip.status === 'cancelled' && (
-                                                            <div className="text-red-600 text-xs">
-                                                                <div className="font-semibold">❌ Rejected</div>
-                                                                {trip.cancellation_reason && (
-                                                                    <div className="text-gray-500 mt-1 max-w-xs">
-                                                                        {trip.cancellation_reason}
-                                                                    </div>
-                                                                )}
+                                                            <div className="text-red-600 text-sm bg-red-100 px-3 py-2 rounded-md flex items-center">
+                                                                ❌ Trip Cancelled
                                                             </div>
                                                         )}
                                                     </div>
