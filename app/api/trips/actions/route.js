@@ -218,8 +218,7 @@ async function handleApprove(supabase, trip, requestId) {
       .from('trips')
       .update({
         status: 'upcoming',
-        updated_at: new Date().toISOString(),
-        approval_notes: `Approved by dispatcher at ${new Date().toLocaleString()} [${requestId}]`
+        updated_at: new Date().toISOString()
       })
       .eq('id', trip.id)
       .select()
@@ -259,8 +258,7 @@ async function handleReject(supabase, trip, reason, requestId) {
       .update({
         status: 'cancelled',
         cancellation_reason: rejectionReason,
-        updated_at: new Date().toISOString(),
-        rejection_notes: `Rejected by dispatcher at ${new Date().toLocaleString()} [${requestId}]`
+        updated_at: new Date().toISOString()
       })
       .eq('id', trip.id)
       .select()
@@ -312,9 +310,7 @@ async function handleComplete(supabase, trip, requestId) {
       .from('trips')
       .update({
         status: 'completed',
-        completed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        completion_notes: `Completed by dispatcher at ${new Date().toLocaleString()} [${requestId}]`
+        updated_at: new Date().toISOString()
       })
       .eq('id', trip.id)
       .select()
@@ -339,7 +335,7 @@ async function handleComplete(supabase, trip, requestId) {
       details: {
         previousStatus: trip.status,
         newStatus: updatedTrip.status,
-        completedAt: updatedTrip.completed_at,
+        updatedAt: updatedTrip.updated_at,
         requestId
       }
     });
