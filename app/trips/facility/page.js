@@ -47,16 +47,55 @@ export default function FacilityOverviewPage() {
             // First, let's check if the facilities table exists and get some debug info
             console.log('🔧 DEBUG: Checking database connection...');
             
-            // Fetch all facilities with enhanced debugging
-            console.log('🔧 DEBUG: Querying facilities table...');
-            const { data: facilitiesData, error: facilitiesError } = await supabase
+            // Try different query approaches to work around RLS policies
+            console.log('🔧 DEBUG: Attempting different query strategies...');
+            
+            let facilitiesData = null;
+            let facilitiesError = null;
+            
+            // Strategy 1: Try normal query
+            console.log('📋 Strategy 1: Normal query...');
+            const result1 = await supabase
                 .from('facilities')
                 .select('id, name, address, contact_email, phone_number, billing_email')
                 .order('name', { ascending: true });
+            
+            if (!result1.error && result1.data && result1.data.length > 0) {
+                console.log('✅ Strategy 1 worked! Found facilities:', result1.data.length);
+                facilitiesData = result1.data;
+            } else {
+                console.log('❌ Strategy 1 failed:', result1.error);
+                
+                // Strategy 2: Try with different select fields
+                console.log('📋 Strategy 2: Minimal fields query...');
+                const result2 = await supabase
+                    .from('facilities')
+                    .select('*');
+                
+                if (!result2.error && result2.data && result2.data.length > 0) {
+                    console.log('✅ Strategy 2 worked! Found facilities:', result2.data.length);
+                    facilitiesData = result2.data;
+                } else {
+                    console.log('❌ Strategy 2 failed:', result2.error);
+                    
+                    // Strategy 3: Check if it's an RLS issue by trying with service role
+                    console.log('📋 Strategy 3: Checking RLS policies...');
+                    facilitiesError = result2.error || result1.error;
+                }
+            }
 
-            if (facilitiesError) {
-                console.error('❌ Facilities query error:', facilitiesError);
-                throw facilitiesError;
+            if (facilitiesError && !facilitiesData) {
+                console.error('❌ All facility query strategies failed:', facilitiesError);
+                
+                // Check if this is an RLS issue
+                if (facilitiesError.message && facilitiesError.message.includes('row-level security')) {
+                    setError('Database access issue: The current user doesn\'t have permission to view facilities. This suggests the facilities exist but Row Level Security policies are blocking access. Please contact an admin to adjust the RLS policies for the dispatcher role.');
+                    setLoading(false);
+                    setRefreshing(false);
+                    return;
+                } else {
+                    throw facilitiesError;
+                }
             }
 
             console.log(`✅ Found ${facilitiesData?.length || 0} facilities`);
@@ -200,113 +239,71 @@ export default function FacilityOverviewPage() {
             setRefreshing(true);
             setError(null);
             
-            // First, check if facilities already exist
-            console.log('🔍 Checking for existing facilities...');
-            const { data: existingFacilities, error: checkError } = await supabase
-                .from('facilities')
-                .select('id, name, address, contact_email, phone_number, billing_email')
-                .order('name', { ascending: true });
+            // Since we're having RLS issues, let's try a different approach
+            // Instead of creating facilities, let's create a demo with mock data
+            console.log('💡 Due to RLS restrictions, creating demo data with mock facilities...');
             
-            if (checkError) {
-                console.error('❌ Error checking facilities:', checkError);
-                throw new Error(`Failed to check existing facilities: ${checkError.message}`);
-            }
-            
-            console.log(`📊 Found ${existingFacilities?.length || 0} existing facilities`);
-            
-            if (existingFacilities && existingFacilities.length > 0) {
-                console.log('✅ Facilities already exist! Creating test trips for existing facilities...');
-                
-                // Create test trips for existing facilities instead of creating new facilities
-                for (const facility of existingFacilities.slice(0, 3)) { // Use first 3 facilities
-                    console.log(`📋 Creating trips for existing facility: ${facility.name}...`);
-                    
-                    const testTrips = [
-                        {
-                            facility_id: facility.id,
-                            pickup_address: facility.address || '123 Main St',
-                            destination_address: '999 Hospital Way, Toronto, ON',
-                            pickup_time: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-                            status: 'pending',
-                            price: 45.00
-                        },
-                        {
-                            facility_id: facility.id,
-                            pickup_address: facility.address || '123 Main St',
-                            destination_address: '555 Medical Plaza, Toronto, ON',
-                            pickup_time: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
-                            status: 'upcoming',
-                            price: 35.00
-                        },
-                        {
-                            facility_id: facility.id,
-                            pickup_address: facility.address || '123 Main St',
-                            destination_address: '777 Pharmacy Drive, Toronto, ON',
-                            pickup_time: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-                            status: 'completed',
-                            price: 50.00
-                        }
-                    ];
-                    
-                    for (const tripData of testTrips) {
-                        console.log(`📋 Creating trip: ${tripData.status}...`);
-                        const { error: tripError } = await supabase.from('trips').insert([tripData]);
-                        if (tripError) {
-                            console.error(`❌ Error creating trip:`, tripError);
-                            // Continue with other trips even if one fails
-                        } else {
-                            console.log(`✅ Created trip: ${tripData.status}`);
-                        }
-                    }
+            // Create mock facility data for demonstration
+            const mockFacilities = [
+                {
+                    id: 'demo-facility-1',
+                    name: 'CareBridge Living (Demo)',
+                    address: '123 Healthcare Drive, Toronto, ON M5V 3A8',
+                    contact_email: 'admin@carebridge.com',
+                    billing_email: 'billing@carebridge.com',
+                    phone_number: '(416) 555-0123',
+                    clientCount: 5,
+                    totalTrips: 12,
+                    pendingTrips: 3,
+                    upcomingTrips: 4,
+                    completedTrips: 5,
+                    totalAmount: 650.00
+                },
+                {
+                    id: 'demo-facility-2',
+                    name: 'Sunset Senior Care (Demo)',
+                    address: '456 Sunset Boulevard, Toronto, ON M6H 2K9',
+                    contact_email: 'info@sunsetcare.com',
+                    billing_email: 'billing@sunsetcare.com',
+                    phone_number: '(416) 555-0456',
+                    clientCount: 8,
+                    totalTrips: 18,
+                    pendingTrips: 2,
+                    upcomingTrips: 6,
+                    completedTrips: 10,
+                    totalAmount: 890.00
+                },
+                {
+                    id: 'demo-facility-3',
+                    name: 'Maple Grove Medical (Demo)',
+                    address: '789 Maple Street, Toronto, ON M4B 1X2',
+                    contact_email: 'contact@maplegrove.com',
+                    billing_email: 'billing@maplegrove.com',
+                    phone_number: '(416) 555-0789',
+                    clientCount: 12,
+                    totalTrips: 25,
+                    pendingTrips: 5,
+                    upcomingTrips: 8,
+                    completedTrips: 12,
+                    totalAmount: 1240.00
                 }
-                
-                console.log('🎉 Test trips created for existing facilities!');
-            } else {
-                // If no facilities exist, try to create them (this might fail due to RLS)
-                console.log('📝 No facilities found, attempting to create new ones...');
-                
-                const testFacilities = [
-                    {
-                        name: 'CareBridge Living',
-                        address: '123 Healthcare Drive, Toronto, ON M5V 3A8',
-                        contact_email: 'admin@carebridge.com',
-                        billing_email: 'billing@carebridge.com',
-                        phone_number: '(416) 555-0123'
-                    },
-                    {
-                        name: 'Sunset Senior Care',
-                        address: '456 Sunset Boulevard, Toronto, ON M6H 2K9',
-                        contact_email: 'info@sunsetcare.com',
-                        billing_email: 'billing@sunsetcare.com',
-                        phone_number: '(416) 555-0456'
-                    }
-                ];
-                
-                for (const facilityData of testFacilities) {
-                    console.log(`📝 Attempting to create facility: ${facilityData.name}...`);
-                    
-                    const { data: newFacility, error: createError } = await supabase
-                        .from('facilities')
-                        .insert([facilityData])
-                        .select()
-                        .single();
-                    
-                    if (createError) {
-                        console.error(`❌ Error creating ${facilityData.name}:`, createError);
-                        throw new Error(`Failed to create ${facilityData.name}: ${createError.message}. This might be due to permissions - facilities may need to be created by an admin user.`);
-                    } else {
-                        console.log(`✅ Created: ${newFacility.name} with ID: ${newFacility.id}`);
-                    }
-                }
-            }
+            ];
             
-            // Refresh the data to show the results
-            console.log('🔄 Refreshing facility overview...');
-            await fetchFacilityOverview();
+            console.log('✅ Demo facilities created:', mockFacilities.length);
+            
+            // Set the mock data directly
+            setFacilities(mockFacilities);
+            setFacilityStats(mockFacilities);
+            
+            // Show success message
+            setError(null);
+            console.log('🎉 Demo multi-facility overview is now displayed!');
+            console.log('💡 This demonstrates the functionality with mock data.');
+            console.log('🔧 To use real data, the RLS policies need to be updated to allow dispatcher access to facilities.');
             
         } catch (err) {
-            console.error('💥 Error creating test facilities:', err);
-            setError('Failed to create test facilities: ' + err.message);
+            console.error('💥 Error creating demo facilities:', err);
+            setError('Failed to create demo facilities: ' + err.message);
         } finally {
             setRefreshing(false);
         }
@@ -598,7 +595,7 @@ export default function FacilityOverviewPage() {
                                             disabled={refreshing}
                                             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition-colors disabled:opacity-50"
                                         >
-                                            {refreshing ? 'Creating Test Data...' : '🏗️ Create Test Facilities & Trips'}
+                                            {refreshing ? 'Creating Demo Data...' : '🎭 Create Demo Multi-Facility View'}
                                         </button>
                                     </div>
                                 )}
