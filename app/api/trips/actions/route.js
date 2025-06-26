@@ -3,18 +3,24 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 
 export async function POST(request) {
-  console.log('🚀 Trip actions API called');
+  const requestId = Math.random().toString(36).substring(7);
+  console.log(`🚀 Trip actions API called [${requestId}]`);
+  console.log(`📡 Request URL: ${request.url}`);
+  console.log(`📡 Request method: ${request.method}`);
+  console.log(`📡 Request headers:`, Object.fromEntries(request.headers.entries()));
   
   try {
     // Create Supabase client with proper error handling
     let supabase;
     try {
       supabase = createRouteHandlerClient({ cookies });
+      console.log(`✅ Supabase client created successfully [${requestId}]`);
     } catch (supabaseError) {
-      console.error('Failed to create Supabase client:', supabaseError);
+      console.error(`❌ Failed to create Supabase client [${requestId}]:`, supabaseError);
       return NextResponse.json({ 
         error: 'Database connection failed',
-        details: supabaseError.message 
+        details: supabaseError.message,
+        requestId 
       }, { status: 500 });
     }
 
@@ -22,19 +28,23 @@ export async function POST(request) {
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     
     if (sessionError) {
-      console.error('Session error:', sessionError);
+      console.error(`❌ Session error [${requestId}]:`, sessionError);
       return NextResponse.json({ 
         error: 'Authentication failed',
-        details: sessionError.message 
+        details: sessionError.message,
+        requestId 
       }, { status: 401 });
     }
     
     if (!session) {
-      console.error('No session found');
-      return NextResponse.json({ error: 'Unauthorized - No session' }, { status: 401 });
+      console.error(`❌ No session found [${requestId}]`);
+      return NextResponse.json({ 
+        error: 'Unauthorized - No session',
+        requestId 
+      }, { status: 401 });
     }
 
-    console.log('✅ Session found for user:', session.user.email);
+    console.log(`✅ Session found for user [${requestId}]:`, session.user.email);
 
     // Check dispatcher role
     const { data: profile, error: profileError } = await supabase
@@ -125,15 +135,50 @@ export async function POST(request) {
 
   } catch (error) {
     console.error('🚨 Trip action error:', error);
+    console.error('🚨 Full error details:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      cause: error.cause
+    });
+    
+    // Provide more specific error messages
+    let errorMessage = 'Internal server error';
+    let errorDetails = error.message;
+    
+    if (error.message.includes('fetch')) {
+      errorMessage = 'Payment system connection failed';
+      errorDetails = 'Unable to connect to payment processing system';
+    } else if (error.message.includes('permission')) {
+      errorMessage = 'Database permission error';
+      errorDetails = 'Insufficient permissions to update trip';
+    } else if (error.message.includes('authentication')) {
+      errorMessage = 'Authentication error';
+      errorDetails = 'User authentication failed';
+    } else if (error.message.includes('timeout')) {
+      errorMessage = 'Request timeout';
+      errorDetails = 'Operation took too long to complete';
+    }
+    
     return NextResponse.json({
-      error: 'Internal server error',
-      details: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      error: errorMessage,
+      details: errorDetails,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      timestamp: new Date().toISOString(),
+      endpoint: '/api/trips/actions'
     }, { status: 500 });
   }
 }
 
 async function handleApprove(supabase, trip) {
+  console.log('🔄 Starting trip approval process for:', trip.id);
+  console.log('Trip details:', { 
+    user_id: trip.user_id, 
+    facility_id: trip.facility_id, 
+    payment_method_id: trip.payment_method_id,
+    status: trip.status 
+  });
+
   // First set to approved_pending_payment status
   const { data: updatedTrip, error: updateError } = await supabase
     .from('trips')
@@ -148,16 +193,21 @@ async function handleApprove(supabase, trip) {
     .single();
 
   if (updateError) {
+    console.error('❌ Failed to update trip to approved_pending_payment:', updateError);
     throw new Error(`Failed to approve trip: ${updateError.message}`);
   }
 
+  console.log('✅ Trip updated to approved_pending_payment status');
+
   // If this is an individual BookingCCT trip (has user_id, no facility_id, and has payment_method_id)
   if (trip.user_id && !trip.facility_id && trip.payment_method_id) {
+    console.log('🔄 This is an individual trip with payment method - attempting payment processing...');
+    
     try {
       const bookingAppUrl = process.env.BOOKING_APP_URL || 'https://booking.compassionatecaretransportation.com';
       console.log(`🔍 Attempting to charge payment via: ${bookingAppUrl}/api/stripe/charge-payment`);
       
-      // Call the BookingCCT payment charging API
+      // Call the BookingCCT payment charging API with enhanced error handling
       const chargeResponse = await fetch(`${bookingAppUrl}/api/stripe/charge-payment`, {
         method: 'POST',
         headers: {
@@ -165,12 +215,20 @@ async function handleApprove(supabase, trip) {
         },
         body: JSON.stringify({ tripId: trip.id }),
         // Add timeout to prevent hanging
-        signal: AbortSignal.timeout(10000) // 10 second timeout
+        signal: AbortSignal.timeout(15000) // Increased to 15 seconds
       });
+
+      // Check if the response is ok before trying to parse JSON
+      if (!chargeResponse.ok) {
+        console.error(`❌ Payment API returned status ${chargeResponse.status}`);
+        const errorText = await chargeResponse.text();
+        console.error(`❌ Payment API error response: ${errorText}`);
+        throw new Error(`Payment API returned ${chargeResponse.status}: ${errorText}`);
+      }
 
       const chargeResult = await chargeResponse.json();
 
-      if (chargeResponse.ok && chargeResult.success) {
+      if (chargeResult.success) {
         console.log('✅ Payment charged successfully for trip:', trip.id);
         
         // Update trip status to "paid_in_progress" since payment was successful
@@ -231,30 +289,50 @@ async function handleApprove(supabase, trip) {
       }
     } catch (paymentError) {
       console.error('Payment charging request failed:', paymentError);
+      console.error('Payment error details:', {
+        name: paymentError.name,
+        message: paymentError.message,
+        stack: paymentError.stack
+      });
       
-      // Update trip with payment failure
-      await supabase
+      // FALLBACK: If payment processing completely fails, still approve the trip
+      // This ensures dispatchers can approve trips even when payment system is down
+      console.log('🔄 Payment failed - falling back to manual payment approval...');
+      
+      const { data: fallbackTrip, error: fallbackError } = await supabase
         .from('trips')
         .update({
-          payment_status: 'failed',
-          payment_error: 'Payment API unavailable'
+          status: 'upcoming', // Approve without payment for manual handling
+          payment_status: 'pending',
+          payment_error: `Automatic payment failed: ${paymentError.message}. Manual payment required.`,
+          approval_notes: 'Payment system unavailable - approved for manual payment processing'
         })
-        .eq('id', trip.id);
+        .eq('id', trip.id)
+        .select()
+        .single();
+
+      if (fallbackError) {
+        console.error('❌ Fallback approval also failed:', fallbackError);
+        throw new Error(`Both payment processing and fallback approval failed: ${fallbackError.message}`);
+      }
 
       return NextResponse.json({
         success: true,
-        trip: updatedTrip,
+        trip: fallbackTrip,
         payment: {
           charged: false,
-          status: 'failed',
-          error: 'Payment API unavailable'
+          status: 'pending',
+          error: 'Payment system unavailable',
+          fallback: true
         },
-        warning: 'Trip approved but payment system is unavailable. Please handle payment manually.',
-        message: 'Trip approved with payment system issue'
+        warning: 'Trip approved but payment system is unavailable. Payment must be processed manually.',
+        message: 'Trip approved - manual payment required'
       });
     }
   } else {
     // Facility trip or trip without payment method - no automatic charging
+    console.log('🔄 This is a facility trip or trip without payment method - no automatic charging required');
+    
     return NextResponse.json({
       success: true,
       trip: updatedTrip,
