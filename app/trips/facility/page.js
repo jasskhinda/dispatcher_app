@@ -58,6 +58,21 @@ export default function FacilityOverviewPage() {
             }
 
             console.log(`✅ Found ${tripsData?.length || 0} facility trips`);
+            
+            // Debug: Check trip date ranges
+            if (tripsData && tripsData.length > 0) {
+                const tripDates = tripsData.map(trip => ({
+                    id: trip.id,
+                    pickup_time: trip.pickup_time,
+                    created_at: trip.created_at,
+                    status: trip.status,
+                    price: trip.price
+                }));
+                console.log('🗓️ Trip date range analysis:');
+                console.log('   First trip:', tripDates[tripDates.length - 1]);
+                console.log('   Latest trip:', tripDates[0]);
+                console.log('   Sample trips:', tripDates.slice(0, 3));
+            }
 
             if (!tripsData || tripsData.length === 0) {
                 console.log('⚠️ No facility trips found');
@@ -102,23 +117,54 @@ export default function FacilityOverviewPage() {
                 // Find facility details if available from facilities table
                 const facilityDetails = facilitiesData.find(f => f.id === facilityId);
                 
+                // Enhanced debugging for data accuracy
+                console.log(`\n🏥 FACILITY ${facilityId} ANALYSIS:`);
+                console.log(`   Total trips found: ${facilityTrips.length}`);
+                
+                // Detailed status breakdown with debugging
+                const statusCounts = {};
+                facilityTrips.forEach(trip => {
+                    const status = trip.status || 'unknown';
+                    statusCounts[status] = (statusCounts[status] || 0) + 1;
+                });
+                console.log('   Status breakdown:', statusCounts);
+                
                 // Get unique clients for this facility
                 const uniqueClientIds = [...new Set(facilityTrips.map(trip => trip.managed_client_id || trip.user_id).filter(Boolean))];
+                console.log(`   Unique clients: ${uniqueClientIds.length}`);
                 
-                // Calculate trip statistics
+                // Calculate trip statistics with enhanced accuracy
                 const totalTrips = facilityTrips.length;
                 const pendingTrips = facilityTrips.filter(trip => trip.status === 'pending').length;
                 const upcomingTrips = facilityTrips.filter(trip => trip.status === 'upcoming').length;
                 const completedTrips = facilityTrips.filter(trip => trip.status === 'completed').length;
-                const totalAmount = facilityTrips
-                    .filter(trip => trip.status === 'completed' && trip.price > 0)
-                    .reduce((sum, trip) => sum + parseFloat(trip.price || 0), 0);
+                
+                // FIXED: Match facility app billing logic - only completed trips with valid prices
+                const billableTrips = facilityTrips.filter(trip => 
+                    trip.status === 'completed' && 
+                    trip.price && 
+                    parseFloat(trip.price) > 0
+                );
+                
+                const totalAmount = billableTrips.reduce((sum, trip) => sum + parseFloat(trip.price || 0), 0);
+                
+                console.log(`   Completed trips: ${completedTrips}`);
+                console.log(`   Billable trips: ${billableTrips.length}`);
+                console.log(`   Total billable amount: $${totalAmount.toFixed(2)}`);
+                
+                // Debug individual billable trips
+                if (billableTrips.length > 0) {
+                    console.log('   Billable trip details:');
+                    billableTrips.forEach(trip => {
+                        const date = trip.pickup_time ? new Date(trip.pickup_time).toLocaleDateString() : 'No date';
+                        console.log(`     - ${date}: $${trip.price} (${trip.id})`);
+                    });
+                }
 
                 // Infer facility name if not available from facilities table
                 let facilityName = facilityDetails?.name;
                 if (!facilityName) {
                     // Look for patterns in trip data to identify facility
-                    const sampleTrip = facilityTrips[0];
                     if (facilityId.startsWith('e1b94bde') || 
                         facilityTrips.some(trip => 
                             trip.pickup_location?.includes('CareBridge') ||
@@ -132,7 +178,7 @@ export default function FacilityOverviewPage() {
                     }
                 }
 
-                return {
+                const result = {
                     id: facilityId,
                     name: facilityName,
                     address: facilityDetails?.address || 'Address not available',
@@ -146,14 +192,48 @@ export default function FacilityOverviewPage() {
                     completedTrips,
                     totalAmount
                 };
+                
+                console.log('   Final facility stats:', result);
+                return result;
             });
 
             console.log('✅ Facility stats calculated:', facilityStatsResults);
+            
+            // Validate data accuracy against facility app
+            validateDataAccuracy(facilityStatsResults);
             
             setFacilities(facilityStatsResults);
             setFacilityStats(facilityStatsResults);
             setLoading(false);
             setRefreshing(false);
+
+            // Validate data accuracy against facility app expectations
+            const validateDataAccuracy = (facilityStats) => {
+                const carebridgeFacility = facilityStats.find(f => f.name.includes('CareBridge'));
+                if (carebridgeFacility) {
+                    console.log('\n🔍 DATA ACCURACY VALIDATION:');
+                    console.log('Expected (from facility app): 14 trips, $676.80');
+                    console.log(`Actual (dispatcher app): ${carebridgeFacility.totalTrips} trips, $${carebridgeFacility.totalAmount.toFixed(2)}`);
+                    
+                    const tripsDiff = carebridgeFacility.totalTrips - 14;
+                    const amountDiff = carebridgeFacility.totalAmount - 676.80;
+                    
+                    if (Math.abs(tripsDiff) > 0) {
+                        console.log(`⚠️ Trip count discrepancy: ${tripsDiff > 0 ? '+' : ''}${tripsDiff}`);
+                    }
+                    if (Math.abs(amountDiff) > 0.01) {
+                        console.log(`⚠️ Amount discrepancy: ${amountDiff > 0 ? '+' : ''}$${amountDiff.toFixed(2)}`);
+                    }
+                    
+                    if (Math.abs(tripsDiff) <= 0 && Math.abs(amountDiff) <= 0.01) {
+                        console.log('✅ Data matches facility app expectations!');
+                    } else {
+                        console.log('🔧 Data needs adjustment to match facility app');
+                    }
+                }
+            };
+
+            validateDataAccuracy(facilityStatsResults);
 
         } catch (err) {
             console.error('Error fetching facility overview:', err);
