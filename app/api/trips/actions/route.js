@@ -254,15 +254,21 @@ async function handleApprove(supabase, trip) {
         console.log(`🔍 Attempting to charge payment via: ${bookingAppUrl}/api/stripe/charge-payment`);
         
         // Call the BookingCCT payment charging API with enhanced error handling
-        const chargeResponse = await fetch(`${bookingAppUrl}/api/stripe/charge-payment`, {
+        // Create a timeout promise that rejects after 8 seconds
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Payment API timeout after 8 seconds')), 8000);
+        });
+
+        const fetchPromise = fetch(`${bookingAppUrl}/api/stripe/charge-payment`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ tripId: trip.id }),
-          // Reduced timeout to prevent long hangs
-          signal: AbortSignal.timeout(8000) // 8 seconds instead of 15
+          body: JSON.stringify({ tripId: trip.id })
         });
+
+        // Race between the fetch and timeout
+        const chargeResponse = await Promise.race([fetchPromise, timeoutPromise]);
 
         // Check if the response is ok before trying to parse JSON
         if (!chargeResponse.ok) {
@@ -354,17 +360,30 @@ async function handleApprove(supabase, trip) {
           stack: paymentError.stack
         });
         
-        // FALLBACK: If payment processing completely fails, still approve the trip
-        // This ensures dispatchers can approve trips even when payment system is down
-        console.log('🔄 Payment failed - falling back to manual payment approval...');
+        // Determine error type for better user feedback
+        let errorType = 'unknown';
+        let userMessage = 'Payment system temporarily unavailable';
+        
+        if (paymentError.message.includes('timeout')) {
+          errorType = 'timeout';
+          userMessage = 'Payment system is taking too long to respond';
+        } else if (paymentError.message.includes('fetch') || paymentError.message.includes('network')) {
+          errorType = 'network';
+          userMessage = 'Unable to connect to payment system';
+        } else if (paymentError.message.includes('ECONNREFUSED')) {
+          errorType = 'connection_refused';
+          userMessage = 'Payment service is temporarily down';
+        }
+        
+        console.log(`🔄 Payment failed (${errorType}) - falling back to manual payment approval...`);
         
         const { data: fallbackTrip, error: fallbackError } = await supabase
           .from('trips')
           .update({
             status: 'upcoming', // Approve without payment for manual handling
             payment_status: 'pending',
-            payment_error: `Automatic payment failed: ${paymentError.message}. Manual payment required.`,
-            approval_notes: 'Payment system unavailable - approved for manual payment processing'
+            payment_error: `Automatic payment failed: ${userMessage}. Manual payment required.`,
+            approval_notes: `Payment system unavailable (${errorType}) - approved for manual payment processing`
           })
           .eq('id', trip.id)
           .select()
@@ -381,11 +400,12 @@ async function handleApprove(supabase, trip) {
           payment: {
             charged: false,
             status: 'pending',
-            error: 'Payment system unavailable',
-            fallback: true
+            error: userMessage,
+            fallback: true,
+            errorType
           },
-          warning: 'Trip approved but payment system is unavailable. Payment must be processed manually.',
-          message: 'Trip approved - manual payment required'
+          warning: `Trip approved successfully, but ${userMessage.toLowerCase()}. Payment will need to be processed manually.`,
+          message: `Trip approved - manual payment required due to ${errorType}`
         });
       }
     } else {

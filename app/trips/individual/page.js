@@ -158,6 +158,10 @@ export default function IndividualTripsPage() {
                 message += ` - Payment processed: $${result.payment.amount}`;
             } else if (action === 'approve' && result.payment?.status === 'failed') {
                 message += ` - ⚠️ Payment failed: ${result.payment.error}`;
+            } else if (action === 'approve' && result.payment?.fallback) {
+                message += ` - ⚠️ ${result.warning || 'Payment will be processed manually'}`;
+            } else if (action === 'approve' && result.warning) {
+                message += ` - ⚠️ ${result.warning}`;
             }
 
             setActionMessage(message);
