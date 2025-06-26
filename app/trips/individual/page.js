@@ -119,55 +119,44 @@ export default function IndividualTripsPage() {
             setActionLoading(prev => ({ ...prev, [tripId]: true }));
             setActionMessage('');
 
-            let newStatus;
-            let message;
-            let updateData = {
-                id: tripId,
-                updated_at: new Date().toISOString()
-            };
+            const response = await fetch('/api/trips/actions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    tripId: tripId,
+                    action: action,
+                    reason: action === 'reject' ? prompt('Please provide a reason for rejecting this trip:') : undefined
+                }),
+            });
 
-            switch (action) {
-                case 'approve':
-                    newStatus = 'upcoming';
-                    message = '✅ Trip approved successfully';
-                    updateData.status = newStatus;
-                    break;
-                case 'reject':
-                    newStatus = 'cancelled';
-                    message = '❌ Trip rejected';
-                    updateData.status = newStatus;
-                    updateData.cancellation_reason = 'Rejected by dispatcher';
-                    break;
-                case 'complete':
-                    newStatus = 'completed';
-                    message = '🎉 Trip marked as completed';
-                    updateData.status = newStatus;
-                    break;
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || `Failed to ${action} trip`);
             }
 
-            const { error } = await supabase
-                .from('trips')
-                .update(updateData)
-                .eq('id', tripId);
+            console.log(`✅ Trip ${action} result:`, result);
 
-            if (error) throw error;
-
-            // Update local state
-            setTrips(prevTrips => 
-                prevTrips.map(trip => 
-                    trip.id === tripId 
-                        ? { ...trip, status: newStatus, updated_at: new Date().toISOString() }
-                        : trip
-                )
-            );
+            // Show appropriate success message based on action and payment status
+            let message = `✅ Trip ${action}d successfully`;
+            if (action === 'approve' && result.payment?.charged) {
+                message += ` - Payment of $${result.payment.amount} charged`;
+            } else if (action === 'approve' && result.payment?.status === 'failed') {
+                message += ` - ⚠️ Payment charging failed: ${result.payment.error}`;
+            }
 
             setActionMessage(message);
-            setTimeout(() => setActionMessage(''), 3000);
+            
+            // Refresh the page to show updated data
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
 
-        } catch (err) {
-            console.error(`Error ${action}ing trip:`, err);
-            setActionMessage(`Error: ${err.message}`);
-            setTimeout(() => setActionMessage(''), 5000);
+        } catch (error) {
+            console.error(`Error ${action}ing trip:`, error);
+            setActionMessage(`❌ Failed to ${action} trip: ${error.message}`);
         } finally {
             setActionLoading(prev => ({ ...prev, [tripId]: false }));
         }

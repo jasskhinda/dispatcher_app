@@ -96,38 +96,41 @@ export default function DashboardClientView({ user, userProfile, trips: initialT
   const handleApproveTrip = async (tripId) => {
     setApproving(tripId);
     try {
-      console.log('Approving trip:', tripId);
+      console.log('🔄 Starting trip approval process...');
+      console.log('Trip ID:', tripId);
       
-      // Find a driver to assign (in this example we'll use a placeholder)
-      // In a real app, you'd have a driver selection feature
-      const driverName = "Assigned Driver";
-      const vehicle = "Standard Accessible Vehicle";
-      
-      const { data, error } = await supabase
-        .from('trips')
-        .update({ 
-          status: 'upcoming',
-          driver_name: driverName,
-          vehicle: vehicle,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', tripId)
-        .select();
+      const response = await fetch('/api/trips/actions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tripId: tripId,
+          action: 'approve'
+        }),
+      });
 
-      if (error) {
-        console.error('Supabase error:', error);
-        throw error;
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to approve trip');
       }
-      
-      console.log('Trip approved successfully:', data);
-      
-      // Force a complete page refresh to ensure we get fresh data
-      alert('Trip approved successfully! Page will refresh to show updated status.');
+
+      console.log('✅ Trip approval result:', result);
+
+      // Show appropriate success message based on payment status
+      let message = 'Trip approved successfully!';
+      if (result.payment?.charged) {
+        message += ` Payment of $${result.payment.amount} charged successfully.`;
+      } else if (result.payment?.status === 'failed') {
+        message += ` Warning: ${result.warning}`;
+      }
+
+      alert(message + ' Page will refresh to show updated status.');
       window.location.reload();
       
     } catch (error) {
       console.error('Error approving trip:', error);
-      console.error('Error details:', JSON.stringify(error, null, 2));
       alert(`Failed to approve trip: ${error.message || 'Please try again.'}`);
     } finally {
       setApproving(null);

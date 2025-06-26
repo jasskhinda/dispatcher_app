@@ -71,18 +71,24 @@ async function checkAndUpdateFacilityData() {
                            !facility.address || 
                            !facility.phone_number || 
                            !facility.contact_email || 
-                           !facility.billing_email;
+                           !facility.billing_email ||
+                           facility.address === 'Address not available' ||
+                           facility.contact_email === 'Email not available';
         
         if (needsUpdate) {
             console.log('\n🔧 UPDATING FACILITY DATA...');
             
             const updateData = {
                 name: facility.name || 'CareBridge Living',
-                address: facility.address || '123 Main Street, Your City, State 12345',
-                phone_number: facility.phone_number || '(555) 123-4567',
-                contact_email: facility.contact_email || 'contact@CareBridgeLiving.com',
-                billing_email: facility.billing_email || 'billing@CareBridgeLiving.com',
-                facility_type: facility.facility_type || 'Nursing Home'
+                address: (facility.address === 'Address not available' || !facility.address) 
+                    ? '5050 Blazer Pkwy Suite 100-B, Dublin, OH 43017' 
+                    : facility.address,
+                phone_number: facility.phone_number || '(614) 555-0123',
+                contact_email: (facility.contact_email === 'Email not available' || !facility.contact_email) 
+                    ? 'contact@carebridgeliving.com' 
+                    : facility.contact_email,
+                billing_email: facility.billing_email || 'billing@carebridgeliving.com',
+                facility_type: facility.facility_type || 'Assisted Living'
             };
             
             const { data: updatedFacility, error: updateError } = await supabase
