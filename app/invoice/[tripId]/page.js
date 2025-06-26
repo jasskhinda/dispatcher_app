@@ -309,13 +309,49 @@ export default function TripInvoiceDetailPage() {
         return null;
     };
 
-    // Get payment status based on trip and invoice data
+    // Enhanced payment status with BookingCCT integration
     const getPaymentStatus = () => {
-        if (existingInvoice) {
-            return existingInvoice.payment_status === 'paid' ? 'PAID' : 'DUE';
+        console.log('🔍 getPaymentStatus called with:', {
+            existingInvoice: existingInvoice?.payment_status,
+            tripPaymentStatus: trip?.payment_status,
+            tripStatus: trip?.status,
+            paymentIntentId: trip?.payment_intent_id,
+            source: getClientInfo().source
+        });
+
+        // Priority 1: Check trip-level payment status (from BookingCCT integration)
+        if (trip?.payment_status === 'paid' || trip?.payment_intent_id) {
+            console.log('✅ Payment status: PAID (from trip data)');
+            return 'PAID';
         }
-        // Default based on trip status
-        return trip?.status === 'completed' ? 'DUE' : 'PENDING';
+
+        // Priority 2: Check invoice-level payment status
+        if (existingInvoice?.payment_status === 'paid') {
+            console.log('✅ Payment status: PAID (from invoice data)');
+            return 'PAID';
+        }
+
+        // Priority 3: Check if payment failed
+        if (trip?.payment_status === 'failed') {
+            console.log('❌ Payment status: FAILED');
+            return 'FAILED';
+        }
+
+        // Priority 4: Check if trip is completed but not paid
+        if (trip?.status === 'completed') {
+            console.log('⏳ Payment status: DUE (trip completed but not paid)');
+            return 'DUE';
+        }
+
+        // Priority 5: Check if trip is in progress and payment is pending
+        if (['upcoming', 'paid_in_progress', 'approved_pending_payment'].includes(trip?.status)) {
+            console.log('⏳ Payment status: PENDING (trip in progress)');
+            return 'PENDING';
+        }
+
+        // Default for other statuses
+        console.log('❓ Payment status: NOT_APPLICABLE (trip not ready for payment)');
+        return 'NOT_APPLICABLE';
     };
 
     // Send invoice to appropriate app dashboard
@@ -557,9 +593,13 @@ export default function TripInvoiceDetailPage() {
                                         )}
                                     </button>
                                 )}
-                                {getPaymentStatus() === 'PAID' && (
-                                    <span className="inline-flex items-center px-4 py-2 border border-green-300 rounded-md shadow-sm text-sm font-medium text-green-700 bg-green-50">
-                                        ✅ Paid
+                                {(getPaymentStatus() === 'PAID' || getPaymentStatus() === 'FAILED') && (
+                                    <span className={`inline-flex items-center px-4 py-2 border rounded-md shadow-sm text-sm font-medium ${
+                                        getPaymentStatus() === 'PAID' 
+                                            ? 'border-green-300 text-green-700 bg-green-50'
+                                            : 'border-red-300 text-red-700 bg-red-50'
+                                    }`}>
+                                        {getPaymentStatus() === 'PAID' ? '✅ Paid' : '❌ Payment Failed'}
                                     </span>
                                 )}
                                 {invoiceSent && (
@@ -703,9 +743,17 @@ export default function TripInvoiceDetailPage() {
                                         <div className="flex justify-between">
                                             <span className="text-gray-600">Payment Status:</span>
                                             <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                                                getPaymentStatus() === 'PAID' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                                                getPaymentStatus() === 'PAID' ? 'bg-green-100 text-green-800' :
+                                                getPaymentStatus() === 'FAILED' ? 'bg-red-100 text-red-800' :
+                                                getPaymentStatus() === 'DUE' ? 'bg-yellow-100 text-yellow-800' :
+                                                getPaymentStatus() === 'PENDING' ? 'bg-blue-100 text-blue-800' :
+                                                'bg-gray-100 text-gray-800'
                                             }`}>
-                                                {getPaymentStatus()}
+                                                {getPaymentStatus() === 'PAID' ? '✅ PAID' :
+                                                 getPaymentStatus() === 'FAILED' ? '❌ FAILED' :
+                                                 getPaymentStatus() === 'DUE' ? '💳 DUE' :
+                                                 getPaymentStatus() === 'PENDING' ? '⏳ PENDING' :
+                                                 '❓ NOT APPLICABLE'}
                                             </span>
                                         </div>
                                         {trip.driver_name && (
@@ -851,15 +899,17 @@ export default function TripInvoiceDetailPage() {
                                     </div>
                                     <div className="text-right">
                                         <span className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${
-                                            getPaymentStatus() === 'PAID'
-                                                ? 'bg-green-100 text-green-800' 
-                                                : getPaymentStatus() === 'DUE'
-                                                ? 'bg-yellow-100 text-yellow-800'
-                                                : 'bg-gray-100 text-gray-800'
+                                            getPaymentStatus() === 'PAID' ? 'bg-green-100 text-green-800' :
+                                            getPaymentStatus() === 'FAILED' ? 'bg-red-100 text-red-800' :
+                                            getPaymentStatus() === 'DUE' ? 'bg-yellow-100 text-yellow-800' :
+                                            getPaymentStatus() === 'PENDING' ? 'bg-blue-100 text-blue-800' :
+                                            'bg-gray-100 text-gray-800'
                                         }`}>
-                                            {getPaymentStatus() === 'PAID' ? '✅ PAID' : 
-                                             getPaymentStatus() === 'DUE' ? '💳 DUE' : 
-                                             '⏳ PENDING'}
+                                            {getPaymentStatus() === 'PAID' ? '✅ PAID' :
+                                             getPaymentStatus() === 'FAILED' ? '❌ PAYMENT FAILED' :
+                                             getPaymentStatus() === 'DUE' ? '💳 PAYMENT DUE' :
+                                             getPaymentStatus() === 'PENDING' ? '⏳ PAYMENT PENDING' :
+                                             '❓ NOT APPLICABLE'}
                                         </span>
                                     </div>
                                 </div>
@@ -915,6 +965,54 @@ export default function TripInvoiceDetailPage() {
                                                 <h4 className="font-medium text-green-900">Payment Received</h4>
                                                 <p className="text-sm text-green-700">
                                                     This invoice has been marked as paid. Thank you for your business!
+                                                    {trip?.payment_intent_id && (
+                                                        <span className="block mt-1 text-xs text-green-600">
+                                                            Payment ID: {trip.payment_intent_id.substring(0, 20)}...
+                                                        </span>
+                                                    )}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Payment Failed Message */}
+                                {getPaymentStatus() === 'FAILED' && (
+                                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                                        <div className="flex items-center space-x-3">
+                                            <div className="text-red-500 text-lg">❌</div>
+                                            <div>
+                                                <h4 className="font-medium text-red-900">Payment Failed</h4>
+                                                <p className="text-sm text-red-700">
+                                                    The payment for this trip could not be processed. 
+                                                    {clientInfo.source === 'booking_app' ? (
+                                                        <> The client will be notified and can retry payment in their dashboard.</>
+                                                    ) : (
+                                                        <> Please contact the facility to arrange alternative payment.</>
+                                                    )}
+                                                </p>
+                                                {trip?.payment_error && (
+                                                    <p className="text-xs text-red-600 mt-2 bg-red-100 p-2 rounded">
+                                                        Error: {trip.payment_error}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Payment Pending Message */}
+                                {getPaymentStatus() === 'PENDING' && (
+                                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                        <div className="flex items-center space-x-3">
+                                            <div className="text-blue-500 text-lg">⏳</div>
+                                            <div>
+                                                <h4 className="font-medium text-blue-900">Payment Pending</h4>
+                                                <p className="text-sm text-blue-700">
+                                                    This trip is approved and payment will be processed when the trip is completed.
+                                                    {clientInfo.source === 'booking_app' && (
+                                                        <> The client will be charged automatically upon completion.</>
+                                                    )}
                                                 </p>
                                             </div>
                                         </div>
