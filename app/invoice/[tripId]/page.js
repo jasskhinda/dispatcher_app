@@ -579,7 +579,7 @@ export default function TripInvoiceDetailPage() {
                         <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-8 print-bg print-gradient">
                             <div className="flex justify-between items-start">
                                 <div>
-                                    <h2 className="text-3xl font-bold mb-2">CCT Transportation</h2>
+                                    <h2 className="text-3xl font-bold mb-2">Compassionate Care Transportation</h2>
                                     <p className="text-blue-100">Professional Transportation Services</p>
                                     {clientInfo.source === 'facility_app' && clientInfo.facilityInfo && (
                                         <div className="mt-3 bg-white/10 rounded-lg p-3">
@@ -588,7 +588,7 @@ export default function TripInvoiceDetailPage() {
                                         </div>
                                     )}
                                     <div className="mt-4 text-sm">
-                                        <p>📧 billing@ccttransportation.com</p>
+                                        <p>📧 billing@compassionatecaretransportation.com</p>
                                         <p>📞 (416) 555-0123</p>
                                         <p>📍 Toronto, Ontario, Canada</p>
                                     </div>
@@ -926,14 +926,14 @@ export default function TripInvoiceDetailPage() {
 
                     {/* Footer */}
                     <div className="mt-8 text-center text-sm text-gray-500 no-print">
-                        <p>Thank you for choosing CCT Transportation Services</p>
-                        <p>For questions about this invoice, please contact billing@ccttransportation.com</p>
+                        <p>Thank you for choosing Compassionate Care Transportation Services</p>
+                        <p>For questions about this invoice, please contact billing@compassionatecaretransportation.com</p>
                     </div>
                     
                     {/* Print-only footer */}
                     <div className="hidden print:block mt-8 text-center text-sm text-gray-600 border-t pt-4">
-                        <p className="font-medium">CCT Transportation Services</p>
-                        <p>Thank you for your business • For questions: billing@ccttransportation.com • (416) 555-0123</p>
+                        <p className="font-medium">Compassionate Care Transportation Services</p>
+                        <p>Thank you for your business • For questions: billing@compassionatecaretransportation.com • (416) 555-0123</p>
                     </div>
                 </div>
             </div>

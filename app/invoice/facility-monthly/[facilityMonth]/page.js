@@ -118,8 +118,8 @@ export default function FacilityMonthlyInvoicePage() {
                     const fallbackFacility = {
                         id: facilityId,
                         name: 'CareBridge Living', // Known facility name from the system
-                        contact_email: 'admin@ccttransportation.com',
-                        billing_email: 'billing@ccttransportation.com' // Use correct billing email to match company header
+                        contact_email: 'admin@compassionatecaretransportation.com',
+                        billing_email: 'billing@compassionatecaretransportation.com', // Use correct billing email to match company header
                         phone_number: '(416) 555-0123',
                         address: '123 Healthcare Drive, Toronto, ON M5V 3A8'
                     };
@@ -132,8 +132,8 @@ export default function FacilityMonthlyInvoicePage() {
                             .upsert([{
                                 id: facilityId,
                                 name: 'CareBridge Living',
-                                contact_email: 'admin@ccttransportation.com',
-                                billing_email: 'billing@ccttransportation.com',
+                                contact_email: 'admin@compassionatecaretransportation.com',
+                                billing_email: 'billing@compassionatecaretransportation.com',
                                 phone_number: '(416) 555-0123',
                                 address: '123 Healthcare Drive, Toronto, ON M5V 3A8',
                                 created_at: new Date().toISOString(),
@@ -811,12 +811,12 @@ export default function FacilityMonthlyInvoicePage() {
                     <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-8 print-bg print-gradient">
                         <div className="flex justify-between items-start">
                             <div>
-                                <h2 className="text-3xl font-bold mb-2">CCT Transportation</h2>
+                                <h2 className="text-3xl font-bold mb-2">Compassionate Care Transportation</h2>
                                 <p className="text-blue-100 text-lg">Professional Transportation Services</p>
                                 <div className="mt-4 text-sm space-y-1">
                                     <p className="flex items-center">
                                         <span className="mr-2">📧</span>
-                                        billing@ccttransportation.com
+                                        billing@compassionatecaretransportation.com
                                     </p>
                                     <p className="flex items-center">
                                         <span className="mr-2">📞</span>
@@ -1121,7 +1121,7 @@ export default function FacilityMonthlyInvoicePage() {
                                                 <span className="font-medium text-green-900">Company Check (Preferred)</span>
                                             </div>
                                             <p className="text-sm text-green-700 mt-1 ml-6">
-                                                Mail to: CCT Transportation, 123 Healthcare Drive, Toronto, ON M5V 3A8
+                                                Mail to: Compassionate Care Transportation, 123 Healthcare Drive, Toronto, ON M5V 3A8
                                             </p>
                                         </div>
                                         
@@ -1131,7 +1131,7 @@ export default function FacilityMonthlyInvoicePage() {
                                                 <span className="font-medium text-blue-900">Credit Card</span>
                                             </div>
                                             <p className="text-sm text-blue-700 mt-1 ml-6">
-                                                Contact billing@ccttransportation.com for secure payment processing
+                                                Contact billing@compassionatecaretransportation.com for secure payment processing
                                             </p>
                                         </div>
                                     </div>
