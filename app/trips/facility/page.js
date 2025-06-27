@@ -44,11 +44,22 @@ export default function FacilityOverviewPage() {
             setRefreshing(true);
             setError(null);
             
-            // Fetch all facility trips first (with cache busting)
-            console.log('🔧 Fetching trips with facility information...');
+            // Fetch trips with facility information using JOIN (with cache busting)
+            console.log('🔧 Fetching trips with facility information using JOIN...');
             const { data: tripsData, error: tripsError } = await supabase
                 .from('trips')
-                .select('*')
+                .select(`
+                    *,
+                    facilities!inner(
+                        id,
+                        name,
+                        address,
+                        contact_email,
+                        phone_number,
+                        billing_email,
+                        facility_type
+                    )
+                `)
                 .not('facility_id', 'is', null)
                 .order('created_at', { ascending: false });
 
@@ -83,27 +94,8 @@ export default function FacilityOverviewPage() {
                 return;
             }
 
-            // Try to get facility details from facilities table (might fail due to RLS)
-            let facilitiesData = [];
-            try {
-                console.log('🏥 Attempting to fetch facility details...');
-                // Force fresh fetch with timestamp to avoid cache
-                const timestamp = Date.now();
-                console.log(`🔄 Cache-busting fetch at ${timestamp}`);
-                const { data: facilityDetails, error: facilityError } = await supabase
-                    .from('facilities')
-                    .select('id, name, address, contact_email, phone_number, billing_email, facility_type');
-                
-                if (!facilityError && facilityDetails) {
-                    console.log('✅ Successfully fetched facility details:', facilityDetails.length);
-                    console.log('📋 Facility details received:', facilityDetails);
-                    facilitiesData = facilityDetails;
-                } else {
-                    console.error('❌ Could not fetch facility details:', facilityError);
-                }
-            } catch (facilityErr) {
-                console.log('⚠️ Facility table access failed:', facilityErr.message);
-            }
+            // Facility data is now included in the trips data via JOIN
+            console.log('✅ Facility data included via JOIN - no separate fetch needed');
 
             // Group trips by facility_id to build facility information
             const facilityTripsMap = {};
@@ -118,9 +110,9 @@ export default function FacilityOverviewPage() {
 
             // Create facility stats for each facility
             const facilityStatsResults = Object.entries(facilityTripsMap).map(([facilityId, facilityTrips]) => {
-                // Find facility details if available from facilities table
-                const facilityDetails = facilitiesData.find(f => f.id === facilityId);
-                console.log(`🔍 Processing facility ${facilityId}:`, facilityDetails ? `Found: ${facilityDetails.name}` : 'Not found in facilities table');
+                // Get facility details from the first trip's joined data
+                const facilityDetails = facilityTrips[0]?.facilities;
+                console.log(`🔍 Processing facility ${facilityId}:`, facilityDetails ? `Found: ${facilityDetails.name}` : 'Not found in joined data');
                 
                 // Enhanced debugging for data accuracy
                 console.log(`\n🏥 FACILITY ${facilityId} ANALYSIS:`);
