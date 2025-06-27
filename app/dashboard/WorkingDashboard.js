@@ -869,12 +869,6 @@ export default function WorkingDashboard() {
                                 >
                                     🔄 Refresh Data
                                 </button>
-                                <a 
-                                    href="/invoices" 
-                                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors text-sm"
-                                >
-                                    📄 Manage Invoices
-                                </a>
                                 <button
                                     onClick={handleSignOut}
                                     className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors text-sm"
