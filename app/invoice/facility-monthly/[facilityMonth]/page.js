@@ -115,15 +115,15 @@ export default function FacilityMonthlyInvoicePage() {
                         console.log('🎯 Step 5a: Facilities with matching prefix:', matchingFacilities);
                     }
                     
-                    // 🆘 FALLBACK: Use actual facility data for invoicing
-                    console.log('🆘 Step 5b: Using real facility data for invoicing purposes...');
+                    // 🆘 FALLBACK: Use generic facility data if not found
+                    console.log('🆘 Step 5b: Facility not found, using fallback data...');
                     const fallbackFacility = {
                         id: facilityId,
-                        name: 'CareBridge Living',
-                        contact_email: 'contact@CareBridgeLiving.com',
-                        billing_email: 'billing@CareBridgeLiving.com',
-                        phone_number: '(555) 123-4567',
-                        address: '123 Main Street, Your City, State 12345'
+                        name: `Healthcare Facility ${facilityId.substring(0, 8)}...`,
+                        contact_email: 'contact@facility.com',
+                        billing_email: 'billing@facility.com',
+                        phone_number: 'Phone not available',
+                        address: 'Address not available'
                     };
                     
                     // 🔧 PERMANENT FIX: Try to create the facility record in the database
