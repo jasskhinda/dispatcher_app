@@ -1303,30 +1303,79 @@ export default function FacilityMonthlyInvoicePage() {
                                         Recent trip bookings requiring dispatcher approval, cancellation, or rejection.
                                     </p>
                                     <div className="space-y-3">
-                                        {facilityTrips.filter(trip => ['pending', 'upcoming'].includes(trip.status)).slice(0, 10).map((trip) => (
-                                            <div key={trip.id} className="flex justify-between items-center p-4 bg-white rounded border border-blue-200 shadow-sm">
-                                                <div className="flex-1">
-                                                    <div className="flex items-center justify-between">
-                                                        <div>
-                                                            <div className="text-sm font-medium text-gray-900">
-                                                                {trip.clientName}
-                                                            </div>
-                                                            <div className="text-xs text-gray-600 mt-1">
-                                                                📍 {trip.pickup_address?.split(',')[0]} → {trip.destination_address?.split(',')[0]}
-                                                            </div>
-                                                            <div className="text-xs text-gray-500 mt-1">
+                                        {processedTrips.filter(trip => ['pending', 'upcoming'].includes(trip.status)).slice(0, 10).map((trip) => (
+                                            <div key={trip.id} className="bg-white rounded border border-blue-200 shadow-sm overflow-hidden">
+                                                <div className="p-4">
+                                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+                                                        {/* Date Column */}
+                                                        <div className="text-center md:text-left">
+                                                            <div className="text-sm font-medium">
                                                                 {new Date(trip.pickup_time).toLocaleDateString('en-US', {
-                                                                    weekday: 'short',
                                                                     month: 'short',
-                                                                    day: 'numeric',
-                                                                    year: 'numeric'
-                                                                })} at {new Date(trip.pickup_time).toLocaleTimeString('en-US', {
+                                                                    day: 'numeric'
+                                                                })}
+                                                            </div>
+                                                            <div className="text-xs text-gray-500">
+                                                                {new Date(trip.pickup_time).toLocaleTimeString('en-US', {
                                                                     hour: '2-digit',
                                                                     minute: '2-digit'
-                                                                })} | ${trip.displayPrice?.toFixed(2) || '0.00'}
+                                                                })}
                                                             </div>
                                                         </div>
-                                                        <div className="flex items-center space-x-2 ml-4">
+                                                        
+                                                        {/* Client Column */}
+                                                        <div>
+                                                            <div className="text-sm font-medium text-gray-900">{trip.clientName}</div>
+                                                            {trip.clientPhone && (
+                                                                <div className="text-xs text-gray-500">📞 {trip.clientPhone}</div>
+                                                            )}
+                                                        </div>
+                                                        
+                                                        {/* Route Column */}
+                                                        <div>
+                                                            <div className="text-sm">
+                                                                <div className="text-gray-900">
+                                                                    📍 {trip.pickup_address?.split(',')[0] || 'Unknown pickup'}
+                                                                </div>
+                                                                <div className="text-gray-600 mt-1">
+                                                                    🎯 {trip.destination_address?.split(',')[0] || 'Unknown destination'}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        {/* Features & Actions Column */}
+                                                        <div>
+                                                            <div className="flex flex-col space-y-2">
+                                                                {/* Features */}
+                                                                <div className="flex flex-wrap gap-1">
+                                                                    {trip.wheelchair_type && (
+                                                                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                                                                            ♿ Wheelchair
+                                                                        </span>
+                                                                    )}
+                                                                    {trip.is_round_trip && (
+                                                                        <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                                                                            🔄 Round Trip
+                                                                        </span>
+                                                                    )}
+                                                                    {trip.additional_passengers > 0 && (
+                                                                        <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
+                                                                            👥 +{trip.additional_passengers}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                
+                                                                {/* Price */}
+                                                                <div className="text-sm font-semibold text-green-600">
+                                                                    ${trip.displayPrice?.toFixed(2) || '0.00'}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    {/* Status and Actions Row */}
+                                                    <div className="mt-3 pt-3 border-t border-gray-200">
+                                                        <div className="flex items-center justify-between">
                                                             <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                                                                 trip.status === 'pending' ? 'bg-amber-100 text-amber-800 border border-amber-300' :
                                                                 trip.status === 'upcoming' ? 'bg-blue-100 text-blue-800 border border-blue-300' :
