@@ -346,43 +346,65 @@ export function NewTripForm({ user, userProfile, individualClients, managedClien
     console.log('Initializing Google Maps autocomplete for address fields');
     
     try {
-      // Initialize autocomplete for pickup address
+      // Initialize autocomplete for pickup address with enhanced options
       pickupAutocompleteRef.current = new window.google.maps.places.Autocomplete(
         pickupInputRef.current,
-        { types: [] }  // Allow all types of places including cities
+        {
+          fields: ['formatted_address', 'geometry', 'name', 'place_id', 'address_components'],
+          componentRestrictions: { country: 'us' }
+        }
       );
+      
+      // Set bias to Ohio region for better results
+      const ohioBounds = new window.google.maps.LatLngBounds(
+        new window.google.maps.LatLng(38.4031, -84.8204), // SW corner of Ohio
+        new window.google.maps.LatLng(42.3270, -80.5183)  // NE corner of Ohio
+      );
+      pickupAutocompleteRef.current.setBounds(ohioBounds);
       
       // Initialize autocomplete for destination address
       destinationAutocompleteRef.current = new window.google.maps.places.Autocomplete(
         destinationInputRef.current,
-        { types: [] }  // Allow all types of places including cities
+        {
+          fields: ['formatted_address', 'geometry', 'name', 'place_id', 'address_components'],
+          componentRestrictions: { country: 'us' }
+        }
       );
+      
+      // Also set bias for destination
+      destinationAutocompleteRef.current.setBounds(ohioBounds);
       
       // Add place_changed listeners
       pickupAutocompleteRef.current.addListener('place_changed', () => {
         const place = pickupAutocompleteRef.current.getPlace();
         console.log('Pickup place selected:', place);
-        setFormData(prevData => {
-          const updatedData = { ...prevData, pickup_address: place.formatted_address || prevData.pickup_address };
-          // Only trigger price calculation if both addresses are set
-          if (updatedData.pickup_address && updatedData.destination_address) {
-            setTimeout(() => calculatePrice(updatedData), 100); // Slight delay to ensure state is updated
-          }
-          return updatedData;
-        });
+        
+        if (place.formatted_address) {
+          setFormData(prevData => {
+            const updatedData = { ...prevData, pickup_address: place.formatted_address };
+            // Only trigger price calculation if both addresses are set
+            if (updatedData.pickup_address && updatedData.destination_address) {
+              setTimeout(() => calculatePrice(updatedData), 100);
+            }
+            return updatedData;
+          });
+        }
       });
       
       destinationAutocompleteRef.current.addListener('place_changed', () => {
         const place = destinationAutocompleteRef.current.getPlace();
         console.log('Destination place selected:', place);
-        setFormData(prevData => {
-          const updatedData = { ...prevData, destination_address: place.formatted_address || prevData.destination_address };
-          // Only trigger price calculation if both addresses are set
-          if (updatedData.pickup_address && updatedData.destination_address) {
-            setTimeout(() => calculatePrice(updatedData), 100); // Slight delay to ensure state is updated
-          }
-          return updatedData;
-        });
+        
+        if (place.formatted_address) {
+          setFormData(prevData => {
+            const updatedData = { ...prevData, destination_address: place.formatted_address };
+            // Only trigger price calculation if both addresses are set
+            if (updatedData.pickup_address && updatedData.destination_address) {
+              setTimeout(() => calculatePrice(updatedData), 100);
+            }
+            return updatedData;
+          });
+        }
       });
       
       console.log('Google Maps autocomplete initialized successfully');
@@ -655,9 +677,15 @@ export function NewTripForm({ user, userProfile, individualClients, managedClien
   return (
     <>
       <Script
-        src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`}
+        id="google-maps-script"
+        strategy="afterInteractive"
+        src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places&callback=Function.prototype`}
         onLoad={() => {
           console.log('Google Maps script loaded successfully in NewTripForm');
+          setGoogleLoaded(true);
+        }}
+        onReady={() => {
+          console.log('Google Maps script ready in NewTripForm');
           setGoogleLoaded(true);
         }}
         onError={() => console.error('Error loading Google Maps script in NewTripForm')}
@@ -714,7 +742,17 @@ export function NewTripForm({ user, userProfile, individualClients, managedClien
                         <optgroup label="🏥 Facility Clients (Managed)">
                           {managedClients.map(client => {
                             const facility = facilities?.find(f => f.id === client.facility_id);
-                            const facilityName = facility?.name || `Facility ${client.facility_id?.substring(0, 8)}`;
+                            let facilityName;
+                            
+                            // Special handling for known facilities
+                            if (client.facility_id && client.facility_id.startsWith('e1b94bde')) {
+                              facilityName = 'CareBridge Living';
+                            } else if (facility?.name) {
+                              facilityName = facility.name;
+                            } else {
+                              facilityName = `Facility ${client.facility_id?.substring(0, 8)}`;
+                            }
+                            
                             const clientName = `${client.first_name || ''} ${client.last_name || ''}`.trim() || client.email || 'Unnamed Client';
                             
                             return (
