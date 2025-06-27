@@ -238,9 +238,6 @@ export default function FacilityMonthlyInvoicePage() {
                             destination_address,
                             pickup_time,
                             price,
-                            amount,
-                            total_price,
-                            total_amount,
                             status,
                             wheelchair_type,
                             is_round_trip,
@@ -485,17 +482,13 @@ export default function FacilityMonthlyInvoicePage() {
             }
 
             // Handle price - ensure it's properly parsed and has a fallback
-            // Try multiple common price field names
-            const tripPrice = trip.price || trip.amount || trip.total_price || trip.total_amount || trip.cost || 0;
+            const tripPrice = trip.price || 0;
             const displayPrice = parseFloat(tripPrice) || 0;
             
             // Debug log for price issues
             if (displayPrice === 0 && trip.id) {
                 console.log(`⚠️ Trip ${trip.id} has no price:`, {
                     price: trip.price,
-                    amount: trip.amount, 
-                    total_price: trip.total_price,
-                    total_amount: trip.total_amount,
                     status: trip.status
                 });
             }
