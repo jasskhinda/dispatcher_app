@@ -19,6 +19,7 @@ export default function FacilityMonthlyInvoicePage() {
     const [paymentStatus, setPaymentStatus] = useState(null);
     const [updatingPaymentStatus, setUpdatingPaymentStatus] = useState(false);
     const [processingTripAction, setProcessingTripAction] = useState(null);
+    const [pendingAmount, setPendingAmount] = useState(0);
     
     const router = useRouter();
     const params = useParams();
@@ -237,6 +238,9 @@ export default function FacilityMonthlyInvoicePage() {
                             destination_address,
                             pickup_time,
                             price,
+                            amount,
+                            total_price,
+                            total_amount,
                             status,
                             wheelchair_type,
                             is_round_trip,
@@ -416,15 +420,24 @@ export default function FacilityMonthlyInvoicePage() {
                     setFacilityTrips([]);
                 }
                 
-                // Calculate total for billable trips only  
-                console.log('🔍 Step 9: Calculating billable amount...');
+                // Calculate total for billable trips and pending amount
+                console.log('🔍 Step 9: Calculating billable and pending amounts...');
                 const enhancedTrips = facilityTrips.length > 0 ? facilityTrips : (trips || []);
+                
+                // Billable amount (completed trips only)
                 const billableAmount = enhancedTrips
                     .filter(trip => trip.status === 'completed' && trip.price > 0)
                     .reduce((sum, trip) => sum + parseFloat(trip.price || 0), 0);
                 
+                // Pending amount (upcoming/pending trips)
+                const pendingTripsAmount = enhancedTrips
+                    .filter(trip => ['upcoming', 'pending', 'confirmed'].includes(trip.status) && trip.price > 0)
+                    .reduce((sum, trip) => sum + parseFloat(trip.price || 0), 0);
+                
                 console.log(`✅ Step 9: Calculated billable amount: $${billableAmount.toFixed(2)}`);
+                console.log(`✅ Step 9: Calculated pending amount: $${pendingTripsAmount.toFixed(2)}`);
                 setTotalAmount(billableAmount);
+                setPendingAmount(pendingTripsAmount);
                 
                 console.log('✅ Step 10: All processing complete, setting loading to false');
                 setLoading(false);
@@ -471,13 +484,30 @@ export default function FacilityMonthlyInvoicePage() {
                 clientName = `${facilityInfo.name} Client`;
             }
 
+            // Handle price - ensure it's properly parsed and has a fallback
+            // Try multiple common price field names
+            const tripPrice = trip.price || trip.amount || trip.total_price || trip.total_amount || trip.cost || 0;
+            const displayPrice = parseFloat(tripPrice) || 0;
+            
+            // Debug log for price issues
+            if (displayPrice === 0 && trip.id) {
+                console.log(`⚠️ Trip ${trip.id} has no price:`, {
+                    price: trip.price,
+                    amount: trip.amount, 
+                    total_price: trip.total_price,
+                    total_amount: trip.total_amount,
+                    status: trip.status
+                });
+            }
+            
             return {
                 ...trip,
                 clientName,
                 clientPhone,
                 clientEmail,
-                displayPrice: parseFloat(trip.price || 0),
-                isBillable: trip.status === 'completed' && trip.price > 0
+                displayPrice: displayPrice,
+                price: displayPrice, // Ensure price is always available
+                isBillable: trip.status === 'completed' && displayPrice > 0
             };
         });
     };
@@ -652,13 +682,30 @@ export default function FacilityMonthlyInvoicePage() {
             console.log(`✅ Trip ${action} successful:`, result);
             
             // Update the trip in our local state
-            setFacilityTrips(prevTrips => 
-                prevTrips.map(trip => 
+            setFacilityTrips(prevTrips => {
+                const updatedTrips = prevTrips.map(trip => 
                     trip.id === tripId 
                         ? { ...trip, status: result.trip.status }
                         : trip
-                )
-            );
+                );
+                
+                // Recalculate totals after status change
+                setTimeout(() => {
+                    const billableAmount = updatedTrips
+                        .filter(trip => trip.status === 'completed' && trip.price > 0)
+                        .reduce((sum, trip) => sum + parseFloat(trip.price || 0), 0);
+                    
+                    const pendingTripsAmount = updatedTrips
+                        .filter(trip => ['upcoming', 'pending', 'confirmed'].includes(trip.status) && trip.price > 0)
+                        .reduce((sum, trip) => sum + parseFloat(trip.price || 0), 0);
+                    
+                    setTotalAmount(billableAmount);
+                    setPendingAmount(pendingTripsAmount);
+                    console.log(`🔄 Updated totals - Billable: $${billableAmount.toFixed(2)}, Pending: $${pendingTripsAmount.toFixed(2)}`);
+                }, 100);
+                
+                return updatedTrips;
+            });
 
             // Show success message briefly
             const actionText = {
@@ -1060,11 +1107,26 @@ export default function FacilityMonthlyInvoicePage() {
                                             </span>
                                         </div>
                                     )}
+                                    
+                                    {/* Pending Amount */}
+                                    {pendingAmount > 0 && (
+                                        <div className="flex justify-between items-center p-3 bg-purple-50 rounded border border-purple-200">
+                                            <span className="text-purple-700 font-medium">Pending Amount:</span>
+                                            <span className="font-bold text-purple-800">${pendingAmount.toFixed(2)}</span>
+                                        </div>
+                                    )}
+                                    
                                     <div className="border-t-2 pt-4 mt-4">
                                         <div className="flex justify-between items-center p-4 bg-green-100 rounded-lg border-2 border-green-300">
                                             <span className="text-xl font-bold text-green-900">Total Amount Due:</span>
                                             <span className="text-2xl font-bold text-green-800">${totalAmount.toFixed(2)}</span>
                                         </div>
+                                        {pendingAmount > 0 && (
+                                            <div className="flex justify-between items-center p-3 bg-purple-100 rounded-lg border border-purple-300 mt-2">
+                                                <span className="text-md font-medium text-purple-900">Total When All Trips Complete:</span>
+                                                <span className="text-lg font-bold text-purple-800">${(totalAmount + pendingAmount).toFixed(2)}</span>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
