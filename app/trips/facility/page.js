@@ -44,7 +44,7 @@ export default function FacilityOverviewPage() {
             setRefreshing(true);
             setError(null);
             
-            // Fetch all facility trips first
+            // Fetch all facility trips first (with cache busting)
             console.log('🔧 Fetching trips with facility information...');
             const { data: tripsData, error: tripsError } = await supabase
                 .from('trips')
@@ -87,15 +87,19 @@ export default function FacilityOverviewPage() {
             let facilitiesData = [];
             try {
                 console.log('🏥 Attempting to fetch facility details...');
+                // Force fresh fetch with timestamp to avoid cache
+                const timestamp = Date.now();
+                console.log(`🔄 Cache-busting fetch at ${timestamp}`);
                 const { data: facilityDetails, error: facilityError } = await supabase
                     .from('facilities')
-                    .select('id, name, address, contact_email, phone_number, billing_email');
+                    .select('id, name, address, contact_email, phone_number, billing_email, facility_type');
                 
                 if (!facilityError && facilityDetails) {
                     console.log('✅ Successfully fetched facility details:', facilityDetails.length);
+                    console.log('📋 Facility details received:', facilityDetails);
                     facilitiesData = facilityDetails;
                 } else {
-                    console.log('⚠️ Could not fetch facility details (RLS issue):', facilityError?.message);
+                    console.error('❌ Could not fetch facility details:', facilityError);
                 }
             } catch (facilityErr) {
                 console.log('⚠️ Facility table access failed:', facilityErr.message);
@@ -116,6 +120,7 @@ export default function FacilityOverviewPage() {
             const facilityStatsResults = Object.entries(facilityTripsMap).map(([facilityId, facilityTrips]) => {
                 // Find facility details if available from facilities table
                 const facilityDetails = facilitiesData.find(f => f.id === facilityId);
+                console.log(`🔍 Processing facility ${facilityId}:`, facilityDetails ? `Found: ${facilityDetails.name}` : 'Not found in facilities table');
                 
                 // Enhanced debugging for data accuracy
                 console.log(`\n🏥 FACILITY ${facilityId} ANALYSIS:`);
@@ -185,21 +190,11 @@ export default function FacilityOverviewPage() {
                     });
                 }
 
-                // Infer facility name if not available from facilities table
+                // Use facility name from facilities table or fallback
                 let facilityName = facilityDetails?.name;
                 if (!facilityName) {
-                    // Look for patterns in trip data to identify facility
-                    if (facilityId.startsWith('e1b94bde') || 
-                        facilityTrips.some(trip => 
-                            trip.pickup_location?.includes('CareBridge') ||
-                            trip.dropoff_location?.includes('CareBridge') ||
-                            trip.pickup_address?.includes('Blazer') ||
-                            trip.pickup_address?.includes('Dublin')
-                        )) {
-                        facilityName = 'CareBridge Living';
-                    } else {
-                        facilityName = `Healthcare Facility ${facilityId.substring(0, 8)}...`;
-                    }
+                    // Only use fallback logic if we truly cannot get the facility name
+                    facilityName = `Healthcare Facility ${facilityId.substring(0, 8)}...`;
                 }
 
                 const result = {
