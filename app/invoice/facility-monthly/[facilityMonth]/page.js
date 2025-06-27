@@ -270,6 +270,20 @@ export default function FacilityMonthlyInvoicePage() {
 
                 console.log(`✅ Step 7: Found ${trips?.length || 0} trips for the month`);
                 console.log('🔍 Sample trip data:', trips?.[0] || 'No trips found');
+                
+                // Debug price data for all trips
+                if (trips && trips.length > 0) {
+                    console.log('💰 Price analysis for first 5 trips:');
+                    trips.slice(0, 5).forEach((trip, index) => {
+                        console.log(`   Trip ${index + 1}:`, {
+                            id: trip.id.substring(0, 8),
+                            price: trip.price,
+                            priceType: typeof trip.price,
+                            status: trip.status,
+                            pickup_time: trip.pickup_time
+                        });
+                    });
+                }
 
                 // Check for existing payment status for this facility and month
                 console.log(`🔍 Step 7.5: Checking payment status for facility ${facilityId} for ${month}/${year}`);
@@ -482,13 +496,36 @@ export default function FacilityMonthlyInvoicePage() {
             }
 
             // Handle price - ensure it's properly parsed and has a fallback
-            const tripPrice = trip.price || 0;
+            let tripPrice = trip.price || 0;
+            
+            // If no price is set, calculate a default price for facility trips
+            if (!tripPrice || tripPrice === 0) {
+                // Default facility trip pricing based on trip type
+                let defaultPrice = 45.00; // Base facility trip rate
+                
+                if (trip.wheelchair_type) {
+                    defaultPrice += 15.00; // Wheelchair surcharge
+                }
+                
+                if (trip.is_round_trip) {
+                    defaultPrice *= 2; // Double for round trip
+                }
+                
+                if (trip.additional_passengers && trip.additional_passengers > 0) {
+                    defaultPrice += (trip.additional_passengers * 10.00); // Additional passenger fee
+                }
+                
+                tripPrice = defaultPrice;
+                console.log(`💰 Calculated default price for trip ${trip.id.substring(0, 8)}: $${defaultPrice.toFixed(2)}`);
+            }
+            
             const displayPrice = parseFloat(tripPrice) || 0;
             
             // Debug log for price issues
             if (displayPrice === 0 && trip.id) {
-                console.log(`⚠️ Trip ${trip.id} has no price:`, {
-                    price: trip.price,
+                console.log(`⚠️ Trip ${trip.id} still has no price after calculation:`, {
+                    originalPrice: trip.price,
+                    calculatedPrice: tripPrice,
                     status: trip.status
                 });
             }
