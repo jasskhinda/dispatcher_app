@@ -22,6 +22,7 @@ export function NewTripForm({ user, userProfile, individualClients, managedClien
     wheelchair_type: 'none', // none, manual, power, rental
     notes: '',
     round_trip: false,
+    is_emergency: false,
     driver_id: driverId || null,
     driver_name: ''
   });
@@ -45,12 +46,14 @@ export function NewTripForm({ user, userProfile, individualClients, managedClien
     basePrice: 50,
     distance: 0,
     distancePrice: 0,
-    weekendSurcharge: 0,
-    hourSurcharge: 0,
-    holidaySurcharge: 0,
+    countyPrice: 0,
+    weekendAfterHoursSurcharge: 0,
+    emergencyFee: 0,
     roundTripPrice: 0,
     wheelchairPrice: 0,
     veteranDiscount: 0,
+    isInFranklinCounty: true,
+    countiesOut: 0,
     totalPrice: 50
   });
   
@@ -111,80 +114,65 @@ export function NewTripForm({ user, userProfile, individualClients, managedClien
     }
   };
   
-  // Calculate price based on form data
+  // Professional price calculation based on CCT's rate structure
   const calculatePrice = async (data = formData, client = clientDetails) => {
     let newPriceInfo = {
-      basePrice: 50,
+      basePrice: 50, // $50 per leg
       distance: 0,
       distancePrice: 0,
-      weekendSurcharge: 0,
-      hourSurcharge: 0,
-      holidaySurcharge: 0,
+      countyPrice: 0,
+      weekendAfterHoursSurcharge: 0,
+      emergencyFee: 0,
       roundTripPrice: 0,
       wheelchairPrice: 0,
+      veteranDiscount: 0,
+      isInFranklinCounty: true,
+      countiesOut: 0,
       totalPrice: 50
     };
     
-    // Round trip calculation - add fixed $50 fee for round trips
+    // Base price per leg - $50 per leg
+    newPriceInfo.basePrice = 50;
+    
+    // Round trip calculation - double the base price (2 legs)
     if (data.round_trip) {
-      newPriceInfo.basePrice = 100;
-      newPriceInfo.roundTripPrice = 50;
+      newPriceInfo.roundTripPrice = 50; // Additional leg
     }
     
-    // Wheelchair surcharge - only for rental wheelchair
-    if (data.wheelchair_required && data.wheelchair_type === 'none') {
+    // Emergency fee
+    if (data.is_emergency) {
+      newPriceInfo.emergencyFee = 40;
+    }
+    
+    // Wheelchair rental fee - only for rental wheelchair
+    if (data.wheelchair_required && data.wheelchair_type === 'rental') {
       newPriceInfo.wheelchairPrice = 25; // Rental fee
-    } else if (data.wheelchair_required) {
-      newPriceInfo.wheelchairPrice = 0; // No fee for own wheelchair
     }
     
-    // Time-based surcharges for initial pickup
+    // Weekend and after hours surcharge
     if (data.pickup_time) {
       const pickupDate = new Date(data.pickup_time);
-      
-      // Weekend surcharge
-      const day = pickupDate.getDay();
+      const day = pickupDate.getDay(); // 0 = Sunday, 6 = Saturday
       const hour = pickupDate.getHours();
       
-      if (day === 0 || day === 6) {
-        // Higher rate for weekend nights (after 8pm)
-        if (hour >= 20 || hour < 8) {
-          newPriceInfo.weekendSurcharge = 80; // Weekend night rate
-        } else {
-          newPriceInfo.weekendSurcharge = 40; // Regular weekend rate
-        }
+      // Weekend or after hours: $40 charge
+      const isWeekend = day === 0 || day === 6;
+      const isAfterHours = hour < 8 || hour >= 18; // Before 8am or after 6pm
+      
+      if (isWeekend || isAfterHours) {
+        newPriceInfo.weekendAfterHoursSurcharge = 40;
       }
-      
-      // Hour surcharge - only apply if not a weekend
-      if ((hour < 8 || hour >= 20) && day !== 0 && day !== 6) {
-        newPriceInfo.hourSurcharge = 40;
-      }
-      
-      // Holiday surcharge - simplified version
-      const month = pickupDate.getMonth();
-      const date = pickupDate.getDate();
-      
-      // Major US holidays (simplified check)
-      const isNewYearsDay = month === 0 && date === 1;
-      const isChristmas = month === 11 && date === 25;
-      const isIndependenceDay = month === 6 && date === 4;
-      const isThanksgiving = month === 10 && (date >= 22 && date <= 28) && day === 4;
-      
-      if (isNewYearsDay || isChristmas || isIndependenceDay || isThanksgiving) {
-        newPriceInfo.holidaySurcharge = 100;
-      }
-      
-      // No special surcharges for return trip - the fixed $50 round trip fee covers this
     }
     
-    // Calculate distance price if we have both addresses
+    // Calculate distance price and county detection if we have both addresses
     if (data.pickup_address && data.destination_address && googleLoaded && 
         window.google && window.google.maps && window.google.maps.DistanceMatrixService) {
       try {
-        console.log('Calculating distance between:', data.pickup_address, 'and', data.destination_address);
+        console.log('Calculating distance and location data between:', data.pickup_address, 'and', data.destination_address);
         
         // Use Google Maps Distance Matrix API to calculate actual distance
         const service = new window.google.maps.DistanceMatrixService();
+        const geocoder = new window.google.maps.Geocoder();
         
         const response = await new Promise((resolve, reject) => {
           service.getDistanceMatrix(
@@ -214,24 +202,96 @@ export function NewTripForm({ user, userProfile, individualClients, managedClien
           const roundedDistance = Math.round(distanceInMiles * 10) / 10; // Round to 1 decimal place
           
           console.log('Distance calculated:', roundedDistance, 'miles');
-          
-          // Update price information with actual distance
           newPriceInfo.distance = roundedDistance;
-          // For round trips, double the distance for price calculation
+          
+          // Geocode both addresses to determine counties
+          const [pickupGeocode, destinationGeocode] = await Promise.all([
+            new Promise((resolve, reject) => {
+              geocoder.geocode({ address: data.pickup_address }, (results, status) => {
+                if (status === 'OK' && results[0]) {
+                  resolve(results[0]);
+                } else {
+                  console.warn('Pickup geocoding failed:', status);
+                  resolve(null);
+                }
+              });
+            }),
+            new Promise((resolve, reject) => {
+              geocoder.geocode({ address: data.destination_address }, (results, status) => {
+                if (status === 'OK' && results[0]) {
+                  resolve(results[0]);
+                } else {
+                  console.warn('Destination geocoding failed:', status);
+                  resolve(null);
+                }
+              });
+            })
+          ]);
+          
+          // Determine counties from geocoding results
+          const getCountyFromComponents = (addressComponents) => {
+            const countyComponent = addressComponents.find(component =>
+              component.types.includes('administrative_area_level_2')
+            );
+            return countyComponent ? countyComponent.long_name.replace(' County', '') : null;
+          };
+          
+          const pickupCounty = pickupGeocode ? getCountyFromComponents(pickupGeocode.address_components) : null;
+          const destinationCounty = destinationGeocode ? getCountyFromComponents(destinationGeocode.address_components) : null;
+          
+          console.log('Pickup county:', pickupCounty, 'Destination county:', destinationCounty);
+          
+          // Determine if trip involves Franklin County and calculate pricing
+          const franklinCountyNames = ['Franklin', 'Franklin County'];
+          const isPickupInFranklin = pickupCounty && franklinCountyNames.includes(pickupCounty);
+          const isDestinationInFranklin = destinationCounty && franklinCountyNames.includes(destinationCounty);
+          
+          // Trip is "in Franklin County" if both pickup and destination are in Franklin County
+          newPriceInfo.isInFranklinCounty = isPickupInFranklin && isDestinationInFranklin;
+          
+          // Count unique counties (excluding Franklin if both ends are in Franklin)
+          const uniqueCounties = new Set();
+          if (pickupCounty && pickupCounty !== 'Franklin') uniqueCounties.add(pickupCounty);
+          if (destinationCounty && destinationCounty !== 'Franklin') uniqueCounties.add(destinationCounty);
+          
+          newPriceInfo.countiesOut = uniqueCounties.size;
+          
+          // Calculate distance pricing based on location
           const effectiveDistance = data.round_trip ? roundedDistance * 2 : roundedDistance;
-          newPriceInfo.distancePrice = effectiveDistance * 3; // $3 per mile
+          
+          if (newPriceInfo.isInFranklinCounty) {
+            // Both pickup and destination in Franklin County: $3/mile
+            newPriceInfo.distancePrice = effectiveDistance * 3;
+          } else {
+            // Outside Franklin County or crossing county lines: $4/mile
+            newPriceInfo.distancePrice = effectiveDistance * 4;
+          }
+          
+          // County surcharge for trips going outside Franklin County
+          if (newPriceInfo.countiesOut >= 2) {
+            // 2+ counties out: $50 per county beyond the first
+            newPriceInfo.countyPrice = (newPriceInfo.countiesOut - 1) * 50;
+          } else if (newPriceInfo.countiesOut === 1) {
+            // 1 county out: no surcharge (just the higher $4/mile rate)
+            newPriceInfo.countyPrice = 0;
+          }
+          
         } else {
           console.warn('Distance calculation returned non-OK status:', response.rows[0].elements[0].status);
           // Fallback to estimate
           newPriceInfo.distance = 15; // miles, placeholder
+          newPriceInfo.isInFranklinCounty = true; // Default assumption
+          newPriceInfo.countiesOut = 0;
           // For round trips, double the distance for price calculation
           const effectiveDistance = data.round_trip ? newPriceInfo.distance * 2 : newPriceInfo.distance;
           newPriceInfo.distancePrice = effectiveDistance * 3;
         }
       } catch (error) {
-        console.error('Error calculating distance:', error);
+        console.error('Error calculating distance and location:', error);
         // Fallback to estimate
         newPriceInfo.distance = 15; // miles, placeholder
+        newPriceInfo.isInFranklinCounty = true; // Default assumption
+        newPriceInfo.countiesOut = 0;
         // For round trips, double the distance for price calculation
         const effectiveDistance = data.round_trip ? newPriceInfo.distance * 2 : newPriceInfo.distance;
         newPriceInfo.distancePrice = effectiveDistance * 3;
@@ -245,10 +305,11 @@ export function NewTripForm({ user, userProfile, individualClients, managedClien
     if (isVeteran) {
       // Calculate subtotal before discount
       const subtotal = newPriceInfo.basePrice + 
+                       newPriceInfo.roundTripPrice +
                        newPriceInfo.distancePrice + 
-                       newPriceInfo.weekendSurcharge + 
-                       newPriceInfo.hourSurcharge + 
-                       newPriceInfo.holidaySurcharge +
+                       newPriceInfo.countyPrice +
+                       newPriceInfo.weekendAfterHoursSurcharge +
+                       newPriceInfo.emergencyFee +
                        newPriceInfo.wheelchairPrice;
       
       // Apply 20% veteran discount
@@ -257,10 +318,11 @@ export function NewTripForm({ user, userProfile, individualClients, managedClien
     
     // Calculate total price
     newPriceInfo.totalPrice = newPriceInfo.basePrice + 
+                             newPriceInfo.roundTripPrice +
                              newPriceInfo.distancePrice + 
-                             newPriceInfo.weekendSurcharge + 
-                             newPriceInfo.hourSurcharge + 
-                             newPriceInfo.holidaySurcharge +
+                             newPriceInfo.countyPrice +
+                             newPriceInfo.weekendAfterHoursSurcharge +
+                             newPriceInfo.emergencyFee +
                              newPriceInfo.wheelchairPrice +
                              newPriceInfo.veteranDiscount;
     
@@ -338,6 +400,8 @@ export function NewTripForm({ user, userProfile, individualClients, managedClien
     formData.return_pickup_time, 
     formData.round_trip, 
     formData.wheelchair_required,
+    formData.wheelchair_type,
+    formData.is_emergency,
     formData.pickup_address,
     formData.destination_address,
     formData.client_id,
@@ -1192,40 +1256,38 @@ export function NewTripForm({ user, userProfile, individualClients, managedClien
             
             {/* Price calculation box */}
             <div className="bg-brand-border/10 p-4 rounded-md border border-brand-border/30">
-              <h3 className="text-lg font-medium mb-3">Price Calculation</h3>
+              <h3 className="text-lg font-medium mb-3">Professional Price Calculation</h3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span>Base fare {formData.round_trip ? '(round trip)' : '(one way)'}:</span>
-                  <span>${priceInfo.basePrice.toFixed(2)}</span>
+                  <span>Base fare ({formData.round_trip ? '2 legs' : '1 leg'} @ $50/leg):</span>
+                  <span>${(priceInfo.basePrice + priceInfo.roundTripPrice).toFixed(2)}</span>
                 </div>
                 
                 {priceInfo.distance > 0 && (
                   <div className="flex justify-between">
-                    <span>Distance ({priceInfo.distance.toFixed(1)} miles {formData.round_trip ? 'x2 for round trip' : ''} @ $3/mile):</span>
+                    <span>Distance ({priceInfo.distance.toFixed(1)} miles {formData.round_trip ? 'x2 for round trip' : ''} @ ${priceInfo.isInFranklinCounty ? '$3' : '$4'}/mile {priceInfo.isInFranklinCounty ? '(Franklin County)' : '(Outside Franklin County)'}):</span>
                     <span>${priceInfo.distancePrice.toFixed(2)}</span>
                   </div>
                 )}
                 
-                {priceInfo.weekendSurcharge > 0 && (
+                {priceInfo.countyPrice > 0 && (
                   <div className="flex justify-between">
-                    <span>
-                      {priceInfo.weekendSurcharge === 80 ? 'Weekend night surcharge:' : 'Weekend surcharge:'}
-                    </span>
-                    <span>${priceInfo.weekendSurcharge.toFixed(2)}</span>
+                    <span>County surcharge ({priceInfo.countiesOut} counties out @ $50/county):</span>
+                    <span>${priceInfo.countyPrice.toFixed(2)}</span>
                   </div>
                 )}
                 
-                {priceInfo.hourSurcharge > 0 && (
+                {priceInfo.weekendAfterHoursSurcharge > 0 && (
                   <div className="flex justify-between">
-                    <span>After hours surcharge:</span>
-                    <span>${priceInfo.hourSurcharge.toFixed(2)}</span>
+                    <span>Weekend/After hours surcharge:</span>
+                    <span>${priceInfo.weekendAfterHoursSurcharge.toFixed(2)}</span>
                   </div>
                 )}
                 
-                {priceInfo.holidaySurcharge > 0 && (
+                {priceInfo.emergencyFee > 0 && (
                   <div className="flex justify-between">
-                    <span>Holiday surcharge:</span>
-                    <span>${priceInfo.holidaySurcharge.toFixed(2)}</span>
+                    <span>Emergency fee:</span>
+                    <span>${priceInfo.emergencyFee.toFixed(2)}</span>
                   </div>
                 )}
                 
@@ -1253,6 +1315,29 @@ export function NewTripForm({ user, userProfile, individualClients, managedClien
                 <div className="border-t border-brand-border/30 pt-2 mt-2 font-medium flex justify-between">
                   <span>Total estimated price:</span>
                   <span>${priceInfo.totalPrice.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Emergency Trip Option */}
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+              <div className="flex items-start">
+                <input
+                  type="checkbox"
+                  id="is_emergency"
+                  name="is_emergency"
+                  checked={formData.is_emergency}
+                  onChange={handleChange}
+                  className="mt-1 text-red-600 focus:ring-red-500 h-4 w-4"
+                />
+                <div className="ml-3">
+                  <label htmlFor="is_emergency" className="block text-sm font-medium text-red-800 cursor-pointer">
+                    🚨 Emergency Trip
+                  </label>
+                  <p className="text-sm text-red-700 mt-1">
+                    Check this box if this is an emergency trip requiring immediate attention.
+                    <span className="font-medium"> Additional $40 emergency fee applies.</span>
+                  </p>
                 </div>
               </div>
             </div>
@@ -1356,13 +1441,14 @@ export function NewTripForm({ user, userProfile, individualClients, managedClien
                         type="radio"
                         name="wheelchair_rental"
                         value="yes"
-                        checked={formData.wheelchair_required}
+                        checked={formData.wheelchair_type === 'rental'}
                         onChange={(e) => {
                           setFormData(prev => ({ 
                             ...prev, 
+                            wheelchair_type: 'rental',
                             wheelchair_required: true 
                           }));
-                        }}
+                        })
                         className="mt-1 text-blue-600"
                       />
                       <div className="ml-3">
@@ -1377,7 +1463,7 @@ export function NewTripForm({ user, userProfile, individualClients, managedClien
                         type="radio"
                         name="wheelchair_rental"
                         value="no"
-                        checked={!formData.wheelchair_required}
+                        checked={formData.wheelchair_type === 'none' && !formData.wheelchair_required}
                         onChange={(e) => {
                           setFormData(prev => ({ 
                             ...prev, 
