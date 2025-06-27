@@ -56,9 +56,9 @@ export function NewTripForm({ user, userProfile, individualClients, managedClien
   // State for client details
   const [clientDetails, setClientDetails] = useState(null);
   
-  // Refs for the address input fields
-  const pickupInputRef = useRef(null);
-  const destinationInputRef = useRef(null);
+  // Refs for the address input containers (like BookingCCT)
+  const pickupAutocompleteContainerRef = useRef(null);
+  const destinationAutocompleteContainerRef = useRef(null);
   
   // Refs for the autocomplete objects
   const pickupAutocompleteRef = useRef(null);
@@ -374,115 +374,154 @@ export function NewTripForm({ user, userProfile, individualClients, managedClien
     }
   }, [formData.driver_id]);
 
-  // Initialize Google Maps autocomplete
+  // Initialize Google Maps autocomplete (exact BookingCCT implementation)
   useEffect(() => {
-    if (!googleLoaded) {
-      console.log('Google Maps not yet loaded');
-      return;
-    }
+    if (!googleLoaded || 
+        !window.google?.maps?.places?.Autocomplete ||
+        !pickupAutocompleteContainerRef.current || 
+        !destinationAutocompleteContainerRef.current) return;
 
-    if (!window.google || !window.google.maps || !window.google.maps.places) {
-      console.log('Google Maps Places API not available');
-      return;
-    }
-
-    // Add delay for DOM stability (similar to working BookingCCT implementation)
-    const initTimeout = setTimeout(() => {
-      if (!pickupInputRef.current || !destinationInputRef.current) {
-        console.log('Input refs not available yet:', { 
-          pickupInput: !!pickupInputRef.current, 
-          destinationInput: !!destinationInputRef.current 
-        });
-        return;
-      }
-      
-      console.log('Initializing Google Maps autocomplete for address fields');
-      
+    // Add delay to ensure DOM stability after component mount
+    const initializeAutocomplete = () => {
       try {
-        // Initialize autocomplete for pickup address with enhanced options
-        pickupAutocompleteRef.current = new window.google.maps.places.Autocomplete(
-          pickupInputRef.current,
-          {
-            fields: ['formatted_address', 'geometry', 'name', 'place_id', 'address_components'],
-            componentRestrictions: { country: 'us' }
+        // Perform cleanup first to ensure we start fresh
+        const cleanupAutocomplete = () => {
+          // Clean up existing autocomplete instances
+          if (pickupAutocompleteRef.current) {
+            window.google.maps.event.clearInstanceListeners(pickupAutocompleteRef.current);
+            pickupAutocompleteRef.current = null;
           }
-        );
+          
+          if (destinationAutocompleteRef.current) {
+            window.google.maps.event.clearInstanceListeners(destinationAutocompleteRef.current);
+            destinationAutocompleteRef.current = null;
+          }
+          
+          // Remove existing input elements to create fresh ones
+          if (pickupAutocompleteContainerRef.current) {
+            while (pickupAutocompleteContainerRef.current.firstChild) {
+              pickupAutocompleteContainerRef.current.removeChild(
+                pickupAutocompleteContainerRef.current.firstChild
+              );
+            }
+          }
+          
+          if (destinationAutocompleteContainerRef.current) {
+            while (destinationAutocompleteContainerRef.current.firstChild) {
+              destinationAutocompleteContainerRef.current.removeChild(
+                destinationAutocompleteContainerRef.current.firstChild
+              );
+            }
+          }
+        };
+        
+        // Clean up existing elements first
+        cleanupAutocomplete();
+
+        // Create traditional input fields for autocomplete (exact BookingCCT pattern)
+        const pickupInput = document.createElement('input');
+        pickupInput.className = 'w-full p-2 border border-brand-border rounded-md bg-brand-background';
+        pickupInput.placeholder = 'Enter address, city, or location';
+        pickupInput.value = formData.pickup_address || '';
+        pickupInput.id = 'pickup-autocomplete-input';
+        
+        const destinationInput = document.createElement('input');
+        destinationInput.className = 'w-full p-2 border border-brand-border rounded-md bg-brand-background';
+        destinationInput.placeholder = 'Enter address, city, or location';
+        destinationInput.value = formData.destination_address || '';
+        destinationInput.id = 'destination-autocomplete-input';
+        
+        // Append inputs to container
+        pickupAutocompleteContainerRef.current.appendChild(pickupInput);
+        destinationAutocompleteContainerRef.current.appendChild(destinationInput);
+        
+        // Initialize traditional Google Places Autocomplete
+        const pickupAutocomplete = new window.google.maps.places.Autocomplete(pickupInput, {
+          fields: ['formatted_address', 'geometry', 'name', 'place_id', 'address_components'],
+          componentRestrictions: { country: 'us' }
+        });
         
         // Set bias to Ohio region for better results
         const ohioBounds = new window.google.maps.LatLngBounds(
           new window.google.maps.LatLng(38.4031, -84.8204), // SW corner of Ohio
           new window.google.maps.LatLng(42.3270, -80.5183)  // NE corner of Ohio
         );
-        pickupAutocompleteRef.current.setBounds(ohioBounds);
+        pickupAutocomplete.setBounds(ohioBounds);
         
-        // Initialize autocomplete for destination address
-        destinationAutocompleteRef.current = new window.google.maps.places.Autocomplete(
-          destinationInputRef.current,
-          {
-            fields: ['formatted_address', 'geometry', 'name', 'place_id', 'address_components'],
-            componentRestrictions: { country: 'us' }
-          }
-        );
+        const destinationAutocomplete = new window.google.maps.places.Autocomplete(destinationInput, {
+          fields: ['formatted_address', 'geometry', 'name', 'place_id', 'address_components'],
+          componentRestrictions: { country: 'us' }
+        });
         
         // Also set bias for destination
-        destinationAutocompleteRef.current.setBounds(ohioBounds);
+        destinationAutocomplete.setBounds(ohioBounds);
         
-        // Add place_changed listeners
-        pickupAutocompleteRef.current.addListener('place_changed', () => {
-          const place = pickupAutocompleteRef.current.getPlace();
-          console.log('Pickup place selected:', place);
+        // Store references to autocomplete instances
+        pickupAutocompleteRef.current = pickupAutocomplete;
+        destinationAutocompleteRef.current = destinationAutocomplete;
+        
+        // Add event listeners with place validation
+        pickupAutocomplete.addListener('place_changed', () => {
+          const place = pickupAutocomplete.getPlace();
+          if (!place.geometry || !place.geometry.location) return;
           
-          if (place.formatted_address) {
-            setFormData(prevData => {
-              const updatedData = { ...prevData, pickup_address: place.formatted_address };
-              // Only trigger price calculation if both addresses are set
-              if (updatedData.pickup_address && updatedData.destination_address) {
-                setTimeout(() => calculatePrice(updatedData), 100);
-              }
-              return updatedData;
-            });
+          const address = place.formatted_address || place.name || '';
+          setFormData(prev => ({ ...prev, pickup_address: address }));
+          
+          // Only trigger price calculation if both addresses are set
+          if (address && formData.destination_address) {
+            setTimeout(() => calculatePrice({ ...formData, pickup_address: address }), 100);
           }
         });
         
-        destinationAutocompleteRef.current.addListener('place_changed', () => {
-          const place = destinationAutocompleteRef.current.getPlace();
-          console.log('Destination place selected:', place);
+        destinationAutocomplete.addListener('place_changed', () => {
+          const place = destinationAutocomplete.getPlace();
+          if (!place.geometry || !place.geometry.location) return;
           
-          if (place.formatted_address) {
-            setFormData(prevData => {
-              const updatedData = { ...prevData, destination_address: place.formatted_address };
-              // Only trigger price calculation if both addresses are set
-              if (updatedData.pickup_address && updatedData.destination_address) {
-                setTimeout(() => calculatePrice(updatedData), 100);
-              }
-              return updatedData;
-            });
+          const address = place.formatted_address || place.name || '';
+          setFormData(prev => ({ ...prev, destination_address: address }));
+          
+          // Only trigger price calculation if both addresses are set
+          if (formData.pickup_address && address) {
+            setTimeout(() => calculatePrice({ ...formData, destination_address: address }), 100);
           }
+        });
+        
+        // Manual input change handlers (two-way binding without re-rendering)
+        pickupInput.addEventListener('input', (e) => {
+          // Update the form state without causing a re-render
+          setFormData(prev => ({ ...prev, pickup_address: e.target.value }));
+        });
+        
+        destinationInput.addEventListener('input', (e) => {
+          // Update the form state without causing a re-render
+          setFormData(prev => ({ ...prev, destination_address: e.target.value }));
         });
         
         console.log('Google Maps autocomplete initialized successfully');
       } catch (error) {
-        console.error('Error initializing Google Maps autocomplete:', error);
+        console.error('Error initializing Places Autocomplete:', error);
       }
-    }, 500); // 500ms delay for DOM stability (like BookingCCT)
+    };
+
+    // Add delay to ensure DOM stability (BookingCCT uses 500ms)
+    const timer = setTimeout(initializeAutocomplete, 500);
     
     // Cleanup function
     return () => {
-      clearTimeout(initTimeout);
-      try {
-        if (pickupAutocompleteRef.current) {
-          window.google.maps.event.clearInstanceListeners(pickupAutocompleteRef.current);
-          pickupAutocompleteRef.current = null;
-        }
-        if (destinationAutocompleteRef.current) {
-          window.google.maps.event.clearInstanceListeners(destinationAutocompleteRef.current);
-          destinationAutocompleteRef.current = null;
-        }
-      } catch (error) {
-        console.error('Error cleaning up Google Maps autocomplete:', error);
+      clearTimeout(timer);
+      // Clean up autocomplete instances and event listeners on unmount
+      if (pickupAutocompleteRef.current) {
+        window.google?.maps?.event?.clearInstanceListeners(pickupAutocompleteRef.current);
+        pickupAutocompleteRef.current = null;
+      }
+      
+      if (destinationAutocompleteRef.current) {
+        window?.google?.maps?.event?.clearInstanceListeners(destinationAutocompleteRef.current);
+        destinationAutocompleteRef.current = null;
       }
     };
-  }, [googleLoaded]);
+  }, [googleLoaded, formData.pickup_address, formData.destination_address]);
 
   // Function to handle creating a new client
   const handleNewClientSubmit = async () => {
@@ -735,27 +774,18 @@ export function NewTripForm({ user, userProfile, individualClients, managedClien
     <>
       <Script
         id="google-maps-script"
-        strategy="afterInteractive"
-        src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places&callback=initGoogleMaps`}
+        strategy="beforeInteractive"
+        src={`https://maps.googleapis.com/maps/api/js?key=AIzaSyDylwCsypHOs6T9e-JnTA7AoqOMrc3hbhE&libraries=places`}
         onLoad={() => {
-          console.log('Google Maps script loaded successfully in NewTripForm');
-          // Set up global callback function
-          window.initGoogleMaps = () => {
-            console.log('Google Maps initialized via callback');
-            setGoogleLoaded(true);
-          };
-          // If google is already available, call the callback immediately
-          if (window.google && window.google.maps) {
-            window.initGoogleMaps();
-          }
-        }}
-        onReady={() => {
-          console.log('Google Maps script ready in NewTripForm');
+          console.log('Google Maps script loaded successfully');
+          console.log('window.google available:', !!window.google);
+          console.log('window.google.maps available:', !!(window.google && window.google.maps));
+          console.log('window.google.maps.places available:', !!(window.google && window.google.maps && window.google.maps.places));
           setGoogleLoaded(true);
         }}
         onError={(error) => {
-          console.error('Error loading Google Maps script in NewTripForm:', error);
-          console.error('API Key:', process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ? 'Present' : 'Missing');
+          console.error('Error loading Google Maps script:', error);
+          console.error('Full error details:', JSON.stringify(error));
         }}
       />
       
@@ -989,31 +1019,39 @@ export function NewTripForm({ user, userProfile, individualClients, managedClien
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
               <div>
                 <label htmlFor="pickup_address" className="block text-sm font-medium mb-1">Pickup Address</label>
-                <input
-                  ref={pickupInputRef}
-                  type="text"
-                  id="pickup_address"
-                  name="pickup_address"
-                  value={formData.pickup_address}
-                  onChange={handleChange}
-                  className="w-full p-2 border border-brand-border rounded-md bg-brand-background"
-                  placeholder="Enter address, city, or location"
-                  required
-                />
+                <div className="relative">
+                  <div 
+                    ref={pickupAutocompleteContainerRef} 
+                    className="w-full"
+                    aria-label="Pickup location input"
+                  >
+                    {/* Autocomplete input will be inserted here */}
+                  </div>
+                  <input 
+                    type="hidden" 
+                    name="pickup_address" 
+                    value={formData.pickup_address} 
+                    required
+                  />
+                </div>
               </div>
               <div>
                 <label htmlFor="destination_address" className="block text-sm font-medium mb-1">Destination Address</label>
-                <input
-                  ref={destinationInputRef}
-                  type="text"
-                  id="destination_address"
-                  name="destination_address"
-                  value={formData.destination_address}
-                  onChange={handleChange}
-                  className="w-full p-2 border border-brand-border rounded-md bg-brand-background"
-                  placeholder="Enter address, city, or location"
-                  required
-                />
+                <div className="relative">
+                  <div 
+                    ref={destinationAutocompleteContainerRef} 
+                    className="w-full"
+                    aria-label="Destination location input"
+                  >
+                    {/* Autocomplete input will be inserted here */}
+                  </div>
+                  <input 
+                    type="hidden" 
+                    name="destination_address" 
+                    value={formData.destination_address} 
+                    required
+                  />
+                </div>
               </div>
             </div>
             
