@@ -75,7 +75,15 @@ export function NewTripForm({ user, userProfile, individualClients, managedClien
         fetchClientDetails(newValue);
       }
       
-      calculatePrice(updatedData);
+      // Only calculate price for non-address fields or when both addresses are present
+      // This prevents errors when user is typing addresses manually
+      if (name !== 'pickup_address' && name !== 'destination_address') {
+        calculatePrice(updatedData);
+      } else if (updatedData.pickup_address && updatedData.destination_address) {
+        // Debounce price calculation for address changes
+        setTimeout(() => calculatePrice(updatedData), 500);
+      }
+      
       return updatedData;
     });
   };
@@ -167,7 +175,8 @@ export function NewTripForm({ user, userProfile, individualClients, managedClien
     }
     
     // Calculate distance price if we have both addresses
-    if (data.pickup_address && data.destination_address && googleLoaded) {
+    if (data.pickup_address && data.destination_address && googleLoaded && 
+        window.google && window.google.maps && window.google.maps.DistanceMatrixService) {
       try {
         console.log('Calculating distance between:', data.pickup_address, 'and', data.destination_address);
         
@@ -263,6 +272,39 @@ export function NewTripForm({ user, userProfile, individualClients, managedClien
     }
   }, []);
   
+  // Fallback script loader in case Next.js Script component fails
+  useEffect(() => {
+    const fallbackTimer = setTimeout(() => {
+      if (!googleLoaded && !window.google) {
+        console.log('Google Maps script not loaded via Next.js Script, trying fallback loader...');
+        
+        const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
+        if (existingScript) {
+          console.log('Google Maps script already exists, waiting for it to load...');
+          return;
+        }
+        
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places&callback=initGoogleMapsFallback`;
+        script.async = true;
+        script.defer = true;
+        
+        window.initGoogleMapsFallback = () => {
+          console.log('Google Maps loaded via fallback method');
+          setGoogleLoaded(true);
+        };
+        
+        script.onerror = () => {
+          console.error('Fallback Google Maps script loading failed');
+        };
+        
+        document.head.appendChild(script);
+      }
+    }, 3000); // Wait 3 seconds before trying fallback
+    
+    return () => clearTimeout(fallbackTimer);
+  }, [googleLoaded]);
+  
   // Check again after component mounts - Google Maps might have loaded after
   useEffect(() => {
     // Check immediately once
@@ -334,98 +376,113 @@ export function NewTripForm({ user, userProfile, individualClients, managedClien
 
   // Initialize Google Maps autocomplete
   useEffect(() => {
-    if (!googleLoaded || !pickupInputRef.current || !destinationInputRef.current) {
-      console.log('Cannot initialize autocomplete yet:', { 
-        googleLoaded, 
-        pickupInput: !!pickupInputRef.current, 
-        destinationInput: !!destinationInputRef.current 
-      });
+    if (!googleLoaded) {
+      console.log('Google Maps not yet loaded');
       return;
     }
-    
-    console.log('Initializing Google Maps autocomplete for address fields');
-    
-    try {
-      // Initialize autocomplete for pickup address with enhanced options
-      pickupAutocompleteRef.current = new window.google.maps.places.Autocomplete(
-        pickupInputRef.current,
-        {
-          fields: ['formatted_address', 'geometry', 'name', 'place_id', 'address_components'],
-          componentRestrictions: { country: 'us' }
-        }
-      );
-      
-      // Set bias to Ohio region for better results
-      const ohioBounds = new window.google.maps.LatLngBounds(
-        new window.google.maps.LatLng(38.4031, -84.8204), // SW corner of Ohio
-        new window.google.maps.LatLng(42.3270, -80.5183)  // NE corner of Ohio
-      );
-      pickupAutocompleteRef.current.setBounds(ohioBounds);
-      
-      // Initialize autocomplete for destination address
-      destinationAutocompleteRef.current = new window.google.maps.places.Autocomplete(
-        destinationInputRef.current,
-        {
-          fields: ['formatted_address', 'geometry', 'name', 'place_id', 'address_components'],
-          componentRestrictions: { country: 'us' }
-        }
-      );
-      
-      // Also set bias for destination
-      destinationAutocompleteRef.current.setBounds(ohioBounds);
-      
-      // Add place_changed listeners
-      pickupAutocompleteRef.current.addListener('place_changed', () => {
-        const place = pickupAutocompleteRef.current.getPlace();
-        console.log('Pickup place selected:', place);
-        
-        if (place.formatted_address) {
-          setFormData(prevData => {
-            const updatedData = { ...prevData, pickup_address: place.formatted_address };
-            // Only trigger price calculation if both addresses are set
-            if (updatedData.pickup_address && updatedData.destination_address) {
-              setTimeout(() => calculatePrice(updatedData), 100);
-            }
-            return updatedData;
-          });
-        }
-      });
-      
-      destinationAutocompleteRef.current.addListener('place_changed', () => {
-        const place = destinationAutocompleteRef.current.getPlace();
-        console.log('Destination place selected:', place);
-        
-        if (place.formatted_address) {
-          setFormData(prevData => {
-            const updatedData = { ...prevData, destination_address: place.formatted_address };
-            // Only trigger price calculation if both addresses are set
-            if (updatedData.pickup_address && updatedData.destination_address) {
-              setTimeout(() => calculatePrice(updatedData), 100);
-            }
-            return updatedData;
-          });
-        }
-      });
-      
-      console.log('Google Maps autocomplete initialized successfully');
-    } catch (error) {
-      console.error('Error initializing Google Maps autocomplete:', error);
+
+    if (!window.google || !window.google.maps || !window.google.maps.places) {
+      console.log('Google Maps Places API not available');
+      return;
     }
+
+    // Add delay for DOM stability (similar to working BookingCCT implementation)
+    const initTimeout = setTimeout(() => {
+      if (!pickupInputRef.current || !destinationInputRef.current) {
+        console.log('Input refs not available yet:', { 
+          pickupInput: !!pickupInputRef.current, 
+          destinationInput: !!destinationInputRef.current 
+        });
+        return;
+      }
+      
+      console.log('Initializing Google Maps autocomplete for address fields');
+      
+      try {
+        // Initialize autocomplete for pickup address with enhanced options
+        pickupAutocompleteRef.current = new window.google.maps.places.Autocomplete(
+          pickupInputRef.current,
+          {
+            fields: ['formatted_address', 'geometry', 'name', 'place_id', 'address_components'],
+            componentRestrictions: { country: 'us' }
+          }
+        );
+        
+        // Set bias to Ohio region for better results
+        const ohioBounds = new window.google.maps.LatLngBounds(
+          new window.google.maps.LatLng(38.4031, -84.8204), // SW corner of Ohio
+          new window.google.maps.LatLng(42.3270, -80.5183)  // NE corner of Ohio
+        );
+        pickupAutocompleteRef.current.setBounds(ohioBounds);
+        
+        // Initialize autocomplete for destination address
+        destinationAutocompleteRef.current = new window.google.maps.places.Autocomplete(
+          destinationInputRef.current,
+          {
+            fields: ['formatted_address', 'geometry', 'name', 'place_id', 'address_components'],
+            componentRestrictions: { country: 'us' }
+          }
+        );
+        
+        // Also set bias for destination
+        destinationAutocompleteRef.current.setBounds(ohioBounds);
+        
+        // Add place_changed listeners
+        pickupAutocompleteRef.current.addListener('place_changed', () => {
+          const place = pickupAutocompleteRef.current.getPlace();
+          console.log('Pickup place selected:', place);
+          
+          if (place.formatted_address) {
+            setFormData(prevData => {
+              const updatedData = { ...prevData, pickup_address: place.formatted_address };
+              // Only trigger price calculation if both addresses are set
+              if (updatedData.pickup_address && updatedData.destination_address) {
+                setTimeout(() => calculatePrice(updatedData), 100);
+              }
+              return updatedData;
+            });
+          }
+        });
+        
+        destinationAutocompleteRef.current.addListener('place_changed', () => {
+          const place = destinationAutocompleteRef.current.getPlace();
+          console.log('Destination place selected:', place);
+          
+          if (place.formatted_address) {
+            setFormData(prevData => {
+              const updatedData = { ...prevData, destination_address: place.formatted_address };
+              // Only trigger price calculation if both addresses are set
+              if (updatedData.pickup_address && updatedData.destination_address) {
+                setTimeout(() => calculatePrice(updatedData), 100);
+              }
+              return updatedData;
+            });
+          }
+        });
+        
+        console.log('Google Maps autocomplete initialized successfully');
+      } catch (error) {
+        console.error('Error initializing Google Maps autocomplete:', error);
+      }
+    }, 500); // 500ms delay for DOM stability (like BookingCCT)
     
     // Cleanup function
     return () => {
+      clearTimeout(initTimeout);
       try {
         if (pickupAutocompleteRef.current) {
           window.google.maps.event.clearInstanceListeners(pickupAutocompleteRef.current);
+          pickupAutocompleteRef.current = null;
         }
         if (destinationAutocompleteRef.current) {
           window.google.maps.event.clearInstanceListeners(destinationAutocompleteRef.current);
+          destinationAutocompleteRef.current = null;
         }
       } catch (error) {
         console.error('Error cleaning up Google Maps autocomplete:', error);
       }
     };
-  }, [googleLoaded, pickupInputRef.current, destinationInputRef.current]);
+  }, [googleLoaded]);
 
   // Function to handle creating a new client
   const handleNewClientSubmit = async () => {
@@ -679,16 +736,27 @@ export function NewTripForm({ user, userProfile, individualClients, managedClien
       <Script
         id="google-maps-script"
         strategy="afterInteractive"
-        src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places&callback=Function.prototype`}
+        src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places&callback=initGoogleMaps`}
         onLoad={() => {
           console.log('Google Maps script loaded successfully in NewTripForm');
-          setGoogleLoaded(true);
+          // Set up global callback function
+          window.initGoogleMaps = () => {
+            console.log('Google Maps initialized via callback');
+            setGoogleLoaded(true);
+          };
+          // If google is already available, call the callback immediately
+          if (window.google && window.google.maps) {
+            window.initGoogleMaps();
+          }
         }}
         onReady={() => {
           console.log('Google Maps script ready in NewTripForm');
           setGoogleLoaded(true);
         }}
-        onError={() => console.error('Error loading Google Maps script in NewTripForm')}
+        onError={(error) => {
+          console.error('Error loading Google Maps script in NewTripForm:', error);
+          console.error('API Key:', process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ? 'Present' : 'Missing');
+        }}
       />
       
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
