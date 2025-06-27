@@ -1448,7 +1448,7 @@ export function NewTripForm({ user, userProfile, individualClients, managedClien
                             wheelchair_type: 'rental',
                             wheelchair_required: true 
                           }));
-                        })
+                        }}
                         className="mt-1 text-blue-600"
                       />
                       <div className="ml-3">
