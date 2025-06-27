@@ -19,6 +19,7 @@ export function NewTripForm({ user, userProfile, individualClients, managedClien
     pickup_time: '',
     return_pickup_time: '',
     wheelchair_required: false,
+    wheelchair_type: 'none', // none, manual, power, rental
     notes: '',
     round_trip: false,
     driver_id: driverId || null,
@@ -130,9 +131,11 @@ export function NewTripForm({ user, userProfile, individualClients, managedClien
       newPriceInfo.roundTripPrice = 50;
     }
     
-    // Wheelchair surcharge
-    if (data.wheelchair_required) {
-      newPriceInfo.wheelchairPrice = 25;
+    // Wheelchair surcharge - only for rental wheelchair
+    if (data.wheelchair_required && data.wheelchair_type === 'none') {
+      newPriceInfo.wheelchairPrice = 25; // Rental fee
+    } else if (data.wheelchair_required) {
+      newPriceInfo.wheelchairPrice = 0; // No fee for own wheelchair
     }
     
     // Time-based surcharges for initial pickup
@@ -1136,7 +1139,7 @@ export function NewTripForm({ user, userProfile, individualClients, managedClien
               </div>
               <div>
                 <label className="block text-sm font-medium mb-2">Trip Type</label>
-                <div className="flex bg-brand-background border border-brand-border rounded-md overflow-hidden">
+                <div className="flex bg-gray-100 border-2 border-gray-200 rounded-lg overflow-hidden shadow-sm">
                   <button
                     type="button"
                     onClick={() => setFormData(prev => {
@@ -1144,13 +1147,13 @@ export function NewTripForm({ user, userProfile, individualClients, managedClien
                       calculatePrice(updated);
                       return updated;
                     })}
-                    className={`flex-1 py-2 px-4 text-center transition-colors ${
+                    className={`flex-1 py-3 px-4 text-center font-medium transition-all duration-200 ${
                       !formData.round_trip 
-                        ? 'bg-brand-accent text-brand-buttonText font-medium' 
-                        : 'hover:bg-brand-border/10'
+                        ? 'bg-blue-600 text-white shadow-md border-r-2 border-blue-700' 
+                        : 'bg-white text-gray-700 hover:bg-gray-50 border-r border-gray-200'
                     }`}
                   >
-                    One Way
+                    🔄 One Way
                   </button>
                   <button
                     type="button"
@@ -1159,13 +1162,13 @@ export function NewTripForm({ user, userProfile, individualClients, managedClien
                       calculatePrice(updated);
                       return updated;
                     })}
-                    className={`flex-1 py-2 px-4 text-center transition-colors ${
+                    className={`flex-1 py-3 px-4 text-center font-medium transition-all duration-200 ${
                       formData.round_trip 
-                        ? 'bg-brand-accent text-brand-buttonText font-medium' 
-                        : 'hover:bg-brand-border/10'
+                        ? 'bg-blue-600 text-white shadow-md border-l-2 border-blue-700' 
+                        : 'bg-white text-gray-700 hover:bg-gray-50 border-l border-gray-200'
                     }`}
                   >
-                    Round Trip
+                    🔄↩️ Round Trip
                   </button>
                 </div>
               </div>
@@ -1228,8 +1231,15 @@ export function NewTripForm({ user, userProfile, individualClients, managedClien
                 
                 {priceInfo.wheelchairPrice > 0 && (
                   <div className="flex justify-between">
-                    <span>Wheelchair accessible vehicle:</span>
+                    <span>Wheelchair rental fee:</span>
                     <span>${priceInfo.wheelchairPrice.toFixed(2)}</span>
+                  </div>
+                )}
+                
+                {formData.wheelchair_required && priceInfo.wheelchairPrice === 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Wheelchair accessible vehicle (no extra fee):</span>
+                    <span>$0.00</span>
                   </div>
                 )}
                 
@@ -1247,27 +1257,147 @@ export function NewTripForm({ user, userProfile, individualClients, managedClien
               </div>
             </div>
             
-            <div>
-              <label className="block text-sm font-medium mb-3">Wheelchair Required</label>
-              <div className="bg-brand-background border border-brand-border rounded-md p-2 flex items-center">
-                <label className="inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    name="wheelchair_required"
-                    checked={formData.wheelchair_required}
-                    onChange={handleChange}
-                    className="sr-only peer"
-                  />
-                  <div className="relative w-11 h-6 bg-brand-border/50 rounded-full peer peer-checked:bg-brand-accent peer-focus:ring-2 peer-focus:ring-brand-accent/30 transition-colors">
-                    <div className={`absolute left-0.5 top-0.5 bg-white w-5 h-5 rounded-full transition-all duration-300 ${formData.wheelchair_required ? 'translate-x-5' : ''}`}></div>
+            {/* Enhanced Wheelchair Transportation Section */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h3 className="text-lg font-semibold mb-4 text-blue-800">♿ Wheelchair Transportation</h3>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-3 text-gray-700">What type of wheelchair do you have?</label>
+                <div className="space-y-3">
+                  <label className="flex items-start p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                    <input
+                      type="radio"
+                      name="wheelchair_type"
+                      value="none"
+                      checked={formData.wheelchair_type === 'none'}
+                      onChange={(e) => {
+                        setFormData(prev => ({ 
+                          ...prev, 
+                          wheelchair_type: e.target.value,
+                          wheelchair_required: false 
+                        }));
+                      }}
+                      className="mt-1 text-blue-600"
+                    />
+                    <div className="ml-3">
+                      <div className="font-medium">None</div>
+                      <div className="text-sm text-gray-600">No wheelchair needed</div>
+                    </div>
+                  </label>
+                  
+                  <label className="flex items-start p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                    <input
+                      type="radio"
+                      name="wheelchair_type"
+                      value="manual"
+                      checked={formData.wheelchair_type === 'manual'}
+                      onChange={(e) => {
+                        setFormData(prev => ({ 
+                          ...prev, 
+                          wheelchair_type: e.target.value,
+                          wheelchair_required: true 
+                        }));
+                      }}
+                      className="mt-1 text-blue-600"
+                    />
+                    <div className="ml-3">
+                      <div className="font-medium">Manual wheelchair (I have my own)</div>
+                      <div className="text-sm text-gray-600">Standard manual wheelchair that you bring</div>
+                      <div className="text-sm text-green-600 font-medium">No additional fee</div>
+                    </div>
+                  </label>
+                  
+                  <label className="flex items-start p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                    <input
+                      type="radio"
+                      name="wheelchair_type"
+                      value="power"
+                      checked={formData.wheelchair_type === 'power'}
+                      onChange={(e) => {
+                        setFormData(prev => ({ 
+                          ...prev, 
+                          wheelchair_type: e.target.value,
+                          wheelchair_required: true 
+                        }));
+                      }}
+                      className="mt-1 text-blue-600"
+                    />
+                    <div className="ml-3">
+                      <div className="font-medium">Power wheelchair (I have my own)</div>
+                      <div className="text-sm text-gray-600">Electric/motorized wheelchair that you bring</div>
+                      <div className="text-sm text-green-600 font-medium">No additional fee</div>
+                    </div>
+                  </label>
+                  
+                  <div className="flex items-start p-3 border border-gray-300 rounded-lg bg-gray-100 opacity-60">
+                    <input
+                      type="radio"
+                      name="wheelchair_type"
+                      value="transport"
+                      disabled
+                      className="mt-1 text-gray-400"
+                    />
+                    <div className="ml-3">
+                      <div className="font-medium text-gray-500">Transport wheelchair</div>
+                      <div className="text-sm text-gray-500">Not Available</div>
+                      <div className="text-sm text-red-600">Lightweight transport chair - Not permitted for safety reasons</div>
+                    </div>
                   </div>
-                  <span className="ml-3 text-sm font-medium">
-                    {formData.wheelchair_required ? 'Yes' : 'No'}
-                  </span>
-                </label>
-                <div className="ml-auto text-sm opacity-70">
-                  {formData.wheelchair_required ? 'Wheelchair accessible vehicle will be provided' : 'Standard vehicle will be provided'}
                 </div>
+              </div>
+              
+              {/* Conditional wheelchair rental section */}
+              {formData.wheelchair_type === 'none' && (
+                <div className="mt-4 pt-4 border-t border-blue-200">
+                  <label className="block text-sm font-medium mb-3 text-gray-700">Do you want us to provide a wheelchair?</label>
+                  <div className="space-y-3">
+                    <label className="flex items-start p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                      <input
+                        type="radio"
+                        name="wheelchair_rental"
+                        value="yes"
+                        checked={formData.wheelchair_required}
+                        onChange={(e) => {
+                          setFormData(prev => ({ 
+                            ...prev, 
+                            wheelchair_required: true 
+                          }));
+                        }}
+                        className="mt-1 text-blue-600"
+                      />
+                      <div className="ml-3">
+                        <div className="font-medium">Yes, please provide a wheelchair</div>
+                        <div className="text-sm text-gray-600">We will provide a suitable wheelchair for your trip</div>
+                        <div className="text-sm text-orange-600 font-medium">+$25 wheelchair rental fee</div>
+                      </div>
+                    </label>
+                    
+                    <label className="flex items-start p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                      <input
+                        type="radio"
+                        name="wheelchair_rental"
+                        value="no"
+                        checked={!formData.wheelchair_required}
+                        onChange={(e) => {
+                          setFormData(prev => ({ 
+                            ...prev, 
+                            wheelchair_required: false 
+                          }));
+                        }}
+                        className="mt-1 text-blue-600"
+                      />
+                      <div className="ml-3">
+                        <div className="font-medium">No, wheelchair not needed</div>
+                        <div className="text-sm text-gray-600">Passenger can walk or transfer independently</div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              )}
+              
+              <div className="mt-4 p-3 bg-blue-100 rounded-lg">
+                <h4 className="font-medium text-blue-800 mb-1">Wheelchair Accessibility Information</h4>
+                <p className="text-sm text-blue-700">All our vehicles are equipped with wheelchair accessibility features. The same fee applies to all wheelchair types to ensure fair and transparent pricing.</p>
               </div>
             </div>
             
