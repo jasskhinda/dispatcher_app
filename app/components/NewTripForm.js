@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Script from 'next/script';
 import { supabase } from '@/lib/supabase';
 
-export function NewTripForm({ user, userProfile, clients }) {
+export function NewTripForm({ user, userProfile, individualClients, managedClients, facilities }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const driverId = searchParams.get('driver_id');
@@ -603,21 +603,39 @@ export function NewTripForm({ user, userProfile, clients }) {
     if (formData.client_id && !showNewClientForm) {
       let clientName;
       
-      // Case 1: Client is newly created and not in the clients list
-      if (!clients?.some(client => client.id === formData.client_id) && newClientFormData.submitted) {
+      // Case 1: Client is newly created and not in any client list
+      const isInIndividualClients = individualClients?.some(client => client.id === formData.client_id);
+      const isInManagedClients = managedClients?.some(client => client.id === formData.client_id);
+      
+      if (!isInIndividualClients && !isInManagedClients && newClientFormData.submitted) {
         clientName = `${newClientFormData.firstName} ${newClientFormData.lastName}`.trim() || 
                      newClientFormData.email || 
                      'New client';
       } 
-      // Case 2: Client exists in the clients list
-      else {
-        // Find the client in the list to show their name
-        const selectedClient = clients?.find(client => client.id === formData.client_id);
+      // Case 2: Individual client from booking app
+      else if (isInIndividualClients) {
+        const selectedClient = individualClients.find(client => client.id === formData.client_id);
         clientName = selectedClient ? 
-          (selectedClient.full_name || 
-           `${selectedClient.first_name || ''} ${selectedClient.last_name || ''}`.trim() || 
-           selectedClient.email) : 
-          'New client';
+          (`${selectedClient.first_name || ''} ${selectedClient.last_name || ''}`.trim() || 
+           selectedClient.email || 'Individual Client') + ' (Individual)' : 
+          'Individual Client';
+      }
+      // Case 3: Managed client from facility app
+      else if (isInManagedClients) {
+        const selectedClient = managedClients.find(client => client.id === formData.client_id);
+        if (selectedClient) {
+          const facility = facilities?.find(f => f.id === selectedClient.facility_id);
+          const facilityName = facility?.name || 'Facility';
+          const managedClientName = `${selectedClient.first_name || ''} ${selectedClient.last_name || ''}`.trim() || 
+                                   selectedClient.email || 'Managed Client';
+          clientName = `${managedClientName} (${facilityName})`;
+        } else {
+          clientName = 'Managed Client';
+        }
+      }
+      // Fallback
+      else {
+        clientName = 'Selected Client';
       }
       
       return (
@@ -668,18 +686,45 @@ export function NewTripForm({ user, userProfile, clients }) {
                       disabled={showNewClientForm}
                     >
                       <option value="">Select a client</option>
-                      {formData.client_id && !clients?.some(client => client.id === formData.client_id) && (
+                      
+                      {/* Newly created client */}
+                      {formData.client_id && 
+                       !individualClients?.some(client => client.id === formData.client_id) && 
+                       !managedClients?.some(client => client.id === formData.client_id) && (
                         <option key="newly-created" value={formData.client_id}>
                           {newClientFormData.submitted ? 
                             `${newClientFormData.firstName} ${newClientFormData.lastName}`.trim() || newClientFormData.email
                             : 'Newly Created Client'}
                         </option>
                       )}
-                      {clients?.map(client => (
-                        <option key={client.id} value={client.id}>
-                          {client.full_name || `${client.first_name || ''} ${client.last_name || ''}`.trim() || client.email || 'Unnamed Client'}
-                        </option>
-                      ))}
+                      
+                      {/* Individual Clients Section */}
+                      {individualClients && individualClients.length > 0 && (
+                        <optgroup label="📱 Individual Clients (Booking App)">
+                          {individualClients.map(client => (
+                            <option key={`individual-${client.id}`} value={client.id}>
+                              {`${client.first_name || ''} ${client.last_name || ''}`.trim() || client.email || 'Unnamed Client'}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      
+                      {/* Facility Managed Clients Section */}
+                      {managedClients && managedClients.length > 0 && (
+                        <optgroup label="🏥 Facility Clients (Managed)">
+                          {managedClients.map(client => {
+                            const facility = facilities?.find(f => f.id === client.facility_id);
+                            const facilityName = facility?.name || `Facility ${client.facility_id?.substring(0, 8)}`;
+                            const clientName = `${client.first_name || ''} ${client.last_name || ''}`.trim() || client.email || 'Unnamed Client';
+                            
+                            return (
+                              <option key={`managed-${client.id}`} value={client.id}>
+                                {facilityName} • {clientName}
+                              </option>
+                            );
+                          })}
+                        </optgroup>
+                      )}
                     </select>
                     <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-brand-accent">
                       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
