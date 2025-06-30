@@ -130,10 +130,12 @@ export default function PaymentVerificationView() {
         return 'bg-yellow-100 text-yellow-800';
       case 'PAID WITH CARD':
         return 'bg-green-100 text-green-800';
+      case 'PAID WITH BANK TRANSFER':
+        return 'bg-blue-100 text-blue-800';
       case 'PAID':
         return 'bg-green-100 text-green-800';
       case 'PAID WITH CHECK (BEING VERIFIED)':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-purple-100 text-purple-800';
       case 'PAID WITH CHECK - VERIFIED':
         return 'bg-green-100 text-green-800';
       case 'PENDING':
@@ -150,10 +152,11 @@ export default function PaymentVerificationView() {
     
     switch (invoice.payment_status) {
       case 'PAID WITH CARD':
+      case 'PAID WITH BANK TRANSFER':
       case 'PAID':
         actions.push({
           action: 'mark_pending',
-          label: 'MARK AS PENDING',
+          label: 'NOT PAID - MARK AS PENDING',
           color: 'bg-orange-600 hover:bg-orange-700'
         });
         break;
@@ -173,11 +176,11 @@ export default function PaymentVerificationView() {
         break;
     }
 
-    // Add "Mark as Pending" option for most statuses
+    // Add "Mark as Needs Attention" option for most statuses
     if (!['PENDING', 'NEEDS ATTENTION - RETRY PAYMENT'].includes(invoice.payment_status)) {
       actions.push({
         action: 'mark_attention',
-        label: 'NEEDS ATTENTION',
+        label: 'NEEDS ATTENTION - RETRY PAYMENT',
         color: 'bg-red-600 hover:bg-red-700'
       });
     }
