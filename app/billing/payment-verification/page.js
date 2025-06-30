@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
 import Header from '@/app/components/Header';
-import PaymentVerificationView from '@/app/components/PaymentVerificationView';
+import EnhancedPaymentVerificationView from '@/app/components/EnhancedPaymentVerificationView';
 
 export default function PaymentVerificationPage() {
   const [user, setUser] = useState(null);
@@ -97,7 +97,7 @@ export default function PaymentVerificationPage() {
     <div className="min-h-screen bg-gray-50">
       <Header user={user} />
       <div className="max-w-7xl mx-auto p-6">
-        <PaymentVerificationView />
+        <EnhancedPaymentVerificationView />
       </div>
     </div>
   );
