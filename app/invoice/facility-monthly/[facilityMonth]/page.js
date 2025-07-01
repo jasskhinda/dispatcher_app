@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
 import { useParams } from 'next/navigation';
+import EditTripForm from '../../../components/EditTripForm';
 
 // Professional Monthly Facility Invoice - Shows all trips for a facility for a specific month
 export default function FacilityMonthlyInvoicePage() {
@@ -21,6 +22,8 @@ export default function FacilityMonthlyInvoicePage() {
     const [processingTripAction, setProcessingTripAction] = useState(null);
     const [pendingAmount, setPendingAmount] = useState(0);
     const [showUnpaidConfirmation, setShowUnpaidConfirmation] = useState(false);
+    const [showEditForm, setShowEditForm] = useState(false);
+    const [editingTrip, setEditingTrip] = useState(null);
     
     const router = useRouter();
     const params = useParams();
@@ -753,6 +756,35 @@ export default function FacilityMonthlyInvoicePage() {
         }
     };
 
+    // Handle trip edit
+    const handleEditTrip = (trip) => {
+        setEditingTrip(trip);
+        setShowEditForm(true);
+    };
+
+    // Handle trip edit save
+    const handleTripSave = (updatedTrip) => {
+        // Update the trip in our local state
+        setFacilityTrips(prevTrips => 
+            prevTrips.map(trip => 
+                trip.id === updatedTrip.id ? { ...trip, ...updatedTrip } : trip
+            )
+        );
+        setShowEditForm(false);
+        setEditingTrip(null);
+        
+        // Show success message
+        setTimeout(() => {
+            alert('✅ Trip updated successfully!');
+        }, 100);
+    };
+
+    // Handle trip edit cancel
+    const handleTripEditCancel = () => {
+        setShowEditForm(false);
+        setEditingTrip(null);
+    };
+
     // Month navigation handlers
     const handlePrevMonth = () => {
         if (!selectedMonth) return;
@@ -1408,6 +1440,12 @@ export default function FacilityMonthlyInvoicePage() {
                                                                 {trip.status === 'pending' && (
                                                                     <>
                                                                         <button
+                                                                            onClick={() => handleEditTrip(trip)}
+                                                                            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors"
+                                                                        >
+                                                                            ✏️ EDIT
+                                                                        </button>
+                                                                        <button
                                                                             onClick={() => handleTripAction(trip.id, 'approve')}
                                                                             disabled={processingTripAction === trip.id}
                                                                             className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors disabled:opacity-50"
@@ -1540,6 +1578,15 @@ export default function FacilityMonthlyInvoicePage() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Edit Trip Form Modal */}
+            {showEditForm && editingTrip && (
+                <EditTripForm 
+                    trip={editingTrip}
+                    onSave={handleTripSave}
+                    onCancel={handleTripEditCancel}
+                />
             )}
         </div>
     );
