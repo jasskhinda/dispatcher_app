@@ -600,91 +600,70 @@ export default function FacilityMonthlyInvoicePage() {
                 updated_at: now
             };
 
-            console.log('🔄 Attempting to update payment status...', paymentData);
+            console.log('🔄 Attempting to update payment status using RPC function...');
 
-            // Try to update the database, fallback to localStorage if any issues
-            let updateSuccess = false;
-            try {
-                // Try facility_invoices table first (new system)
+            // Get current user for audit logging
+            const { data: userData, error: userError } = await supabase.auth.getUser();
+            if (userError || !userData.user) {
+                throw new Error('Authentication required for payment status updates');
+            }
+
+            // First, ensure we have or create an invoice record
+            let invoiceId = paymentStatus?.id || paymentStatus?.invoice_id;
+            
+            if (!invoiceId) {
+                // Create or find the invoice record first
                 const { data: invoiceData, error: invoiceError } = await supabase
                     .from('facility_invoices')
                     .upsert([{
                         facility_id: facilityInfo.id,
                         month: invoiceMonth,
                         total_amount: totalAmount,
-                        payment_status: newStatus,
+                        payment_status: statusString, // Keep current status for now
                         last_updated: now,
                         invoice_number: paymentStatus?.invoice_number || `CCT-${invoiceMonth}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`
                     }], {
                         onConflict: 'facility_id,month'
                     })
-                    .select()
+                    .select('id')
                     .single();
 
-                if (!invoiceError && invoiceData) {
-                    console.log('✅ Payment status updated in facility_invoices:', invoiceData);
-                    setPaymentStatus({
-                        payment_status: invoiceData.payment_status,
-                        status: invoiceData.payment_status, // Keep both for compatibility
-                        total_amount: invoiceData.total_amount,
-                        last_updated: invoiceData.last_updated,
-                        invoice_number: invoiceData.invoice_number
-                    });
-                    updateSuccess = true;
-                } else {
-                    // Try fallback table if main table failed
-                    console.log('🔄 facility_invoices update failed, trying facility_payment_status...');
-                    
-                    const { data, error } = await supabase
-                        .from('facility_payment_status')
-                        .upsert([paymentData], {
-                            onConflict: 'facility_id,invoice_month,invoice_year'
-                        })
-                        .select()
-                        .single();
-
-                    if (!error && data) {
-                        console.log('✅ Payment status updated in facility_payment_status:', data);
-                        setPaymentStatus(data);
-                        updateSuccess = true;
-                    } else {
-                        // Both database attempts failed, force localStorage fallback
-                        throw new Error('DATABASE_UNAVAILABLE');
-                    }
+                if (invoiceError || !invoiceData) {
+                    throw new Error('Could not create or find invoice record');
                 }
-            } catch (dbError) {
-                // Any database error - use localStorage fallback
-                console.log('🔄 Database unavailable, using localStorage fallback...');
                 
-                const fallbackPaymentStatus = {
-                    id: `local_${facilityInfo.id}_${year}_${month}`,
-                    facility_id: facilityInfo.id,
-                    invoice_month: parseInt(month),
-                    invoice_year: parseInt(year),
-                    total_amount: totalAmount,
-                    status: newStatus,
-                    payment_status: newStatus, // Keep both for compatibility
-                    payment_date: newStatus === 'PAID' ? now : null,
-                    created_at: now,
-                    updated_at: now,
-                    last_updated: now,
-                    invoice_number: paymentStatus?.invoice_number || `CCT-${invoiceMonth}-LOCAL`
-                };
-                
-                // Store in localStorage for persistence
-                const storageKey = `payment_status_${facilityInfo.id}_${year}_${month}`;
-                localStorage.setItem(storageKey, JSON.stringify(fallbackPaymentStatus));
-                
-                // Update local state
-                setPaymentStatus(fallbackPaymentStatus);
-                updateSuccess = true;
-                
-                console.log('✅ Payment status updated using localStorage fallback');
+                invoiceId = invoiceData.id;
+                console.log('✅ Invoice record ensured with ID:', invoiceId);
             }
 
-            if (!updateSuccess) {
-                throw new Error('Failed to update payment status');
+            // Use the proper RPC function for payment status updates
+            const { error: rpcError } = await supabase.rpc('update_payment_status_with_audit', {
+                p_invoice_id: invoiceId,
+                p_new_status: newStatus,
+                p_user_id: userData.user.id,
+                p_user_role: 'dispatcher',
+                p_notes: newStatus === 'NEEDS ATTENTION - RETRY PAYMENT' 
+                    ? 'Payment verification failed - dispatcher marked as unpaid'
+                    : 'Payment status updated by dispatcher',
+                p_verification_notes: newStatus === 'NEEDS ATTENTION - RETRY PAYMENT'
+                    ? 'Payment could not be verified, facility needs to retry payment'
+                    : null
+            });
+
+            if (rpcError) {
+                console.error('❌ RPC function failed:', rpcError);
+                throw new Error(`Database update failed: ${rpcError.message || 'Unknown error'}`);
             }
+
+            console.log('✅ Payment status updated successfully using RPC function');
+
+            // Update local state to reflect the change
+            setPaymentStatus({
+                ...paymentStatus,
+                payment_status: newStatus,
+                status: newStatus, // Keep both for compatibility
+                last_updated: now
+            });
 
         } catch (err) {
             console.error('❌ Error toggling payment status:', err);
