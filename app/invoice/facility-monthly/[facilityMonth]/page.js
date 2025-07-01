@@ -642,8 +642,7 @@ export default function FacilityMonthlyInvoicePage() {
                     const { error: updateError } = await supabase
                         .from('facility_invoices')
                         .update({
-                            payment_status: newStatus,
-                            last_updated: now
+                            payment_status: newStatus
                         })
                         .eq('id', invoiceId);
 
