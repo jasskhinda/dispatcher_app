@@ -202,6 +202,19 @@ export default function TripDetailsClient({ trip, user }) {
                       <dd className="mt-1 text-sm">{formatTime(currentTrip.created_at)}</dd>
                     </div>
                     
+                    {/* Edit Tracking Information */}
+                    {currentTrip.last_edited_by && (
+                      <div className="col-span-2">
+                        <dt className="text-sm font-medium opacity-70">Last Edited</dt>
+                        <dd className="mt-1 text-sm">
+                          {formatTime(currentTrip.last_edited_at || currentTrip.updated_at)}
+                          <span className="ml-2 text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded">
+                            ✏️ EDITED BY {currentTrip.edited_by_role?.toUpperCase() || 'UNKNOWN'}
+                          </span>
+                        </dd>
+                      </div>
+                    )}
+                    
                     {currentTrip.special_requirements && (
                       <div className="col-span-2">
                         <dt className="text-sm font-medium opacity-70">Special Requirements</dt>

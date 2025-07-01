@@ -33,10 +33,17 @@ export default async function TripDetailsPage({ params }) {
       redirect('/login?error=Access denied. This application is only for dispatchers.');
     }
 
-    // Fetch trip details
+    // Fetch trip details with edit tracking
     const { data: trip, error: tripError } = await supabase
       .from('trips')
-      .select('*')
+      .select(`
+        *,
+        editor:last_edited_by(
+          id,
+          first_name,
+          last_name
+        )
+      `)
       .eq('id', tripId)
       .single();
 
