@@ -3,15 +3,18 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import EditTripForm from '../../components/EditTripForm';
 
 export default function TripDetailsClient({ trip, user }) {
   const router = useRouter();
   const supabase = createClientComponentClient();
   const [error, setError] = useState('');
   const [showDriverSelect, setShowDriverSelect] = useState(false);
-  const [selectedDriverId, setSelectedDriverId] = useState(trip.driver_id || '');
+  const [selectedDriverId, setSelectedDriverId] = useState(currentTrip.driver_id || '');
   const [drivers, setDrivers] = useState([]);
   const [updating, setUpdating] = useState(false);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [currentTrip, setCurrentTrip] = useState(trip);
 
   // Fetch available drivers on mount
   useEffect(() => {
@@ -48,14 +51,14 @@ export default function TripDetailsClient({ trip, user }) {
         updateData = {
           driver_id: selectedDriverId,
           driver_name: driverName,
-          status: trip.status === 'pending' ? 'upcoming' : trip.status
+          status: currentTrip.status === 'pending' ? 'upcoming' : currentTrip.status
         };
       } else {
         // Remove driver assignment
         updateData = {
           driver_id: null,
           driver_name: null,
-          status: trip.status === 'upcoming' ? 'pending' : trip.status
+          status: currentTrip.status === 'upcoming' ? 'pending' : currentTrip.status
         };
       }
       
@@ -63,7 +66,7 @@ export default function TripDetailsClient({ trip, user }) {
       const { error: updateError } = await supabase
         .from('trips')
         .update(updateData)
-        .eq('id', trip.id);
+        .eq('id', currentTrip.id);
       
       if (updateError) {
         throw updateError;
@@ -80,6 +83,17 @@ export default function TripDetailsClient({ trip, user }) {
     }
   };
 
+  // Handle trip edit save
+  const handleTripSave = (updatedTrip) => {
+    setCurrentTrip(updatedTrip);
+    setShowEditForm(false);
+  };
+
+  // Handle trip edit cancel
+  const handleTripEditCancel = () => {
+    setShowEditForm(false);
+  };
+
   // Format time for display
   const formatTime = (timeStr) => {
     if (!timeStr) return 'N/A';
@@ -94,6 +108,14 @@ export default function TripDetailsClient({ trip, user }) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold">Trip Details</h1>
           <div className="flex items-center space-x-4">
+            {currentTrip.status === 'pending' && (
+              <button
+                onClick={() => setShowEditForm(true)}
+                className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+              >
+                Edit Trip
+              </button>
+            )}
             <button
               onClick={() => router.push('/calendar')}
               className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-brand-accent hover:opacity-90"
@@ -126,7 +148,7 @@ export default function TripDetailsClient({ trip, user }) {
               </button>
             </div>
           </div>
-        ) : trip && (
+        ) : currentTrip && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Trip information - left column */}
             <div className="md:col-span-2">
@@ -134,25 +156,25 @@ export default function TripDetailsClient({ trip, user }) {
                 <div className="px-6 py-5 border-b border-brand-border flex justify-between items-center">
                   <h3 className="text-lg font-medium">Trip Information</h3>
                   <span className={`px-2 py-1 text-xs rounded-full font-medium
-                    ${trip.status === 'completed' ? 'bg-brand-completed/20 text-brand-completed' : 
-                      trip.status === 'in_progress' ? 'bg-brand-inProgress/20 text-brand-inProgress' : 
-                      trip.status === 'cancelled' ? 'bg-brand-cancelled/20 text-brand-cancelled' : 
-                      trip.status === 'upcoming' ? 'bg-brand-upcoming/20 text-brand-upcoming' : 
+                    ${currentTrip.status === 'completed' ? 'bg-brand-completed/20 text-brand-completed' : 
+                      currentTrip.status === 'in_progress' ? 'bg-brand-inProgress/20 text-brand-inProgress' : 
+                      currentTrip.status === 'cancelled' ? 'bg-brand-cancelled/20 text-brand-cancelled' : 
+                      currentTrip.status === 'upcoming' ? 'bg-brand-upcoming/20 text-brand-upcoming' : 
                       'bg-brand-pending/20 text-brand-pending'}`}>
-                    {trip.status?.replace('_', ' ') || 'pending'}
+                    {currentTrip.status?.replace('_', ' ') || 'pending'}
                   </span>
                 </div>
                 <div className="p-6">
                   <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-6">
                     <div className="col-span-2">
                       <dt className="text-sm font-medium opacity-70">Pickup Time</dt>
-                      <dd className="mt-1 text-sm">{formatTime(trip.pickup_time)}</dd>
+                      <dd className="mt-1 text-sm">{formatTime(currentTrip.pickup_time)}</dd>
                     </div>
                     
-                    {trip.return_pickup_time && (
+                    {currentTrip.return_pickup_time && (
                       <div className="col-span-2">
                         <dt className="text-sm font-medium opacity-70">Return Pickup Time</dt>
-                        <dd className="mt-1 text-sm">{formatTime(trip.return_pickup_time)}</dd>
+                        <dd className="mt-1 text-sm">{formatTime(currentTrip.return_pickup_time)}</dd>
                       </div>
                     )}
                     
@@ -161,36 +183,36 @@ export default function TripDetailsClient({ trip, user }) {
                       <dd className="mt-1 text-sm">
                         <div className="flex items-center mb-2">
                           <span className="h-2 w-2 rounded-full bg-brand-completed inline-block mr-2 flex-shrink-0"></span>
-                          <span>{trip.pickup_address || trip.pickup_location}</span>
+                          <span>{currentTrip.pickup_address || currentTrip.pickup_location}</span>
                         </div>
                         <div className="flex items-center">
                           <span className="h-2 w-2 rounded-full bg-brand-cancelled inline-block mr-2 flex-shrink-0"></span>
-                          <span>{trip.destination_address || trip.dropoff_location}</span>
+                          <span>{currentTrip.destination_address || currentTrip.dropoff_location}</span>
                         </div>
                       </dd>
                     </div>
                     
                     <div>
                       <dt className="text-sm font-medium opacity-70">Estimated Duration</dt>
-                      <dd className="mt-1 text-sm">{trip.estimated_duration || 30} minutes</dd>
+                      <dd className="mt-1 text-sm">{currentTrip.estimated_duration || 30} minutes</dd>
                     </div>
                     
                     <div>
                       <dt className="text-sm font-medium opacity-70">Created At</dt>
-                      <dd className="mt-1 text-sm">{formatTime(trip.created_at)}</dd>
+                      <dd className="mt-1 text-sm">{formatTime(currentTrip.created_at)}</dd>
                     </div>
                     
-                    {trip.special_requirements && (
+                    {currentTrip.special_requirements && (
                       <div className="col-span-2">
                         <dt className="text-sm font-medium opacity-70">Special Requirements</dt>
-                        <dd className="mt-1 text-sm">{trip.special_requirements}</dd>
+                        <dd className="mt-1 text-sm">{currentTrip.special_requirements}</dd>
                       </div>
                     )}
                     
-                    {trip.notes && (
+                    {currentTrip.notes && (
                       <div className="col-span-2">
                         <dt className="text-sm font-medium opacity-70">Notes</dt>
-                        <dd className="mt-1 text-sm">{trip.notes}</dd>
+                        <dd className="mt-1 text-sm">{currentTrip.notes}</dd>
                       </div>
                     )}
                   </dl>
@@ -206,18 +228,18 @@ export default function TripDetailsClient({ trip, user }) {
                   <h3 className="text-lg font-medium">Client Information</h3>
                 </div>
                 <div className="p-6">
-                  {trip.client_name ? (
+                  {currentTrip.client_name ? (
                     <dl className="space-y-3">
                       <div>
                         <dt className="text-sm font-medium opacity-70">Name</dt>
                         <dd className="mt-1 text-sm">
-                          {trip.client_name}
+                          {currentTrip.client_name}
                         </dd>
                       </div>
-                      {trip.phone_number && (
+                      {currentTrip.phone_number && (
                         <div>
                           <dt className="text-sm font-medium opacity-70">Phone</dt>
-                          <dd className="mt-1 text-sm">{trip.phone_number}</dd>
+                          <dd className="mt-1 text-sm">{currentTrip.phone_number}</dd>
                         </div>
                       )}
                     </dl>
@@ -233,18 +255,18 @@ export default function TripDetailsClient({ trip, user }) {
                   <h3 className="text-lg font-medium">Driver Information</h3>
                 </div>
                 <div className="p-6">
-                  {trip.driver_name ? (
+                  {currentTrip.driver_name ? (
                     <dl className="space-y-3">
                       <div>
                         <dt className="text-sm font-medium opacity-70">Name</dt>
                         <dd className="mt-1 text-sm">
-                          {trip.driver_name}
+                          {currentTrip.driver_name}
                         </dd>
                       </div>
-                      {trip.driver_phone && (
+                      {currentTrip.driver_phone && (
                         <div>
                           <dt className="text-sm font-medium opacity-70">Phone</dt>
-                          <dd className="mt-1 text-sm">{trip.driver_phone}</dd>
+                          <dd className="mt-1 text-sm">{currentTrip.driver_phone}</dd>
                         </div>
                       )}
                       <div className="mt-4">
@@ -291,7 +313,7 @@ export default function TripDetailsClient({ trip, user }) {
                         disabled={updating}
                       >
                         <option value="">
-                          {trip.driver_id ? 'Remove driver assignment' : 'Select a driver'}
+                          {currentTrip.driver_id ? 'Remove driver assignment' : 'Select a driver'}
                         </option>
                         {drivers.map(driver => (
                           <option key={driver.id} value={driver.id}>
@@ -302,7 +324,7 @@ export default function TripDetailsClient({ trip, user }) {
                       <div className="flex gap-2">
                         <button
                           onClick={handleAssignDriver}
-                          disabled={updating || (selectedDriverId === '' && !trip.driver_id)}
+                          disabled={updating || (selectedDriverId === '' && !currentTrip.driver_id)}
                           className="flex-1 px-3 py-1.5 text-xs font-medium rounded-md text-white bg-brand-accent hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {updating ? 'Updating...' : 'Confirm'}
@@ -310,7 +332,7 @@ export default function TripDetailsClient({ trip, user }) {
                         <button
                           onClick={() => {
                             setShowDriverSelect(false);
-                            setSelectedDriverId(trip.driver_id || '');
+                            setSelectedDriverId(currentTrip.driver_id || '');
                           }}
                           disabled={updating}
                           className="flex-1 px-3 py-1.5 text-xs font-medium rounded-md bg-brand-border/20 hover:bg-brand-border/30"
@@ -326,6 +348,15 @@ export default function TripDetailsClient({ trip, user }) {
           </div>
         )}
       </main>
+
+      {/* Edit Trip Form Modal */}
+      {showEditForm && (
+        <EditTripForm 
+          trip={currentTrip}
+          onSave={handleTripSave}
+          onCancel={handleTripEditCancel}
+        />
+      )}
     </div>
   );
 }
