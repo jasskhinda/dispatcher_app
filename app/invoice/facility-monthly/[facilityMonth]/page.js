@@ -247,7 +247,10 @@ export default function FacilityMonthlyInvoicePage() {
                             is_round_trip,
                             additional_passengers,
                             managed_client_id,
-                            user_id
+                            user_id,
+                            last_edited_by,
+                            last_edited_at,
+                            edited_by_role
                         `)
                         .eq('facility_id', facilityId)
                         .gte('pickup_time', startISO)
@@ -1425,6 +1428,25 @@ export default function FacilityMonthlyInvoicePage() {
                                                             </div>
                                                         </div>
                                                     </div>
+                                                    
+                                                    {/* Edit Tracking Display */}
+                                                    {trip.last_edited_by && trip.edited_by_role && (
+                                                        <div className="mt-3 pt-2 border-t border-orange-200">
+                                                            <div className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded inline-block">
+                                                                ✏️ EDITED BY {trip.edited_by_role?.toUpperCase()}
+                                                                {trip.last_edited_at && (
+                                                                    <span className="ml-1 text-orange-500">
+                                                                        ({new Date(trip.last_edited_at).toLocaleDateString('en-US', {
+                                                                            month: 'short',
+                                                                            day: 'numeric',
+                                                                            hour: '2-digit',
+                                                                            minute: '2-digit'
+                                                                        })})
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                     
                                                     {/* Status and Actions Row */}
                                                     <div className="mt-3 pt-3 border-t border-gray-200">
