@@ -60,7 +60,7 @@ export default function PricingDisplay({
         isEmergency: formData.isEmergency || false,
         preCalculatedDistance: routeInfo ? {
           miles: routeInfo.distance?.miles || 0,
-          distance: routeInfo.distance?.value / 1609.34, // Convert meters to miles
+          distance: routeInfo.distance?.miles || 0, // Use the already converted miles
           text: routeInfo.distance?.text || '',
           duration: routeInfo.duration?.text || ''
         } : null
