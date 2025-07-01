@@ -597,8 +597,7 @@ export default function FacilityMonthlyInvoicePage() {
                 invoice_year: parseInt(year),
                 total_amount: totalAmount,
                 status: newStatus,
-                payment_date: newStatus === 'PAID' ? now : null,
-                updated_at: now
+                payment_date: newStatus === 'PAID' ? now : null
             };
 
             console.log('🔄 Attempting to update payment status using direct database update...');
