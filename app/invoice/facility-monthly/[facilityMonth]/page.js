@@ -601,65 +601,33 @@ export default function FacilityMonthlyInvoicePage() {
                 updated_at: now
             };
 
-            console.log('🔄 Attempting to update payment status using RPC function...');
+            console.log('🔄 Attempting to update payment status using API route...');
 
-            // Get current user for audit logging
-            const { data: userData, error: userError } = await supabase.auth.getUser();
-            if (userError || !userData.user) {
-                throw new Error('Authentication required for payment status updates');
-            }
-
-            // Get the invoice ID from the existing payment status
-            const invoiceId = paymentStatus?.id;
-            
-            if (!invoiceId) {
-                throw new Error('No invoice ID found. Cannot update payment status without an existing invoice record.');
-            }
-            
-            console.log('✅ Using existing invoice ID:', invoiceId);
-
-            // Try the RPC function first, fallback to direct update if it doesn't exist
-            let updateSuccess = false;
-            
-            try {
-                // Use the proper RPC function for payment status updates
-                const { error: rpcError } = await supabase.rpc('update_payment_status_with_audit', {
-                    p_invoice_id: invoiceId,
-                    p_new_status: newStatus,
-                    p_user_id: userData.user.id,
-                    p_user_role: 'dispatcher',
-                    p_notes: newStatus === 'NEEDS ATTENTION - RETRY PAYMENT' 
+            // Use the facility-invoices API route that exists
+            const response = await fetch('/api/facility-invoices', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    invoice_id: paymentStatus?.id,
+                    facility_id: facilityInfo.id,
+                    month: invoiceMonth,
+                    payment_status: newStatus,
+                    action: 'update_payment_status',
+                    notes: newStatus === 'NEEDS ATTENTION - RETRY PAYMENT' 
                         ? 'Payment verification failed - dispatcher marked as unpaid'
-                        : 'Payment status updated by dispatcher',
-                    p_verification_notes: newStatus === 'NEEDS ATTENTION - RETRY PAYMENT'
-                        ? 'Payment could not be verified, facility needs to retry payment'
-                        : null
-                });
+                        : 'Payment status updated by dispatcher'
+                })
+            });
 
-                if (rpcError) {
-                    console.log('🔄 RPC function failed, trying direct update...', rpcError);
-                    // Fallback to direct table update
-                    const { error: updateError } = await supabase
-                        .from('facility_invoices')
-                        .update({
-                            payment_status: newStatus
-                        })
-                        .eq('id', invoiceId);
-
-                    if (updateError) {
-                        throw new Error(`Direct update failed: ${updateError.message}`);
-                    }
-                    console.log('✅ Payment status updated via direct table update');
-                } else {
-                    console.log('✅ Payment status updated via RPC function');
-                }
-                updateSuccess = true;
-            } catch (fallbackError) {
-                console.error('❌ Both RPC and direct update failed:', fallbackError);
-                throw new Error(`Database update failed: ${fallbackError.message || 'Unknown error'}`);
+            if (!response.ok) {
+                const errorData = await response.text();
+                throw new Error(`API update failed: ${response.status} - ${errorData}`);
             }
 
-            console.log('✅ Payment status updated successfully using RPC function');
+            const result = await response.json();
+            console.log('✅ Payment status updated successfully via API:', result);
 
             // Update local state to reflect the change
             setPaymentStatus({
