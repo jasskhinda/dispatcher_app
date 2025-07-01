@@ -301,7 +301,8 @@ export default function FacilityMonthlyInvoicePage() {
 
                     if (!invoiceError && invoiceData) {
                         paymentStatus = {
-                            status: invoiceData.payment_status,
+                            payment_status: invoiceData.payment_status,
+                            status: invoiceData.payment_status, // Keep both for compatibility
                             total_amount: invoiceData.total_amount,
                             last_updated: invoiceData.last_updated,
                             invoice_number: invoiceData.invoice_number
@@ -582,7 +583,9 @@ export default function FacilityMonthlyInvoicePage() {
         setUpdatingPaymentStatus(true);
         try {
             const [year, month] = invoiceMonth.split('-');
-            const newStatus = paymentStatus?.status?.includes('PAID') ? 'UNPAID' : 'PAID';
+            // Handle both payment_status (new) and status (old) field names
+            const currentStatus = paymentStatus?.payment_status || paymentStatus?.status || 'UNPAID';
+            const newStatus = currentStatus.includes('PAID') ? 'NEEDS ATTENTION - RETRY PAYMENT' : 'PAID';
             const now = new Date().toISOString();
 
             const paymentData = {
@@ -618,7 +621,8 @@ export default function FacilityMonthlyInvoicePage() {
                 if (!invoiceError && invoiceData) {
                     console.log('✅ Payment status updated in facility_invoices:', invoiceData);
                     setPaymentStatus({
-                        status: invoiceData.payment_status,
+                        payment_status: invoiceData.payment_status,
+                        status: invoiceData.payment_status, // Keep both for compatibility
                         total_amount: invoiceData.total_amount,
                         last_updated: invoiceData.last_updated,
                         invoice_number: invoiceData.invoice_number
@@ -996,16 +1000,16 @@ export default function FacilityMonthlyInvoicePage() {
                                     onClick={handleTogglePaymentStatus}
                                     disabled={updatingPaymentStatus}
                                     className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                                        paymentStatus?.status?.includes('PAID')
+                                        (paymentStatus?.payment_status || paymentStatus?.status || '').includes('PAID')
                                             ? 'bg-red-100 hover:bg-red-200 text-red-700'
                                             : 'bg-green-100 hover:bg-green-200 text-green-700'
                                     } disabled:opacity-50`}
                                 >
                                     {updatingPaymentStatus 
                                         ? '⏳ Updating...' 
-                                        : paymentStatus?.status?.includes('PAID') 
-                                            ? '❌ Mark Unpaid' 
-                                            : '✅ Mark Paid'
+                                        : (paymentStatus?.payment_status || paymentStatus?.status || '').includes('PAID') 
+                                            ? '❌ PAYMENT FAILED' 
+                                            : '✅ MARK PAID'
                                     }
                                 </button>
                                 
