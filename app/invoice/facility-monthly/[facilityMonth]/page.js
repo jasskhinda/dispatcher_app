@@ -601,33 +601,31 @@ export default function FacilityMonthlyInvoicePage() {
                 updated_at: now
             };
 
-            console.log('🔄 Attempting to update payment status using API route...');
+            console.log('🔄 Attempting to update payment status using direct database update...');
 
-            // Use the facility-invoices API route that exists
-            const response = await fetch('/api/facility-invoices', {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    invoice_id: paymentStatus?.id,
-                    facility_id: facilityInfo.id,
-                    month: invoiceMonth,
+            // Get the invoice ID from the existing payment status
+            const invoiceId = paymentStatus?.id;
+            
+            if (!invoiceId) {
+                throw new Error('No invoice ID found. Cannot update payment status without an existing invoice record.');
+            }
+            
+            console.log('✅ Using existing invoice ID:', invoiceId);
+
+            // Use direct database update with correct schema
+            const { error: updateError } = await supabase
+                .from('facility_invoices')
+                .update({
                     payment_status: newStatus,
-                    action: 'update_payment_status',
-                    notes: newStatus === 'NEEDS ATTENTION - RETRY PAYMENT' 
-                        ? 'Payment verification failed - dispatcher marked as unpaid'
-                        : 'Payment status updated by dispatcher'
+                    last_updated: now
                 })
-            });
+                .eq('id', invoiceId);
 
-            if (!response.ok) {
-                const errorData = await response.text();
-                throw new Error(`API update failed: ${response.status} - ${errorData}`);
+            if (updateError) {
+                throw new Error(`Database update failed: ${updateError.message}`);
             }
 
-            const result = await response.json();
-            console.log('✅ Payment status updated successfully via API:', result);
+            console.log('✅ Payment status updated successfully via direct database update');
 
             // Update local state to reflect the change
             setPaymentStatus({
