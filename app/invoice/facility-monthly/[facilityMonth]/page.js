@@ -286,44 +286,64 @@ export default function FacilityMonthlyInvoicePage() {
                 }
 
                 // Check for existing payment status for this facility and month
-                console.log(`🔍 Step 7.5: Checking payment status for facility ${facilityId} for ${month}/${year}`);
+                console.log(`🔍 Step 7.5: Checking payment status for facility ${facilityId} for ${targetMonth}`);
                 
                 let paymentStatus = null;
                 
                 try {
-                    const { data, error: paymentError } = await supabase
-                        .from('facility_payment_status')
+                    // First, try to get payment status from facility_invoices table (new system)
+                    const { data: invoiceData, error: invoiceError } = await supabase
+                        .from('facility_invoices')
                         .select('*')
                         .eq('facility_id', facilityId)
-                        .eq('invoice_month', parseInt(month))
-                        .eq('invoice_year', parseInt(year))
+                        .eq('month', targetMonth)
                         .single();
 
-                    if (paymentError && paymentError.code !== 'PGRST116') {
-                        // Check if it's a table not found error
-                        if (paymentError.message.includes('does not exist') || paymentError.message.includes('relation') || paymentError.code === '42P01') {
-                            console.log('⚠️ Payment status table does not exist, checking localStorage fallback...');
-                            
-                            // Try to load from localStorage
-                            const storageKey = `payment_status_${facilityId}_${year}_${month}`;
-                            const storedStatus = localStorage.getItem(storageKey);
-                            
-                            if (storedStatus) {
-                                try {
-                                    paymentStatus = JSON.parse(storedStatus);
-                                    console.log('✅ Found payment status in localStorage:', paymentStatus);
-                                } catch (parseError) {
-                                    console.log('⚠️ Failed to parse stored payment status');
+                    if (!invoiceError && invoiceData) {
+                        paymentStatus = {
+                            status: invoiceData.payment_status,
+                            total_amount: invoiceData.total_amount,
+                            last_updated: invoiceData.last_updated,
+                            invoice_number: invoiceData.invoice_number
+                        };
+                        console.log('✅ Step 7.5: Found payment status in facility_invoices:', paymentStatus);
+                    } else {
+                        // Fallback to old facility_payment_status table
+                        console.log('🔍 Step 7.5b: Trying fallback facility_payment_status table...');
+                        const { data, error: paymentError } = await supabase
+                            .from('facility_payment_status')
+                            .select('*')
+                            .eq('facility_id', facilityId)
+                            .eq('invoice_month', parseInt(month))
+                            .eq('invoice_year', parseInt(year))
+                            .single();
+
+                        if (paymentError && paymentError.code !== 'PGRST116') {
+                            // Check if it's a table not found error
+                            if (paymentError.message.includes('does not exist') || paymentError.message.includes('relation') || paymentError.code === '42P01') {
+                                console.log('⚠️ Payment status table does not exist, checking localStorage fallback...');
+                                
+                                // Try to load from localStorage
+                                const storageKey = `payment_status_${facilityId}_${year}_${month}`;
+                                const storedStatus = localStorage.getItem(storageKey);
+                                
+                                if (storedStatus) {
+                                    try {
+                                        paymentStatus = JSON.parse(storedStatus);
+                                        console.log('✅ Found payment status in localStorage:', paymentStatus);
+                                    } catch (parseError) {
+                                        console.log('⚠️ Failed to parse stored payment status');
+                                    }
+                                } else {
+                                    console.log('💡 No payment status found in localStorage either');
                                 }
                             } else {
-                                console.log('💡 No payment status found in localStorage either');
+                                console.log('Payment status check error:', paymentError);
                             }
-                        } else {
-                            console.log('Payment status check error:', paymentError);
+                        } else if (data) {
+                            paymentStatus = data;
+                            console.log('✅ Step 7.5b: Found payment status in facility_payment_status:', paymentStatus);
                         }
-                    } else if (data) {
-                        paymentStatus = data;
-                        console.log('✅ Step 7.5: Found payment status in database:', paymentStatus);
                     }
                 } catch (error) {
                     console.log('⚠️ Error checking payment status:', error);
@@ -562,7 +582,7 @@ export default function FacilityMonthlyInvoicePage() {
         setUpdatingPaymentStatus(true);
         try {
             const [year, month] = invoiceMonth.split('-');
-            const newStatus = paymentStatus?.status === 'PAID' ? 'UNPAID' : 'PAID';
+            const newStatus = paymentStatus?.status?.includes('PAID') ? 'UNPAID' : 'PAID';
             const now = new Date().toISOString();
 
             const paymentData = {
@@ -577,30 +597,59 @@ export default function FacilityMonthlyInvoicePage() {
 
             console.log('🔄 Attempting to update payment status...', paymentData);
 
-            // Try to update the facility_payment_status table
+            // Try to update the facility_invoices table first (new system)
             let updateSuccess = false;
             try {
-                const { data, error } = await supabase
-                    .from('facility_payment_status')
-                    .upsert([paymentData], {
-                        onConflict: 'facility_id,invoice_month,invoice_year'
+                const { data: invoiceData, error: invoiceError } = await supabase
+                    .from('facility_invoices')
+                    .upsert([{
+                        facility_id: facilityInfo.id,
+                        month: invoiceMonth,
+                        total_amount: totalAmount,
+                        payment_status: newStatus,
+                        last_updated: now,
+                        invoice_number: paymentStatus?.invoice_number || `CCT-${invoiceMonth}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`
+                    }], {
+                        onConflict: 'facility_id,month'
                     })
                     .select()
                     .single();
 
-                if (error) {
-                    console.error('⚠️ Database update failed:', error);
-                    // Check if it's a table not found error
-                    if (error.message.includes('does not exist') || error.message.includes('relation') || error.code === '42P01') {
-                        console.log('💡 Table does not exist. Creating a local state solution...');
-                        throw new Error('TABLE_NOT_FOUND');
-                    } else {
-                        throw error;
-                    }
-                } else {
-                    console.log('✅ Payment status updated in database:', data);
-                    setPaymentStatus(data);
+                if (!invoiceError && invoiceData) {
+                    console.log('✅ Payment status updated in facility_invoices:', invoiceData);
+                    setPaymentStatus({
+                        status: invoiceData.payment_status,
+                        total_amount: invoiceData.total_amount,
+                        last_updated: invoiceData.last_updated,
+                        invoice_number: invoiceData.invoice_number
+                    });
                     updateSuccess = true;
+                } else {
+                    console.log('🔄 facility_invoices update failed, trying facility_payment_status...');
+                    
+                    // Fallback to facility_payment_status table
+                    const { data, error } = await supabase
+                        .from('facility_payment_status')
+                        .upsert([paymentData], {
+                            onConflict: 'facility_id,invoice_month,invoice_year'
+                        })
+                        .select()
+                        .single();
+
+                    if (error) {
+                        console.error('⚠️ Database update failed:', error);
+                        // Check if it's a table not found error
+                        if (error.message.includes('does not exist') || error.message.includes('relation') || error.code === '42P01') {
+                            console.log('💡 Table does not exist. Creating a local state solution...');
+                            throw new Error('TABLE_NOT_FOUND');
+                        } else {
+                            throw error;
+                        }
+                    } else {
+                        console.log('✅ Payment status updated in facility_payment_status:', data);
+                        setPaymentStatus(data);
+                        updateSuccess = true;
+                    }
                 }
             } catch (dbError) {
                 if (dbError.message === 'TABLE_NOT_FOUND') {
@@ -947,14 +996,14 @@ export default function FacilityMonthlyInvoicePage() {
                                     onClick={handleTogglePaymentStatus}
                                     disabled={updatingPaymentStatus}
                                     className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                                        paymentStatus?.status === 'PAID'
+                                        paymentStatus?.status?.includes('PAID')
                                             ? 'bg-red-100 hover:bg-red-200 text-red-700'
                                             : 'bg-green-100 hover:bg-green-200 text-green-700'
                                     } disabled:opacity-50`}
                                 >
                                     {updatingPaymentStatus 
                                         ? '⏳ Updating...' 
-                                        : paymentStatus?.status === 'PAID' 
+                                        : paymentStatus?.status?.includes('PAID') 
                                             ? '❌ Mark Unpaid' 
                                             : '✅ Mark Paid'
                                     }
@@ -1034,6 +1083,12 @@ export default function FacilityMonthlyInvoicePage() {
                                                 })}
                                             </p>
                                         </div>
+                                        {paymentStatus?.invoice_number && (
+                                            <div className="pb-2 border-b border-white/30">
+                                                <p className="text-xs text-blue-200 uppercase">Invoice Number:</p>
+                                                <p className="text-sm font-mono text-white">{paymentStatus.invoice_number}</p>
+                                            </div>
+                                        )}
                                         <div className="pt-2 border-t border-white/30">
                                             <p className="text-xs text-blue-200 uppercase">Billing Period:</p>
                                             <p className="text-lg font-bold text-white">{getMonthDisplayName()}</p>
@@ -1117,11 +1172,22 @@ export default function FacilityMonthlyInvoicePage() {
                                     <div className="flex justify-between items-center p-3 bg-blue-50 rounded border border-blue-200">
                                         <span className="text-blue-700 font-medium">Payment Status:</span>
                                         <span className={`font-bold px-3 py-1 rounded text-sm ${
-                                            paymentStatus?.status === 'PAID' 
+                                            paymentStatus?.status?.includes('PAID') 
                                                 ? 'bg-green-100 text-green-800 border border-green-300' 
+                                                : paymentStatus?.status === 'PROCESSING PAYMENT'
+                                                ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
+                                                : paymentStatus?.status === 'PENDING'
+                                                ? 'bg-orange-100 text-orange-800 border border-orange-300'
                                                 : 'bg-amber-100 text-amber-800 border border-amber-300'
                                         }`}>
-                                            {paymentStatus?.status === 'PAID' ? '✅ PAID' : '💰 UNPAID'}
+                                            {paymentStatus?.status === 'PAID WITH CARD' ? '💳 PAID WITH CARD' :
+                                             paymentStatus?.status === 'PAID WITH BANK TRANSFER' ? '🏦 PAID WITH BANK TRANSFER' :
+                                             paymentStatus?.status === 'PAID WITH CHECK - VERIFIED' ? '✅ PAID WITH CHECK - VERIFIED' :
+                                             paymentStatus?.status === 'PAID WITH CHECK (BEING VERIFIED)' ? '📝 PAID WITH CHECK (BEING VERIFIED)' :
+                                             paymentStatus?.status === 'PROCESSING PAYMENT' ? '⏳ PROCESSING PAYMENT' :
+                                             paymentStatus?.status === 'PENDING' ? '⚠️ PENDING' :
+                                             paymentStatus?.status === 'NEEDS ATTENTION - RETRY PAYMENT' ? '🚨 NEEDS ATTENTION' :
+                                             paymentStatus?.status === 'PAID' ? '✅ PAID' : '💰 UNPAID'}
                                         </span>
                                     </div>
                                     {paymentStatus?.payment_date && (
