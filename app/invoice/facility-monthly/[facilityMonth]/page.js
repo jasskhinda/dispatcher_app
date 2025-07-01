@@ -302,6 +302,7 @@ export default function FacilityMonthlyInvoicePage() {
 
                     if (!invoiceError && invoiceData) {
                         paymentStatus = {
+                            id: invoiceData.id, // Include the invoice ID
                             payment_status: invoiceData.payment_status,
                             status: invoiceData.payment_status, // Keep both for compatibility
                             total_amount: invoiceData.total_amount,
@@ -608,51 +609,55 @@ export default function FacilityMonthlyInvoicePage() {
                 throw new Error('Authentication required for payment status updates');
             }
 
-            // First, ensure we have or create an invoice record
-            let invoiceId = paymentStatus?.id || paymentStatus?.invoice_id;
+            // Get the invoice ID from the existing payment status
+            const invoiceId = paymentStatus?.id;
             
             if (!invoiceId) {
-                // Create or find the invoice record first
-                const { data: invoiceData, error: invoiceError } = await supabase
-                    .from('facility_invoices')
-                    .upsert([{
-                        facility_id: facilityInfo.id,
-                        month: invoiceMonth,
-                        total_amount: totalAmount,
-                        payment_status: statusString, // Keep current status for now
-                        last_updated: now,
-                        invoice_number: paymentStatus?.invoice_number || `CCT-${invoiceMonth}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`
-                    }], {
-                        onConflict: 'facility_id,month'
-                    })
-                    .select('id')
-                    .single();
-
-                if (invoiceError || !invoiceData) {
-                    throw new Error('Could not create or find invoice record');
-                }
-                
-                invoiceId = invoiceData.id;
-                console.log('✅ Invoice record ensured with ID:', invoiceId);
+                throw new Error('No invoice ID found. Cannot update payment status without an existing invoice record.');
             }
+            
+            console.log('✅ Using existing invoice ID:', invoiceId);
 
-            // Use the proper RPC function for payment status updates
-            const { error: rpcError } = await supabase.rpc('update_payment_status_with_audit', {
-                p_invoice_id: invoiceId,
-                p_new_status: newStatus,
-                p_user_id: userData.user.id,
-                p_user_role: 'dispatcher',
-                p_notes: newStatus === 'NEEDS ATTENTION - RETRY PAYMENT' 
-                    ? 'Payment verification failed - dispatcher marked as unpaid'
-                    : 'Payment status updated by dispatcher',
-                p_verification_notes: newStatus === 'NEEDS ATTENTION - RETRY PAYMENT'
-                    ? 'Payment could not be verified, facility needs to retry payment'
-                    : null
-            });
+            // Try the RPC function first, fallback to direct update if it doesn't exist
+            let updateSuccess = false;
+            
+            try {
+                // Use the proper RPC function for payment status updates
+                const { error: rpcError } = await supabase.rpc('update_payment_status_with_audit', {
+                    p_invoice_id: invoiceId,
+                    p_new_status: newStatus,
+                    p_user_id: userData.user.id,
+                    p_user_role: 'dispatcher',
+                    p_notes: newStatus === 'NEEDS ATTENTION - RETRY PAYMENT' 
+                        ? 'Payment verification failed - dispatcher marked as unpaid'
+                        : 'Payment status updated by dispatcher',
+                    p_verification_notes: newStatus === 'NEEDS ATTENTION - RETRY PAYMENT'
+                        ? 'Payment could not be verified, facility needs to retry payment'
+                        : null
+                });
 
-            if (rpcError) {
-                console.error('❌ RPC function failed:', rpcError);
-                throw new Error(`Database update failed: ${rpcError.message || 'Unknown error'}`);
+                if (rpcError) {
+                    console.log('🔄 RPC function failed, trying direct update...', rpcError);
+                    // Fallback to direct table update
+                    const { error: updateError } = await supabase
+                        .from('facility_invoices')
+                        .update({
+                            payment_status: newStatus,
+                            last_updated: now
+                        })
+                        .eq('id', invoiceId);
+
+                    if (updateError) {
+                        throw new Error(`Direct update failed: ${updateError.message}`);
+                    }
+                    console.log('✅ Payment status updated via direct table update');
+                } else {
+                    console.log('✅ Payment status updated via RPC function');
+                }
+                updateSuccess = true;
+            } catch (fallbackError) {
+                console.error('❌ Both RPC and direct update failed:', fallbackError);
+                throw new Error(`Database update failed: ${fallbackError.message || 'Unknown error'}`);
             }
 
             console.log('✅ Payment status updated successfully using RPC function');
