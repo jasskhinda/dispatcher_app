@@ -33,17 +33,10 @@ export default async function TripDetailsPage({ params }) {
       redirect('/login?error=Access denied. This application is only for dispatchers.');
     }
 
-    // Fetch trip details with edit tracking
+    // Fetch trip details
     const { data: trip, error: tripError } = await supabase
       .from('trips')
-      .select(`
-        *,
-        editor:last_edited_by(
-          id,
-          first_name,
-          last_name
-        )
-      `)
+      .select('*')
       .eq('id', tripId)
       .single();
 
@@ -63,6 +56,19 @@ export default async function TripDetailsPage({ params }) {
       if (clientProfile) {
         trip.client_name = `${clientProfile.first_name || ''} ${clientProfile.last_name || ''}`.trim() || 
                           `Client ${trip.user_id.substring(0, 4)}`;
+      }
+    }
+
+    // If trip has a last_edited_by, fetch editor information
+    if (trip.last_edited_by) {
+      const { data: editorData } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .eq('id', trip.last_edited_by)
+        .single();
+        
+      if (editorData) {
+        trip.editor = editorData;
       }
     }
 
