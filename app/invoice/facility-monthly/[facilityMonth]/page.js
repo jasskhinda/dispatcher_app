@@ -1241,13 +1241,13 @@ export default function FacilityMonthlyInvoicePage() {
                                                 {billableTrips.map((trip, index) => (
                                                     <tr key={trip.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                                                         <td className="px-4 py-3 border-b">
-                                                            <div className="text-sm">
+                                                            <div className="text-sm font-bold text-gray-900">
                                                                 {new Date(trip.pickup_time).toLocaleDateString('en-US', {
                                                                     month: 'short',
                                                                     day: 'numeric'
                                                                 })}
                                                             </div>
-                                                            <div className="text-xs text-gray-500">
+                                                            <div className="text-xs font-medium text-gray-700">
                                                                 {new Date(trip.pickup_time).toLocaleTimeString('en-US', {
                                                                     hour: '2-digit',
                                                                     minute: '2-digit'
@@ -1255,17 +1255,17 @@ export default function FacilityMonthlyInvoicePage() {
                                                             </div>
                                                         </td>
                                                         <td className="px-4 py-3 border-b">
-                                                            <div className="text-sm font-medium">{trip.clientName}</div>
+                                                            <div className="text-sm font-bold text-gray-900">{trip.clientName}</div>
                                                             {trip.clientPhone && (
-                                                                <div className="text-xs text-gray-500">📞 {trip.clientPhone}</div>
+                                                                <div className="text-xs font-medium text-gray-700">📞 {trip.clientPhone}</div>
                                                             )}
                                                         </td>
                                                         <td className="px-4 py-3 border-b">
                                                             <div className="text-sm">
-                                                                <div className="text-gray-900">
+                                                                <div className="font-medium text-gray-900">
                                                                     📍 {trip.pickup_address?.split(',')[0] || 'Unknown pickup'}
                                                                 </div>
-                                                                <div className="text-gray-600 mt-1">
+                                                                <div className="font-medium text-gray-800 mt-1">
                                                                     🎯 {trip.destination_address?.split(',')[0] || 'Unknown destination'}
                                                                 </div>
                                                             </div>
@@ -1290,7 +1290,7 @@ export default function FacilityMonthlyInvoicePage() {
                                                             </div>
                                                         </td>
                                                         <td className="px-4 py-3 border-b text-right">
-                                                            <span className="text-sm font-semibold text-green-600">
+                                                            <span className="text-sm font-bold text-green-700 bg-green-50 px-2 py-1 rounded">
                                                                 ${trip.displayPrice.toFixed(2)}
                                                             </span>
                                                         </td>
@@ -1314,10 +1314,10 @@ export default function FacilityMonthlyInvoicePage() {
                                             {pendingTrips.slice(0, 5).map((trip) => (
                                                 <div key={trip.id} className="flex justify-between items-center p-3 bg-white rounded border border-amber-200 shadow-sm">
                                                     <div className="flex-1">
-                                                        <div className="text-sm font-medium text-gray-900">
+                                                        <div className="text-sm font-bold text-gray-900">
                                                             {trip.clientName}
                                                         </div>
-                                                        <div className="text-xs text-gray-600 mt-1">
+                                                        <div className="text-xs font-medium text-gray-800 mt-1">
                                                             {new Date(trip.pickup_time).toLocaleDateString('en-US', {
                                                                 weekday: 'short',
                                                                 month: 'short',
