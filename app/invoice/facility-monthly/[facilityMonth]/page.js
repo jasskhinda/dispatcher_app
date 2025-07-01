@@ -322,7 +322,7 @@ export default function FacilityMonthlyInvoicePage() {
 
                         if (paymentError && paymentError.code !== 'PGRST116') {
                             // Check if it's a table not found error
-                            if (paymentError.message.includes('does not exist') || paymentError.message.includes('relation') || paymentError.code === '42P01') {
+                            if ((paymentError.message && paymentError.message.includes('does not exist')) || (paymentError.message && paymentError.message.includes('relation')) || paymentError.code === '42P01') {
                                 console.log('⚠️ Payment status table does not exist, checking localStorage fallback...');
                                 
                                 // Try to load from localStorage
@@ -644,9 +644,14 @@ export default function FacilityMonthlyInvoicePage() {
 
                     if (error) {
                         console.error('⚠️ Database update failed:', error);
-                        // Check if it's a table not found error
-                        if (error.message.includes('does not exist') || error.message.includes('relation') || error.code === '42P01') {
-                            console.log('💡 Table does not exist. Creating a local state solution...');
+                        // Check if it's a table not found error or other database access issues
+                        if ((error.message && error.message.includes('does not exist')) || 
+                            (error.message && error.message.includes('relation')) || 
+                            error.code === '42P01' ||
+                            error.code === 'PGRST301' || // table/view not found
+                            error.code === 'PGRST204' || // no matching rows
+                            (error.message && error.message.includes('404'))) {
+                            console.log('💡 Database access issue. Using fallback local state solution...');
                             throw new Error('TABLE_NOT_FOUND');
                         } else {
                             throw error;
