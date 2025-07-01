@@ -586,7 +586,8 @@ export default function FacilityMonthlyInvoicePage() {
             const [year, month] = invoiceMonth.split('-');
             // Handle both payment_status (new) and status (old) field names
             const currentStatus = paymentStatus?.payment_status || paymentStatus?.status || 'UNPAID';
-            const newStatus = currentStatus.includes('PAID') ? 'NEEDS ATTENTION - RETRY PAYMENT' : 'PAID';
+            const statusString = String(currentStatus || 'UNPAID');
+            const newStatus = statusString.includes('PAID') ? 'NEEDS ATTENTION - RETRY PAYMENT' : 'PAID';
             const now = new Date().toISOString();
 
             const paymentData = {
@@ -1000,7 +1001,8 @@ export default function FacilityMonthlyInvoicePage() {
                                 <button
                                     onClick={() => {
                                         const currentStatus = paymentStatus?.payment_status || paymentStatus?.status || 'UNPAID';
-                                        if (currentStatus.includes('PAID')) {
+                                        const statusString = String(currentStatus || 'UNPAID');
+                                        if (statusString.includes('PAID')) {
                                             setShowUnpaidConfirmation(true);
                                         } else {
                                             handleTogglePaymentStatus();
@@ -1008,14 +1010,14 @@ export default function FacilityMonthlyInvoicePage() {
                                     }}
                                     disabled={updatingPaymentStatus}
                                     className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                                        (paymentStatus?.payment_status || paymentStatus?.status || '').includes('PAID')
+                                        String(paymentStatus?.payment_status || paymentStatus?.status || 'UNPAID').includes('PAID')
                                             ? 'bg-red-100 hover:bg-red-200 text-red-700'
                                             : 'bg-green-100 hover:bg-green-200 text-green-700'
                                     } disabled:opacity-50`}
                                 >
                                     {updatingPaymentStatus 
                                         ? '⏳ Updating...' 
-                                        : (paymentStatus?.payment_status || paymentStatus?.status || '').includes('PAID') 
+                                        : String(paymentStatus?.payment_status || paymentStatus?.status || 'UNPAID').includes('PAID') 
                                             ? '❌ MARK UNPAID' 
                                             : '✅ MARK PAID'
                                     }
