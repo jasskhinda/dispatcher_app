@@ -10,7 +10,7 @@ export default function TripDetailsClient({ trip, user }) {
   const supabase = createClientComponentClient();
   const [error, setError] = useState('');
   const [showDriverSelect, setShowDriverSelect] = useState(false);
-  const [selectedDriverId, setSelectedDriverId] = useState(currentTrip.driver_id || '');
+  const [selectedDriverId, setSelectedDriverId] = useState(trip.driver_id || '');
   const [drivers, setDrivers] = useState([]);
   const [updating, setUpdating] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
