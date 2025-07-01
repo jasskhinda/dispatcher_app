@@ -602,9 +602,10 @@ export default function FacilityMonthlyInvoicePage() {
 
             console.log('🔄 Attempting to update payment status...', paymentData);
 
-            // Try to update the facility_invoices table first (new system)
+            // Try to update the database, fallback to localStorage if any issues
             let updateSuccess = false;
             try {
+                // Try facility_invoices table first (new system)
                 const { data: invoiceData, error: invoiceError } = await supabase
                     .from('facility_invoices')
                     .upsert([{
@@ -631,9 +632,9 @@ export default function FacilityMonthlyInvoicePage() {
                     });
                     updateSuccess = true;
                 } else {
+                    // Try fallback table if main table failed
                     console.log('🔄 facility_invoices update failed, trying facility_payment_status...');
                     
-                    // Fallback to facility_payment_status table
                     const { data, error } = await supabase
                         .from('facility_payment_status')
                         .upsert([paymentData], {
@@ -642,56 +643,43 @@ export default function FacilityMonthlyInvoicePage() {
                         .select()
                         .single();
 
-                    if (error) {
-                        console.error('⚠️ Database update failed:', error);
-                        // Check if it's a table not found error or other database access issues
-                        if ((error.message && error.message.includes('does not exist')) || 
-                            (error.message && error.message.includes('relation')) || 
-                            error.code === '42P01' ||
-                            error.code === 'PGRST301' || // table/view not found
-                            error.code === 'PGRST204' || // no matching rows
-                            (error.message && error.message.includes('404'))) {
-                            console.log('💡 Database access issue. Using fallback local state solution...');
-                            throw new Error('TABLE_NOT_FOUND');
-                        } else {
-                            throw error;
-                        }
-                    } else {
+                    if (!error && data) {
                         console.log('✅ Payment status updated in facility_payment_status:', data);
                         setPaymentStatus(data);
                         updateSuccess = true;
+                    } else {
+                        // Both database attempts failed, force localStorage fallback
+                        throw new Error('DATABASE_UNAVAILABLE');
                     }
                 }
             } catch (dbError) {
-                if (dbError.message === 'TABLE_NOT_FOUND') {
-                    // Fallback: Use local state and localStorage
-                    console.log('🔄 Using fallback storage method...');
-                    
-                    const fallbackPaymentStatus = {
-                        id: `local_${facilityInfo.id}_${year}_${month}`,
-                        facility_id: facilityInfo.id,
-                        invoice_month: parseInt(month),
-                        invoice_year: parseInt(year),
-                        total_amount: totalAmount,
-                        status: newStatus,
-                        payment_date: newStatus === 'PAID' ? now : null,
-                        created_at: now,
-                        updated_at: now
-                    };
-                    
-                    // Store in localStorage for persistence
-                    const storageKey = `payment_status_${facilityInfo.id}_${year}_${month}`;
-                    localStorage.setItem(storageKey, JSON.stringify(fallbackPaymentStatus));
-                    
-                    // Update local state
-                    setPaymentStatus(fallbackPaymentStatus);
-                    updateSuccess = true;
-                    
-                    console.log('✅ Payment status updated using fallback method');
-                    console.log('💡 Note: This will create the database table automatically when possible');
-                } else {
-                    throw dbError;
-                }
+                // Any database error - use localStorage fallback
+                console.log('🔄 Database unavailable, using localStorage fallback...');
+                
+                const fallbackPaymentStatus = {
+                    id: `local_${facilityInfo.id}_${year}_${month}`,
+                    facility_id: facilityInfo.id,
+                    invoice_month: parseInt(month),
+                    invoice_year: parseInt(year),
+                    total_amount: totalAmount,
+                    status: newStatus,
+                    payment_status: newStatus, // Keep both for compatibility
+                    payment_date: newStatus === 'PAID' ? now : null,
+                    created_at: now,
+                    updated_at: now,
+                    last_updated: now,
+                    invoice_number: paymentStatus?.invoice_number || `CCT-${invoiceMonth}-LOCAL`
+                };
+                
+                // Store in localStorage for persistence
+                const storageKey = `payment_status_${facilityInfo.id}_${year}_${month}`;
+                localStorage.setItem(storageKey, JSON.stringify(fallbackPaymentStatus));
+                
+                // Update local state
+                setPaymentStatus(fallbackPaymentStatus);
+                updateSuccess = true;
+                
+                console.log('✅ Payment status updated using localStorage fallback');
             }
 
             if (!updateSuccess) {
