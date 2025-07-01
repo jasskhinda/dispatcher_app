@@ -923,7 +923,7 @@ export default function FacilityMonthlyInvoicePage() {
                                         const newUrl = `/invoice/facility-monthly/${facilityInfo.id}-${prevMonth}`;
                                         router.push(newUrl);
                                     }}
-                                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                                    className="bg-gray-200 hover:bg-gray-300 text-gray-900 px-3 py-2 rounded-md text-sm font-bold transition-colors border border-gray-400"
                                 >
                                     ← Previous Month
                                 </button>
@@ -938,7 +938,7 @@ export default function FacilityMonthlyInvoicePage() {
                                             router.push(newUrl);
                                         }
                                     }}
-                                    className="border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    className="border border-gray-400 rounded-md px-3 py-2 text-sm font-bold text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                 >
                                     {/* Generate last 12 months */}
                                     {Array.from({ length: 12 }, (_, i) => {
@@ -966,7 +966,7 @@ export default function FacilityMonthlyInvoicePage() {
                                         const newUrl = `/invoice/facility-monthly/${facilityInfo.id}-${nextMonth}`;
                                         router.push(newUrl);
                                     }}
-                                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                                    className="bg-gray-200 hover:bg-gray-300 text-gray-900 px-3 py-2 rounded-md text-sm font-bold transition-colors border border-gray-400"
                                 >
                                     Next Month →
                                 </button>
@@ -1365,13 +1365,13 @@ export default function FacilityMonthlyInvoicePage() {
                                                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
                                                         {/* Date Column */}
                                                         <div className="text-center md:text-left">
-                                                            <div className="text-sm font-medium">
+                                                            <div className="text-sm font-bold text-black bg-yellow-50 px-2 py-1 rounded border">
                                                                 {new Date(trip.pickup_time).toLocaleDateString('en-US', {
                                                                     month: 'short',
                                                                     day: 'numeric'
                                                                 })}
                                                             </div>
-                                                            <div className="text-xs text-gray-500">
+                                                            <div className="text-xs font-bold text-black mt-1">
                                                                 {new Date(trip.pickup_time).toLocaleTimeString('en-US', {
                                                                     hour: '2-digit',
                                                                     minute: '2-digit'
@@ -1381,19 +1381,19 @@ export default function FacilityMonthlyInvoicePage() {
                                                         
                                                         {/* Client Column */}
                                                         <div>
-                                                            <div className="text-sm font-medium text-gray-900">{trip.clientName}</div>
+                                                            <div className="text-sm font-bold text-black">{trip.clientName}</div>
                                                             {trip.clientPhone && (
-                                                                <div className="text-xs text-gray-500">📞 {trip.clientPhone}</div>
+                                                                <div className="text-xs font-bold text-black">📞 {trip.clientPhone}</div>
                                                             )}
                                                         </div>
                                                         
                                                         {/* Route Column */}
                                                         <div>
                                                             <div className="text-sm">
-                                                                <div className="text-gray-900">
+                                                                <div className="font-bold text-black">
                                                                     📍 {trip.pickup_address?.split(',')[0] || 'Unknown pickup'}
                                                                 </div>
-                                                                <div className="text-gray-600 mt-1">
+                                                                <div className="font-bold text-black mt-1">
                                                                     🎯 {trip.destination_address?.split(',')[0] || 'Unknown destination'}
                                                                 </div>
                                                             </div>
@@ -1422,7 +1422,7 @@ export default function FacilityMonthlyInvoicePage() {
                                                                 </div>
                                                                 
                                                                 {/* Price */}
-                                                                <div className="text-sm font-semibold text-green-600">
+                                                                <div className="text-sm font-bold text-green-800 bg-green-100 px-3 py-1 rounded border border-green-300">
                                                                     ${trip.displayPrice?.toFixed(2) || '0.00'}
                                                                 </div>
                                                             </div>
