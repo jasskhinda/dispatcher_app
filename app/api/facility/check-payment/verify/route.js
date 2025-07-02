@@ -167,7 +167,8 @@ export async function POST(request) {
         payment_date: now.toISOString(),
         verification_action: verification_action,
         verification_notes: verification_notes,
-        verified_by: userData.user.id
+        verified_by: userData.user.id,
+        verification_date: verification_action === 'mark_verified' ? now.toISOString() : null
       })
 
     return Response.json({
