@@ -24,11 +24,60 @@ export default function FacilityMonthlyInvoicePage() {
     const [showUnpaidConfirmation, setShowUnpaidConfirmation] = useState(false);
     const [showEditForm, setShowEditForm] = useState(false);
     const [editingTrip, setEditingTrip] = useState(null);
+    const [facilityContract, setFacilityContract] = useState(null);
+    const [contractLoading, setContractLoading] = useState(false);
+    const [contractError, setContractError] = useState(null);
     
     const router = useRouter();
     const params = useParams();
     const facilityMonth = params.facilityMonth; // This will be in format: facilityId-YYYY-MM
     const supabase = createClientComponentClient();
+
+    // Load facility contract
+    const loadFacilityContract = async (facilityId) => {
+        try {
+            setContractLoading(true);
+            setContractError(null);
+
+            // Check if there's a contract for this facility
+            const { data: files, error: listError } = await supabase.storage
+                .from('contracts')
+                .list(`facility/${facilityId}`, {
+                    limit: 1,
+                    sortBy: { column: 'created_at', order: 'desc' }
+                });
+
+            if (listError) {
+                console.log('Contract storage error:', listError);
+                setFacilityContract(null);
+                return;
+            }
+
+            if (files && files.length > 0) {
+                const contractFile = files[0];
+                
+                // Get the public URL for the contract
+                const { data: urlData } = supabase.storage
+                    .from('contracts')
+                    .getPublicUrl(`facility/${facilityId}/${contractFile.name}`);
+
+                setFacilityContract({
+                    name: contractFile.name,
+                    url: urlData.publicUrl,
+                    uploadedAt: contractFile.created_at,
+                    size: contractFile.metadata?.size || 'Unknown'
+                });
+            } else {
+                setFacilityContract(null);
+            }
+        } catch (err) {
+            console.error('Error loading facility contract:', err);
+            setContractError('Unable to load contract');
+            setFacilityContract(null);
+        } finally {
+            setContractLoading(false);
+        }
+    };
 
     useEffect(() => {
         async function fetchMonthlyInvoiceData() {
@@ -216,6 +265,9 @@ export default function FacilityMonthlyInvoicePage() {
                     
                     console.log('✅ Step 5: Final facility info loaded:', enhancedFacility.name);
                 }
+
+                // Load facility contract
+                await loadFacilityContract(facilityId);
 
                 setInvoiceMonth(targetMonth);
 
@@ -1216,6 +1268,95 @@ export default function FacilityMonthlyInvoicePage() {
                                     </div>
                                 </div>
                             </div>
+                        </div>
+
+                        {/* Facility Contract Section */}
+                        <div className="mb-8">
+                            <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">📋 Facility Service Contract:</h3>
+                            
+                            {contractLoading ? (
+                                <div className="bg-gray-50 p-6 rounded-lg border">
+                                    <div className="flex items-center justify-center">
+                                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mr-3"></div>
+                                        <span className="text-gray-600">Loading contract...</span>
+                                    </div>
+                                </div>
+                            ) : contractError ? (
+                                <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
+                                    <div className="flex items-center">
+                                        <svg className="w-5 h-5 text-red-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                        </svg>
+                                        <span className="text-red-700 text-sm">{contractError}</span>
+                                    </div>
+                                </div>
+                            ) : facilityContract ? (
+                                <div className="bg-blue-50 border border-blue-200 p-6 rounded-lg">
+                                    <div className="flex items-start justify-between mb-4">
+                                        <div className="flex items-center">
+                                            <svg className="w-8 h-8 text-blue-600 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                                            </svg>
+                                            <div>
+                                                <h4 className="font-semibold text-blue-900">{facilityContract.name}</h4>
+                                                <p className="text-sm text-blue-700">
+                                                    Uploaded: {new Date(facilityContract.uploadedAt).toLocaleDateString('en-US', {
+                                                        year: 'numeric',
+                                                        month: 'long',
+                                                        day: 'numeric'
+                                                    })}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex space-x-2">
+                                            <a
+                                                href={facilityContract.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-medium transition-colors inline-flex items-center"
+                                            >
+                                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                                </svg>
+                                                View Contract
+                                            </a>
+                                            <a
+                                                href={facilityContract.url}
+                                                download={facilityContract.name}
+                                                className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded text-sm font-medium transition-colors inline-flex items-center"
+                                            >
+                                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                </svg>
+                                                Download
+                                            </a>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="bg-white p-4 rounded border border-blue-300">
+                                        <p className="text-sm text-gray-700 mb-2">
+                                            <strong>Contract Information:</strong> This is the current service agreement between {facilityInfo?.name} and Compassionate Care Transportation.
+                                        </p>
+                                        <p className="text-xs text-gray-600">
+                                            All transportation services and billing are governed by the terms outlined in this contract.
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="bg-amber-50 border border-amber-200 p-6 rounded-lg">
+                                    <div className="flex items-center">
+                                        <svg className="w-6 h-6 text-amber-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                                        </svg>
+                                        <div>
+                                            <h4 className="font-medium text-amber-900">No Contract Available</h4>
+                                            <p className="text-sm text-amber-700 mt-1">
+                                                No service contract has been uploaded for this facility. Please request the facility to upload their contract through their facility settings.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Trip Details */}
