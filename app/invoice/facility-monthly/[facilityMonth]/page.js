@@ -700,6 +700,68 @@ export default function FacilityMonthlyInvoicePage() {
         }
     };
 
+    // Handle check payment verification
+    const handleCheckVerification = async (verificationAction) => {
+        if (!facilityInfo || !paymentStatus?.id || updatingPaymentStatus) return;
+
+        // Get verification notes from textarea
+        const verificationNotes = document.getElementById('verification_notes')?.value || '';
+
+        setUpdatingPaymentStatus(true);
+        try {
+            console.log(`🔄 Processing check verification action: ${verificationAction}`);
+            
+            const response = await fetch('/api/facility/check-payment/verify', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    facility_id: facilityInfo.id,
+                    month: invoiceMonth,
+                    invoice_id: paymentStatus.id,
+                    verification_action: verificationAction,
+                    verification_notes: verificationNotes
+                }),
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || `Check verification failed`);
+            }
+
+            console.log(`✅ Check verification successful:`, result);
+            
+            // Update local payment status to reflect the change
+            setPaymentStatus({
+                ...paymentStatus,
+                payment_status: result.new_payment_status,
+                status: result.new_payment_status, // Keep both for compatibility
+                last_updated: new Date().toISOString(),
+                verification_details: result.verification_details
+            });
+
+            // Clear the notes textarea
+            const notesField = document.getElementById('verification_notes');
+            if (notesField) {
+                notesField.value = '';
+            }
+
+            // Show success message
+            alert(`✅ ${result.message}`);
+
+            // Refresh the page data to show updated payment status
+            window.location.reload();
+
+        } catch (err) {
+            console.error(`❌ Error processing check verification:`, err);
+            alert(`❌ Check verification failed: ${err.message}`);
+        } finally {
+            setUpdatingPaymentStatus(false);
+        }
+    };
+
     // Send monthly invoice
     const handleSendMonthlyInvoice = async () => {
         if (!facilityInfo || facilityTrips.length === 0 || sendingInvoice) return;
@@ -1220,12 +1282,29 @@ export default function FacilityMonthlyInvoicePage() {
                                                 ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
                                                 : paymentStatus?.status === 'PENDING'
                                                 ? 'bg-orange-100 text-orange-800 border border-orange-300'
+                                                : paymentStatus?.status?.includes('CHECK PAYMENT - WILL MAIL')
+                                                ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                                                : paymentStatus?.status?.includes('CHECK PAYMENT - IN TRANSIT')
+                                                ? 'bg-indigo-100 text-indigo-800 border border-indigo-300'
+                                                : paymentStatus?.status?.includes('CHECK PAYMENT - BEING VERIFIED')
+                                                ? 'bg-purple-100 text-purple-800 border border-purple-300'
+                                                : paymentStatus?.status?.includes('CHECK PAYMENT - HAS ISSUES')
+                                                ? 'bg-red-100 text-red-800 border border-red-300'
+                                                : paymentStatus?.status?.includes('CHECK PAYMENT - REPLACEMENT REQUESTED')
+                                                ? 'bg-orange-100 text-orange-800 border border-orange-300'
+                                                : paymentStatus?.status?.includes('CHECK PAYMENT')
+                                                ? 'bg-orange-100 text-orange-800 border border-orange-300'
                                                 : 'bg-amber-100 text-amber-800 border border-amber-300'
                                         }`}>
                                             {paymentStatus?.status === 'PAID WITH CARD' ? '💳 PAID WITH CARD' :
                                              paymentStatus?.status === 'PAID WITH BANK TRANSFER' ? '🏦 PAID WITH BANK TRANSFER' :
                                              paymentStatus?.status === 'PAID WITH CHECK - VERIFIED' ? '✅ PAID WITH CHECK - VERIFIED' :
                                              paymentStatus?.status === 'PAID WITH CHECK (BEING VERIFIED)' ? '📝 PAID WITH CHECK (BEING VERIFIED)' :
+                                             paymentStatus?.status === 'CHECK PAYMENT - WILL MAIL' ? '📮 CHECK PAYMENT - WILL MAIL' :
+                                             paymentStatus?.status === 'CHECK PAYMENT - IN TRANSIT' ? '🚚 CHECK PAYMENT - IN TRANSIT' :
+                                             paymentStatus?.status === 'CHECK PAYMENT - BEING VERIFIED' ? '🔍 CHECK PAYMENT - BEING VERIFIED' :
+                                             paymentStatus?.status === 'CHECK PAYMENT - HAS ISSUES' ? '⚠️ CHECK PAYMENT - HAS ISSUES' :
+                                             paymentStatus?.status === 'CHECK PAYMENT - REPLACEMENT REQUESTED' ? '🔄 CHECK PAYMENT - REPLACEMENT REQUESTED' :
                                              paymentStatus?.status === 'PROCESSING PAYMENT' ? '⏳ PROCESSING PAYMENT' :
                                              paymentStatus?.status === 'PENDING' ? '⚠️ PENDING' :
                                              paymentStatus?.status === 'NEEDS ATTENTION - RETRY PAYMENT' ? '🚨 NEEDS ATTENTION' :
@@ -1243,6 +1322,120 @@ export default function FacilityMonthlyInvoicePage() {
                                                     year: 'numeric'
                                                 })}
                                             </span>
+                                        </div>
+                                    )}
+                                    
+                                    {/* Payment Notes for Dispatcher */}
+                                    {paymentStatus?.payment_notes && (
+                                        <div className="p-3 bg-blue-50 rounded border border-blue-200">
+                                            <div className="flex items-start space-x-2">
+                                                <svg className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                                <div>
+                                                    <span className="text-blue-700 font-medium text-sm">Payment Details:</span>
+                                                    <p className="text-blue-600 text-sm mt-1">{paymentStatus.payment_notes}</p>
+                                                    {paymentStatus.partial_month_payment && (
+                                                        <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded">
+                                                            <p className="text-amber-700 text-xs font-medium">
+                                                                ⚠️ Mid-Month Payment: Additional trips completed after this payment may require separate billing.
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    
+                                    {/* Check Payment Verification Interface (Dispatcher Only) */}
+                                    {paymentStatus?.status && paymentStatus.status.includes('CHECK PAYMENT') && !paymentStatus.status.includes('VERIFIED') && (
+                                        <div className="p-4 bg-orange-50 border-2 border-orange-300 rounded-lg">
+                                            <div className="flex items-start justify-between mb-4">
+                                                <div className="flex items-center">
+                                                    <svg className="w-6 h-6 text-orange-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    <div>
+                                                        <h4 className="font-semibold text-orange-800">Check Payment Verification Required</h4>
+                                                        <p className="text-sm text-orange-600 mt-1">
+                                                            Current Status: <span className="font-medium">{paymentStatus.status}</span>
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                {/* Mark Received Button */}
+                                                {['CHECK PAYMENT - WILL MAIL', 'CHECK PAYMENT - IN TRANSIT'].includes(paymentStatus.status) && (
+                                                    <button
+                                                        onClick={() => handleCheckVerification('mark_received')}
+                                                        disabled={updatingPaymentStatus}
+                                                        className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center"
+                                                    >
+                                                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                                        </svg>
+                                                        {paymentStatus.status === 'CHECK PAYMENT - WILL MAIL' ? 'Mark as Received' : 'Ready for Verification'}
+                                                    </button>
+                                                )}
+                                                
+                                                {/* Mark Verified Button */}
+                                                {['CHECK PAYMENT - BEING VERIFIED', 'CHECK PAYMENT - IN TRANSIT'].includes(paymentStatus.status) && (
+                                                    <button
+                                                        onClick={() => handleCheckVerification('mark_verified')}
+                                                        disabled={updatingPaymentStatus}
+                                                        className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center"
+                                                    >
+                                                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                        </svg>
+                                                        Verify & Complete Payment
+                                                    </button>
+                                                )}
+                                                
+                                                {/* Mark Issues Button */}
+                                                <button
+                                                    onClick={() => handleCheckVerification('mark_issues')}
+                                                    disabled={updatingPaymentStatus}
+                                                    className="bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center"
+                                                >
+                                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    Mark as Having Issues
+                                                </button>
+                                                
+                                                {/* Request New Check Button */}
+                                                <button
+                                                    onClick={() => handleCheckVerification('request_new_check')}
+                                                    disabled={updatingPaymentStatus}
+                                                    className="bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center"
+                                                >
+                                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                    </svg>
+                                                    Request New Check
+                                                </button>
+                                            </div>
+                                            
+                                            {/* Verification Notes */}
+                                            <div className="mt-4">
+                                                <label className="block text-sm font-medium text-orange-700 mb-2">
+                                                    Verification Notes (Optional)
+                                                </label>
+                                                <textarea
+                                                    id="verification_notes"
+                                                    rows="2"
+                                                    className="w-full px-3 py-2 border border-orange-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm"
+                                                    placeholder="Add notes about check verification, issues, or other relevant information..."
+                                                />
+                                            </div>
+                                            
+                                            <div className="mt-3 p-3 bg-orange-100 rounded border border-orange-200">
+                                                <p className="text-xs text-orange-700">
+                                                    <strong>Professional Check Workflow:</strong> Use these controls to track check payment progress and maintain accurate records for facility billing.
+                                                </p>
+                                            </div>
                                         </div>
                                     )}
                                     
