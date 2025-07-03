@@ -2,6 +2,16 @@ import { createRouteHandlerClient } from '@/lib/route-handler-client'
 
 export async function GET() {
   try {
+    // First check what cookies we're receiving
+    const { cookies } = await import('next/headers')
+    const cookieStore = await cookies()
+    const allCookies = cookieStore.getAll()
+    const supabaseCookies = allCookies.filter(cookie => 
+      cookie.name.includes('supabase') || 
+      cookie.name.includes('sb-') ||
+      cookie.name.includes('auth')
+    )
+    
     const supabase = await createRouteHandlerClient()
     
     // Test authentication without requiring it
@@ -16,7 +26,11 @@ export async function GET() {
         userEmail: session?.user?.email,
         hasUserData: !!userData?.user,
         userDataError: userError?.message,
-        userDataEmail: userData?.user?.email
+        userDataEmail: userData?.user?.email,
+        cookieCount: allCookies.length,
+        supabaseCookieCount: supabaseCookies.length,
+        cookieNames: allCookies.map(c => c.name),
+        supabaseCookieNames: supabaseCookies.map(c => c.name)
       }
     })
   } catch (error) {
