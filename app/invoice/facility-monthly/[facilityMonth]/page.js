@@ -725,10 +725,26 @@ export default function FacilityMonthlyInvoicePage() {
                 }),
             });
 
-            const result = await response.json();
+            console.log('Raw response status:', response.status);
+            console.log('Raw response headers:', response.headers);
+
+            let result;
+            try {
+                const responseText = await response.text();
+                console.log('Raw response text:', responseText);
+                
+                if (responseText) {
+                    result = JSON.parse(responseText);
+                } else {
+                    throw new Error('Empty response from server');
+                }
+            } catch (parseError) {
+                console.error('JSON parse error:', parseError);
+                throw new Error(`Invalid server response: ${parseError.message}`);
+            }
 
             if (!response.ok) {
-                throw new Error(result.error || `Check verification failed`);
+                throw new Error(result.error || `Check verification failed with status ${response.status}`);
             }
 
             console.log(`✅ Check verification successful:`, result);

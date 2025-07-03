@@ -1,10 +1,19 @@
 import { createRouteHandlerClient } from '@/lib/route-handler-client'
 
+export async function GET() {
+  return Response.json({ message: 'Check verification API is accessible' })
+}
+
 export async function POST(request) {
   try {
-    const { facility_id, month, invoice_id, verification_action, verification_notes } = await request.json()
+    console.log('Check verification API called')
+    const requestBody = await request.json()
+    console.log('Request body:', requestBody)
+    
+    const { facility_id, month, invoice_id, verification_action, verification_notes } = requestBody
 
     if (!facility_id || !month || !invoice_id || !verification_action) {
+      console.log('Missing required fields:', { facility_id, month, invoice_id, verification_action })
       return Response.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -123,6 +132,14 @@ export async function POST(request) {
     }
 
     // Update invoice with audit trail
+    console.log('Calling update_payment_status_with_audit with:', {
+      p_invoice_id: invoice_id,
+      p_new_status: newPaymentStatus,
+      p_user_id: userData.user.id,
+      p_user_role: 'dispatcher',
+      p_notes: auditNote
+    })
+
     const { error: updateError } = await supabase.rpc('update_payment_status_with_audit', {
       p_invoice_id: invoice_id,
       p_new_status: newPaymentStatus,
@@ -133,10 +150,32 @@ export async function POST(request) {
 
     if (updateError) {
       console.error('Error updating payment status:', updateError)
-      return Response.json(
-        { error: 'Failed to update payment status' },
-        { status: 500 }
-      )
+      
+      // If the function doesn't exist, try direct update instead
+      if (updateError.code === '42883') { // function does not exist
+        console.log('Function does not exist, trying direct update...')
+        const { error: directUpdateError } = await supabase
+          .from('facility_invoices')
+          .update({ 
+            payment_status: newPaymentStatus,
+            payment_notes: auditNote,
+            last_updated: new Date().toISOString()
+          })
+          .eq('id', invoice_id)
+          
+        if (directUpdateError) {
+          console.error('Direct update also failed:', directUpdateError)
+          return Response.json(
+            { error: `Failed to update payment status: ${directUpdateError.message}` },
+            { status: 500 }
+          )
+        }
+      } else {
+        return Response.json(
+          { error: `Failed to update payment status: ${updateError.message}` },
+          { status: 500 }
+        )
+      }
     }
 
     // Also update the payment_notes field directly with dispatcher verification details
@@ -155,7 +194,7 @@ export async function POST(request) {
       .eq('id', invoice_id)
 
     // Record check verification action in payment history
-    await supabase
+    const { error: paymentHistoryError } = await supabase
       .from('facility_invoice_payments')
       .insert({
         facility_id: facility_id,
@@ -170,6 +209,11 @@ export async function POST(request) {
         verified_by: userData.user.id,
         verification_date: verification_action === 'mark_verified' ? now.toISOString() : null
       })
+
+    if (paymentHistoryError) {
+      console.error('Error inserting payment history:', paymentHistoryError)
+      // Don't fail the entire operation for payment history issues
+    }
 
     return Response.json({
       success: true,
