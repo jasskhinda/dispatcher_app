@@ -704,6 +704,13 @@ export default function FacilityMonthlyInvoicePage() {
     const handleCheckVerification = async (verificationAction) => {
         if (!facilityInfo || !paymentStatus?.id || updatingPaymentStatus) return;
 
+        // Debug: Check cookies from frontend
+        console.log('🍪 Frontend cookies:', document.cookie);
+        const supabaseCookies = document.cookie.split(';').filter(cookie => 
+            cookie.includes('supabase') || cookie.includes('sb-') || cookie.includes('auth')
+        );
+        console.log('🍪 Supabase cookies from frontend:', supabaseCookies);
+
         // Get verification notes from textarea
         const verificationNotes = document.getElementById('verification_notes')?.value || '';
 
