@@ -1454,6 +1454,65 @@ export default function FacilityMonthlyInvoicePage() {
                                                 />
                                             </div>
                                             
+                                            {/* Professional Payment Timeline */}
+                                            <div className="mt-4 p-3 bg-white border border-orange-200 rounded">
+                                                <h5 className="text-sm font-medium text-orange-800 mb-3">Payment Timeline & Current Status</h5>
+                                                <div className="space-y-2">
+                                                    <div className={`flex items-center text-xs ${
+                                                        paymentStatus.status === 'CHECK PAYMENT - WILL MAIL' ? 'text-blue-600 font-bold' : 'text-gray-500'
+                                                    }`}>
+                                                        <div className={`w-3 h-3 rounded-full mr-2 ${
+                                                            paymentStatus.status === 'CHECK PAYMENT - WILL MAIL' ? 'bg-blue-500' : 'bg-gray-300'
+                                                        }`}></div>
+                                                        Step 1: Facility initiates check payment
+                                                        {paymentStatus.created_at && (
+                                                            <span className="ml-auto text-gray-600">
+                                                                {new Date(paymentStatus.created_at).toLocaleDateString('en-US', {
+                                                                    month: 'short',
+                                                                    day: 'numeric'
+                                                                })}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className={`flex items-center text-xs ${
+                                                        paymentStatus.status === 'CHECK PAYMENT - IN TRANSIT' ? 'text-indigo-600 font-bold' : 
+                                                        ['CHECK PAYMENT - BEING VERIFIED', 'PAID WITH CHECK - VERIFIED'].includes(paymentStatus.status) ? 'text-gray-600' : 'text-gray-400'
+                                                    }`}>
+                                                        <div className={`w-3 h-3 rounded-full mr-2 ${
+                                                            paymentStatus.status === 'CHECK PAYMENT - IN TRANSIT' ? 'bg-indigo-500' : 
+                                                            ['CHECK PAYMENT - BEING VERIFIED', 'PAID WITH CHECK - VERIFIED'].includes(paymentStatus.status) ? 'bg-gray-400' : 'bg-gray-300'
+                                                        }`}></div>
+                                                        Step 2: Check in transit / received by office
+                                                    </div>
+                                                    <div className={`flex items-center text-xs ${
+                                                        paymentStatus.status === 'CHECK PAYMENT - BEING VERIFIED' ? 'text-purple-600 font-bold' : 
+                                                        paymentStatus.status === 'PAID WITH CHECK - VERIFIED' ? 'text-gray-600' : 'text-gray-400'
+                                                    }`}>
+                                                        <div className={`w-3 h-3 rounded-full mr-2 ${
+                                                            paymentStatus.status === 'CHECK PAYMENT - BEING VERIFIED' ? 'bg-purple-500' : 
+                                                            paymentStatus.status === 'PAID WITH CHECK - VERIFIED' ? 'bg-gray-400' : 'bg-gray-300'
+                                                        }`}></div>
+                                                        Step 3: Dispatcher verification & processing
+                                                    </div>
+                                                    <div className={`flex items-center text-xs ${
+                                                        paymentStatus.status === 'PAID WITH CHECK - VERIFIED' ? 'text-green-600 font-bold' : 'text-gray-400'
+                                                    }`}>
+                                                        <div className={`w-3 h-3 rounded-full mr-2 ${
+                                                            paymentStatus.status === 'PAID WITH CHECK - VERIFIED' ? 'bg-green-500' : 'bg-gray-300'
+                                                        }`}></div>
+                                                        Step 4: Payment verified & completed
+                                                        {paymentStatus.status === 'PAID WITH CHECK - VERIFIED' && paymentStatus.verification_date && (
+                                                            <span className="ml-auto text-green-600 font-medium">
+                                                                {new Date(paymentStatus.verification_date).toLocaleDateString('en-US', {
+                                                                    month: 'short',
+                                                                    day: 'numeric'
+                                                                })}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
                                             <div className="mt-3 p-3 bg-orange-100 rounded border border-orange-200">
                                                 <p className="text-xs text-orange-700">
                                                     <strong>Professional Check Workflow:</strong> Use these controls to track check payment progress and maintain accurate records for facility billing.
@@ -1477,6 +1536,28 @@ export default function FacilityMonthlyInvoicePage() {
                                                             Amount: <span className="font-medium">${totalAmount.toFixed(2)}</span> | 
                                                             Status: <span className="font-medium">{paymentStatus.status}</span>
                                                         </p>
+                                                        {paymentStatus.last_updated && (
+                                                            <div className="mt-2 p-2 bg-green-100 border border-green-200 rounded text-xs">
+                                                                <p className="text-green-700 font-medium">Payment Verified:</p>
+                                                                <p className="text-green-600 mt-1">
+                                                                    {new Date(paymentStatus.last_updated).toLocaleDateString('en-US', {
+                                                                        weekday: 'long',
+                                                                        year: 'numeric',
+                                                                        month: 'long',
+                                                                        day: 'numeric'
+                                                                    })} at {new Date(paymentStatus.last_updated).toLocaleTimeString('en-US', {
+                                                                        hour: 'numeric',
+                                                                        minute: '2-digit',
+                                                                        hour12: true
+                                                                    })}
+                                                                </p>
+                                                                {paymentStatus.verified_by && (
+                                                                    <p className="text-green-600 mt-1">
+                                                                        Verified by dispatcher • Official payment date established
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>

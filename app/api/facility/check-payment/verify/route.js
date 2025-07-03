@@ -256,7 +256,7 @@ export async function POST(request) {
       })
       .eq('id', invoice_id)
 
-    // Record check verification action in payment history
+    // Record check verification action in payment history with professional dates
     const { error: paymentHistoryError } = await supabase
       .from('facility_invoice_payments')
       .insert({
@@ -270,7 +270,12 @@ export async function POST(request) {
         verification_action: verification_action,
         verification_notes: verification_notes,
         verified_by: user.id,
-        verification_date: verification_action === 'mark_verified' ? now.toISOString() : null
+        verification_date: verification_action === 'mark_verified' ? now.toISOString() : null,
+        // Professional date tracking
+        received_date: verification_action === 'mark_received' ? now.toISOString() : null,
+        verification_started_date: verification_action === 'mark_received' ? now.toISOString() : null,
+        completed_date: verification_action === 'mark_verified' ? now.toISOString() : null,
+        official_payment_date: verification_action === 'mark_verified' ? now.toISOString() : null
       })
 
     if (paymentHistoryError) {
