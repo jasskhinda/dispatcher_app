@@ -12,6 +12,13 @@ export async function GET() {
       cookie.name.includes('auth')
     )
     
+    // Get the specific auth token cookie
+    const authTokenCookie = cookieStore.get('sb-btzfgasugkycbavcwvnx-auth-token')
+    let authTokenPreview = 'Not found'
+    if (authTokenCookie) {
+      authTokenPreview = authTokenCookie.value.substring(0, 50) + '...'
+    }
+    
     const supabase = await createRouteHandlerClient()
     
     // Test authentication without requiring it
@@ -30,13 +37,19 @@ export async function GET() {
         cookieCount: allCookies.length,
         supabaseCookieCount: supabaseCookies.length,
         cookieNames: allCookies.map(c => c.name),
-        supabaseCookieNames: supabaseCookies.map(c => c.name)
+        supabaseCookieNames: supabaseCookies.map(c => c.name),
+        authTokenCookie: {
+          exists: !!authTokenCookie,
+          preview: authTokenPreview,
+          length: authTokenCookie?.value?.length || 0
+        }
       }
     })
   } catch (error) {
     return Response.json({ 
       message: 'API accessible but auth test failed',
-      error: error.message 
+      error: error.message,
+      stack: error.stack
     })
   }
 }
