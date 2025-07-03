@@ -1439,6 +1439,129 @@ export default function FacilityMonthlyInvoicePage() {
                                         </div>
                                     )}
                                     
+                                    {/* Professional Check Payment Management for Paid Invoices */}
+                                    {paymentStatus?.status && (paymentStatus.status.includes('PAID WITH CHECK') || 
+                                        (paymentStatus.status.includes('PAID') && paymentStatus.check_submission_type)) && (
+                                        <div className="p-4 bg-green-50 border-2 border-green-300 rounded-lg">
+                                            <div className="flex items-start justify-between mb-4">
+                                                <div className="flex items-center">
+                                                    <svg className="w-6 h-6 text-green-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    <div>
+                                                        <h4 className="font-semibold text-green-800">Check Payment Completed</h4>
+                                                        <p className="text-sm text-green-600 mt-1">
+                                                            Amount: <span className="font-medium">${totalAmount.toFixed(2)}</span> | 
+                                                            Status: <span className="font-medium">{paymentStatus.status}</span>
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="bg-green-100 p-3 rounded mb-3">
+                                                <p className="text-sm text-green-800">
+                                                    <strong>Check Details:</strong> This invoice was paid by check and has been verified.
+                                                </p>
+                                                {paymentStatus.verification_date && (
+                                                    <p className="text-xs text-green-700 mt-1">
+                                                        Verified on: {new Date(paymentStatus.verification_date).toLocaleDateString('en-US', {
+                                                            month: 'long',
+                                                            day: 'numeric',
+                                                            year: 'numeric'
+                                                        })}
+                                                    </p>
+                                                )}
+                                            </div>
+                                            
+                                            {/* Option to mark as not received if needed */}
+                                            <button
+                                                onClick={() => {
+                                                    if (confirm('Are you sure no check was received? This will mark the payment as unpaid and notify the facility.')) {
+                                                        handleCheckVerification('mark_not_received')
+                                                    }
+                                                }}
+                                                disabled={updatingPaymentStatus}
+                                                className="bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center w-full"
+                                            >
+                                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                                No Check Received - Contact Facility
+                                            </button>
+                                        </div>
+                                    )}
+                                    
+                                    {/* Facility Contact Information for Communication */}
+                                    {paymentStatus?.status && (paymentStatus.status.includes('CHECK PAYMENT') || 
+                                        paymentStatus.status === 'NEEDS ATTENTION - RETRY PAYMENT') && (
+                                        <div className="p-4 bg-gray-50 border border-gray-300 rounded-lg mt-3">
+                                            <h4 className="font-semibold text-gray-800 mb-3 flex items-center">
+                                                <svg className="w-5 h-5 mr-2 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                                </svg>
+                                                Facility Contact Information
+                                            </h4>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div>
+                                                    <p className="text-sm text-gray-600">Facility Name</p>
+                                                    <p className="font-medium text-gray-900">{facilityInfo?.name}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm text-gray-600">Billing Email</p>
+                                                    <p className="font-medium text-gray-900">
+                                                        <a href={`mailto:${facilityInfo?.billing_email}?subject=Check Payment for Invoice ${paymentStatus?.invoice_number}`} 
+                                                           className="text-blue-600 hover:text-blue-800">
+                                                            {facilityInfo?.billing_email}
+                                                        </a>
+                                                    </p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm text-gray-600">Contact Email</p>
+                                                    <p className="font-medium text-gray-900">
+                                                        <a href={`mailto:${facilityInfo?.contact_email}?subject=Check Payment for Invoice ${paymentStatus?.invoice_number}`} 
+                                                           className="text-blue-600 hover:text-blue-800">
+                                                            {facilityInfo?.contact_email}
+                                                        </a>
+                                                    </p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm text-gray-600">Phone</p>
+                                                    <p className="font-medium text-gray-900">
+                                                        <a href={`tel:${facilityInfo?.phone_number}`} className="text-blue-600 hover:text-blue-800">
+                                                            {facilityInfo?.phone_number}
+                                                        </a>
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="mt-3 flex gap-2">
+                                                <button
+                                                    onClick={() => {
+                                                        window.location.href = `mailto:${facilityInfo?.billing_email}?subject=Check Payment Status - Invoice ${paymentStatus?.invoice_number}&body=Dear ${facilityInfo?.name},%0D%0A%0D%0AWe are following up regarding the check payment for Invoice ${paymentStatus?.invoice_number} (${getMonthDisplayName()}).%0D%0A%0D%0AAmount Due: $${totalAmount.toFixed(2)}%0D%0APayment Status: ${paymentStatus?.status}%0D%0A%0D%0APlease let us know the status of your check payment.%0D%0A%0D%0AThank you,%0D%0ACompassionate Care Transportation`
+                                                    }}
+                                                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-medium transition-colors flex items-center"
+                                                >
+                                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                                    </svg>
+                                                    Email About Check Status
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        navigator.clipboard.writeText(facilityInfo?.phone_number)
+                                                        alert('Phone number copied to clipboard!')
+                                                    }}
+                                                    className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded text-sm font-medium transition-colors flex items-center"
+                                                >
+                                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                                    </svg>
+                                                    Copy Phone
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                    
                                     {/* Pending Amount */}
                                     {pendingAmount > 0 && (
                                         <div className="flex justify-between items-center p-3 bg-purple-50 rounded border border-purple-200">
