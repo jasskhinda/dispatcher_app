@@ -15,12 +15,22 @@ export async function middleware(req) {
 
   // Check auth condition
   const isAuthRoute = req.nextUrl.pathname === '/login';
+  const isApiRoute = req.nextUrl.pathname.startsWith('/api/');
   const isPublicRoute = req.nextUrl.pathname === '/' || 
                         req.nextUrl.pathname.startsWith('/_next') || 
                         req.nextUrl.pathname.match(/\.(ico|png|jpg|svg|css|js)$/);
   
-  // If accessing a protected route without being authenticated
-  if (!session && !isAuthRoute && !isPublicRoute) {
+  // If accessing a protected API route without being authenticated
+  if (!session && isApiRoute && !isPublicRoute) {
+    console.log("MIDDLEWARE: API route accessed without session - returning 401");
+    return NextResponse.json(
+      { error: 'Authentication required' },
+      { status: 401 }
+    );
+  }
+  
+  // If accessing a protected page route without being authenticated
+  if (!session && !isAuthRoute && !isPublicRoute && !isApiRoute) {
     console.log("MIDDLEWARE: Redirecting to login - no session on protected route");
     const redirectUrl = new URL('/login', req.url);
     return NextResponse.redirect(redirectUrl);
