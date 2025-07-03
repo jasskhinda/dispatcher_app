@@ -22,6 +22,12 @@ export async function middleware(req) {
   
   // If accessing a protected API route without being authenticated
   if (!session && isApiRoute && !isPublicRoute) {
+    // Allow GET requests to debug endpoint
+    if (req.method === 'GET' && req.nextUrl.pathname === '/api/facility/check-payment/verify') {
+      console.log("MIDDLEWARE: Allowing debug endpoint access");
+      return res;
+    }
+    
     console.log("MIDDLEWARE: API route accessed without session - returning 401");
     return NextResponse.json(
       { error: 'Authentication required' },
