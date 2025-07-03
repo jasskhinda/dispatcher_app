@@ -1,7 +1,30 @@
 import { createRouteHandlerClient } from '@/lib/route-handler-client'
 
 export async function GET() {
-  return Response.json({ message: 'Check verification API is accessible' })
+  try {
+    const supabase = await createRouteHandlerClient()
+    
+    // Test authentication without requiring it
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    const { data: userData, error: userError } = await supabase.auth.getUser()
+    
+    return Response.json({ 
+      message: 'Check verification API is accessible',
+      debug: {
+        hasSession: !!session,
+        sessionError: sessionError?.message,
+        userEmail: session?.user?.email,
+        hasUserData: !!userData?.user,
+        userDataError: userError?.message,
+        userDataEmail: userData?.user?.email
+      }
+    })
+  } catch (error) {
+    return Response.json({ 
+      message: 'API accessible but auth test failed',
+      error: error.message 
+    })
+  }
 }
 
 export async function POST(request) {
