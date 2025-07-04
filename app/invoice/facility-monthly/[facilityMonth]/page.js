@@ -23,6 +23,7 @@ export default function FacilityMonthlyInvoicePage() {
     const [pendingAmount, setPendingAmount] = useState(0);
     const [showEditForm, setShowEditForm] = useState(false);
     const [editingTrip, setEditingTrip] = useState(null);
+    const [showPaymentConfirmation, setShowPaymentConfirmation] = useState(false);
     const [facilityContract, setFacilityContract] = useState(null);
     const [contractLoading, setContractLoading] = useState(false);
     const [contractError, setContractError] = useState(null);
@@ -517,120 +518,40 @@ export default function FacilityMonthlyInvoicePage() {
                     setFacilityTrips([]);
                 }
                 
-                // Calculate professional trip-level billing breakdown
-                console.log('🔍 Step 9: Calculating trip-level billing breakdown...');
+                // SIMPLIFIED monthly billing calculation
+                console.log('🔍 Step 9: Monthly billing calculation...');
                 const enhancedTrips = facilityTrips.length > 0 ? facilityTrips : (trips || []);
                 
-                // Get paid trip IDs from invoice and payment records
-                let paidTripIds = new Set();
-                
-                try {
-                    console.log('🔍 Step 9.1: Checking for trip-level payment records...');
-                    
-                    // Check facility_invoices for trip_ids that have been paid
-                    const { data: paidInvoices, error: invoiceError } = await supabase
-                        .from('facility_invoices')
-                        .select('trip_ids, payment_status, total_amount')
-                        .eq('facility_id', facilityId)
-                        .eq('month', targetMonth)
-                        .in('payment_status', ['PAID', 'PAID WITH CARD', 'PAID WITH CHECK - VERIFIED', 'PAID WITH CHECK', 'PAID WITH BANK TRANSFER']);
-                    
-                    if (!invoiceError && paidInvoices && paidInvoices.length > 0) {
-                        paidInvoices.forEach(invoice => {
-                            if (invoice.trip_ids && Array.isArray(invoice.trip_ids)) {
-                                invoice.trip_ids.forEach(tripId => paidTripIds.add(tripId));
-                            }
-                        });
-                        console.log('✅ Found paid trip IDs from invoices:', Array.from(paidTripIds));
-                    }
-                    
-                    // Check facility_invoice_payments for additional trip_ids
-                    const { data: paymentRecords, error: paymentError } = await supabase
-                        .from('facility_invoice_payments')
-                        .select('trip_ids, amount, payment_date, status')
-                        .eq('facility_id', facilityId)
-                        .eq('month', targetMonth)
-                        .in('status', ['paid', 'PAID', 'PAID WITH CARD', 'PAID WITH CHECK - VERIFIED', 'completed'])
-                        .order('payment_date', { ascending: false });
-                    
-                    if (!paymentError && paymentRecords && paymentRecords.length > 0) {
-                        paymentRecords.forEach(payment => {
-                            if (payment.trip_ids && Array.isArray(payment.trip_ids)) {
-                                payment.trip_ids.forEach(tripId => paidTripIds.add(tripId));
-                            }
-                        });
-                        console.log('✅ Added paid trip IDs from payments, total:', Array.from(paidTripIds));
-                    }
-                    
-                    // FALLBACK: If no trip-level records found, use the existing payment status logic
-                    // This handles older payments that don't have trip_ids stored
-                    if (paidTripIds.size === 0 && paymentStatus) {
-                        const paidStatuses = [
-                            'PAID', 
-                            'PAID WITH CARD', 
-                            'PAID WITH CHECK - VERIFIED',
-                            'PAID WITH CHECK',
-                            'PAID WITH BANK TRANSFER'
-                        ];
-                        
-                        if (paidStatuses.includes(paymentStatus.payment_status || paymentStatus.status)) {
-                            console.log('🔄 No trip-level payments found, using fallback: marking older completed trips as paid');
-                            
-                            // In this fallback, we assume that if there's a PAID status, 
-                            // it covers trips completed before the most recent trip
-                            const completedTrips = enhancedTrips
-                                .filter(trip => trip.status === 'completed' && trip.price > 0)
-                                .sort((a, b) => new Date(a.pickup_time) - new Date(b.pickup_time));
-                            
-                            // Mark all but the newest trip as paid (this handles the case where 
-                            // user had paid for previous trips and just completed a new one)
-                            if (completedTrips.length > 1) {
-                                const newestTrip = completedTrips[completedTrips.length - 1];
-                                completedTrips.forEach(trip => {
-                                    if (trip.id !== newestTrip.id) {
-                                        paidTripIds.add(trip.id);
-                                    }
-                                });
-                                console.log('🔄 Fallback: marked trips as paid except newest:', Array.from(paidTripIds));
-                            }
-                        }
-                    }
-                } catch (error) {
-                    console.log('⚠️ Error fetching paid trip IDs:', error);
-                }
-                
-                // Categorize trips by payment status
+                // Simple monthly billing: all completed trips for the month
                 const allTrips = enhancedTrips.filter(trip => trip.price > 0);
                 const completedTrips = allTrips.filter(trip => trip.status === 'completed');
                 const pendingTrips = allTrips.filter(trip => ['upcoming', 'pending', 'confirmed'].includes(trip.status));
                 
-                // Separate paid vs unpaid completed trips
-                const paidCompletedTrips = completedTrips.filter(trip => paidTripIds.has(trip.id));
-                const unpaidCompletedTrips = completedTrips.filter(trip => !paidTripIds.has(trip.id));
-                
-                // Calculate amounts
-                const previouslyPaidAmount = paidCompletedTrips.reduce((sum, trip) => sum + parseFloat(trip.price || 0), 0);
-                const currentlyDueAmount = unpaidCompletedTrips.reduce((sum, trip) => sum + parseFloat(trip.price || 0), 0);
+                // Calculate monthly totals
+                const monthlyCompletedAmount = completedTrips.reduce((sum, trip) => sum + parseFloat(trip.price || 0), 0);
                 const pendingTripsAmount = pendingTrips.reduce((sum, trip) => sum + parseFloat(trip.price || 0), 0);
-                const totalRevenueWhenComplete = previouslyPaidAmount + currentlyDueAmount + pendingTripsAmount;
+                const totalMonthlyRevenue = monthlyCompletedAmount + pendingTripsAmount;
                 
-                console.log(`✅ Step 9: Trip-level billing breakdown:`);
-                console.log(`   - Total trips: ${allTrips.length}`);
-                console.log(`   - Completed trips: ${completedTrips.length} (${paidCompletedTrips.length} paid + ${unpaidCompletedTrips.length} unpaid)`);
+                // Check if this month has been paid (simple status check)
+                const isMonthPaid = paymentStatus && ['PAID', 'PAID WITH CARD', 'PAID WITH CHECK - VERIFIED', 'PAID WITH CHECK', 'PAID WITH BANK TRANSFER'].includes(paymentStatus.payment_status || paymentStatus.status);
+                
+                console.log(`✅ Step 9: Monthly billing summary:`);
+                console.log(`   - Total trips this month: ${allTrips.length}`);
+                console.log(`   - Completed trips: ${completedTrips.length}`);
                 console.log(`   - Pending trips: ${pendingTrips.length}`);
-                console.log(`   - Previously paid amount: $${previouslyPaidAmount.toFixed(2)}`);
-                console.log(`   - Currently due amount: $${currentlyDueAmount.toFixed(2)}`);
+                console.log(`   - Monthly completed amount: $${monthlyCompletedAmount.toFixed(2)}`);
                 console.log(`   - Pending trips amount: $${pendingTripsAmount.toFixed(2)}`);
-                console.log(`   - Total revenue when complete: $${totalRevenueWhenComplete.toFixed(2)}`);
+                console.log(`   - Total monthly revenue: $${totalMonthlyRevenue.toFixed(2)}`);
+                console.log(`   - Month payment status: ${isMonthPaid ? 'PAID' : 'UNPAID'}`);
                 
-                // Set state values
-                setTotalAmount(currentlyDueAmount);
+                // Set state values for monthly billing
+                setTotalAmount(isMonthPaid ? 0 : monthlyCompletedAmount); // If paid, show 0 due
                 setPendingAmount(pendingTripsAmount);
-                setPreviouslyPaidAmount(previouslyPaidAmount);
-                setCompletedTripsAmount(totalRevenueWhenComplete);
+                setPreviouslyPaidAmount(isMonthPaid ? monthlyCompletedAmount : 0);
+                setCompletedTripsAmount(totalMonthlyRevenue);
                 
-                // Process trips with display properties for the UI
-                const processedUnpaidTrips = unpaidCompletedTrips.map(trip => ({
+                // Process all trips for display (no complex categorization)
+                const processedCompletedTrips = completedTrips.map(trip => ({
                     ...trip,
                     displayPrice: trip.price || 0,
                     clientName: trip.clientName || 'Unknown Client'
@@ -642,8 +563,8 @@ export default function FacilityMonthlyInvoicePage() {
                     clientName: trip.clientName || 'Unknown Client'
                 }));
                 
-                // Set trip counts for display
-                setBillableTrips(processedUnpaidTrips);
+                // Set simplified trip lists
+                setBillableTrips(isMonthPaid ? [] : processedCompletedTrips); // If paid, show no billable trips
                 setPendingTrips(processedPendingTrips);
                 
                 console.log('✅ Step 10: All processing complete, setting loading to false');
@@ -1229,7 +1150,7 @@ export default function FacilityMonthlyInvoicePage() {
                                 {/* Only show MARK PAID button if not already paid */}
                                 {!String(paymentStatus?.payment_status || paymentStatus?.status || 'UNPAID').includes('PAID') && (
                                     <button
-                                        onClick={() => handleTogglePaymentStatus()}
+                                        onClick={() => setShowPaymentConfirmation(true)}
                                         disabled={updatingPaymentStatus}
                                         className="bg-green-100 hover:bg-green-200 text-green-700 px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50"
                                     >
@@ -2199,6 +2120,110 @@ export default function FacilityMonthlyInvoicePage() {
                 </div>
             </div>
 
+
+            {/* Professional Payment Confirmation Dialog */}
+            {showPaymentConfirmation && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-lg w-full">
+                        <div className="p-6">
+                            <div className="flex items-center mb-6">
+                                <div className="flex-shrink-0">
+                                    <svg className="h-8 w-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <div className="ml-4">
+                                    <h3 className="text-xl font-semibold text-gray-900">Confirm Payment Verification</h3>
+                                    <p className="text-sm text-gray-600 mt-1">Final confirmation required</p>
+                                </div>
+                            </div>
+                            
+                            <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                                <div className="flex items-start">
+                                    <svg className="h-5 w-5 text-amber-500 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                                    </svg>
+                                    <div>
+                                        <h4 className="text-sm font-semibold text-amber-800 mb-1">⚠️ Important Notice</h4>
+                                        <p className="text-sm text-amber-700">
+                                            <strong>This action cannot be undone.</strong> Only proceed if you have verified that the payment has been received and processed successfully.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="mb-6">
+                                <h4 className="text-sm font-medium text-gray-900 mb-3">Please confirm the following:</h4>
+                                <div className="space-y-2">
+                                    <div className="flex items-center text-sm text-gray-700">
+                                        <svg className="h-4 w-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        Payment has been received and verified
+                                    </div>
+                                    <div className="flex items-center text-sm text-gray-700">
+                                        <svg className="h-4 w-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        Amount matches the invoice total
+                                    </div>
+                                    <div className="flex items-center text-sm text-gray-700">
+                                        <svg className="h-4 w-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        Payment method has been confirmed
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-gray-50 p-4 rounded-lg mb-6">
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="font-medium text-gray-700">Invoice Amount:</span>
+                                    <span className="font-bold text-gray-900">${totalAmount.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm mt-1">
+                                    <span className="font-medium text-gray-700">Facility:</span>
+                                    <span className="font-medium text-gray-900">{facilityInfo?.name}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm mt-1">
+                                    <span className="font-medium text-gray-700">Period:</span>
+                                    <span className="font-medium text-gray-900">{getMonthDisplayName()}</span>
+                                </div>
+                            </div>
+                            
+                            <div className="flex space-x-3">
+                                <button
+                                    onClick={() => {
+                                        setShowPaymentConfirmation(false);
+                                        handleTogglePaymentStatus();
+                                    }}
+                                    disabled={updatingPaymentStatus}
+                                    className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-medium py-3 px-4 rounded-md transition-colors text-sm"
+                                >
+                                    {updatingPaymentStatus ? (
+                                        <div className="flex items-center justify-center">
+                                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Processing...
+                                        </div>
+                                    ) : (
+                                        '✅ Yes, Confirm Payment Received'
+                                    )}
+                                </button>
+                                <button
+                                    onClick={() => setShowPaymentConfirmation(false)}
+                                    disabled={updatingPaymentStatus}
+                                    className="flex-1 bg-gray-300 hover:bg-gray-400 disabled:bg-gray-200 text-gray-700 font-medium py-3 px-4 rounded-md transition-colors text-sm"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Edit Trip Form Modal */}
             {showEditForm && editingTrip && (
