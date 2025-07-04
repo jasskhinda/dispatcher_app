@@ -31,6 +31,8 @@ export default function FacilityMonthlyInvoicePage() {
     // Professional billing breakdown states
     const [previouslyPaidAmount, setPreviouslyPaidAmount] = useState(0);
     const [completedTripsAmount, setCompletedTripsAmount] = useState(0);
+    const [billableTrips, setBillableTrips] = useState([]);
+    const [pendingTrips, setPendingTrips] = useState([]);
     
     const router = useRouter();
     const params = useParams();
@@ -516,53 +518,87 @@ export default function FacilityMonthlyInvoicePage() {
                     setFacilityTrips([]);
                 }
                 
-                // Calculate professional billing breakdown
-                console.log('🔍 Step 9: Calculating professional billing breakdown...');
+                // Calculate professional trip-level billing breakdown
+                console.log('🔍 Step 9: Calculating trip-level billing breakdown...');
                 const enhancedTrips = facilityTrips.length > 0 ? facilityTrips : (trips || []);
                 
-                // Determine if this month has been paid
-                const paidStatuses = [
-                    'PAID', 
-                    'PAID WITH CARD', 
-                    'PAID WITH CHECK - VERIFIED',
-                    'PAID WITH CHECK',
-                    'PAID WITH BANK TRANSFER'
-                ];
-                const isMonthPaid = paymentStatus && paidStatuses.includes(paymentStatus.payment_status || paymentStatus.status);
+                // Get paid trip IDs from invoice and payment records
+                let paidTripIds = new Set();
                 
-                console.log('💰 Payment status analysis:', {
-                    hasPaymentStatus: !!paymentStatus,
-                    paymentStatusValue: paymentStatus?.payment_status || paymentStatus?.status,
-                    isMonthPaid
-                });
+                try {
+                    console.log('🔍 Step 9.1: Checking for trip-level payment records...');
+                    
+                    // Check facility_invoices for trip_ids that have been paid
+                    const { data: paidInvoices, error: invoiceError } = await supabase
+                        .from('facility_invoices')
+                        .select('trip_ids, payment_status, total_amount')
+                        .eq('facility_id', facilityId)
+                        .eq('month', targetMonth)
+                        .in('payment_status', ['PAID', 'PAID WITH CARD', 'PAID WITH CHECK - VERIFIED', 'PAID WITH CHECK', 'PAID WITH BANK TRANSFER']);
+                    
+                    if (!invoiceError && paidInvoices && paidInvoices.length > 0) {
+                        paidInvoices.forEach(invoice => {
+                            if (invoice.trip_ids && Array.isArray(invoice.trip_ids)) {
+                                invoice.trip_ids.forEach(tripId => paidTripIds.add(tripId));
+                            }
+                        });
+                        console.log('✅ Found paid trip IDs from invoices:', Array.from(paidTripIds));
+                    }
+                    
+                    // Check facility_invoice_payments for additional trip_ids
+                    const { data: paymentRecords, error: paymentError } = await supabase
+                        .from('facility_invoice_payments')
+                        .select('trip_ids, amount, payment_date, status')
+                        .eq('facility_id', facilityId)
+                        .eq('month', targetMonth)
+                        .in('status', ['paid', 'PAID', 'PAID WITH CARD', 'PAID WITH CHECK - VERIFIED', 'completed'])
+                        .order('payment_date', { ascending: false });
+                    
+                    if (!paymentError && paymentRecords && paymentRecords.length > 0) {
+                        paymentRecords.forEach(payment => {
+                            if (payment.trip_ids && Array.isArray(payment.trip_ids)) {
+                                payment.trip_ids.forEach(tripId => paidTripIds.add(tripId));
+                            }
+                        });
+                        console.log('✅ Added paid trip IDs from payments, total:', Array.from(paidTripIds));
+                    }
+                } catch (error) {
+                    console.log('⚠️ Error fetching paid trip IDs:', error);
+                }
                 
-                // Professional billing calculation
-                const completedTrips = enhancedTrips.filter(trip => trip.status === 'completed' && trip.price > 0);
-                const completedAmount = completedTrips.reduce((sum, trip) => sum + parseFloat(trip.price || 0), 0);
+                // Categorize trips by payment status
+                const allTrips = enhancedTrips.filter(trip => trip.price > 0);
+                const completedTrips = allTrips.filter(trip => trip.status === 'completed');
+                const pendingTrips = allTrips.filter(trip => ['upcoming', 'pending', 'confirmed'].includes(trip.status));
                 
-                // Pending amount (upcoming/pending trips)
-                const pendingTripsAmount = enhancedTrips
-                    .filter(trip => ['upcoming', 'pending', 'confirmed'].includes(trip.status) && trip.price > 0)
-                    .reduce((sum, trip) => sum + parseFloat(trip.price || 0), 0);
+                // Separate paid vs unpaid completed trips
+                const paidCompletedTrips = completedTrips.filter(trip => paidTripIds.has(trip.id));
+                const unpaidCompletedTrips = completedTrips.filter(trip => !paidTripIds.has(trip.id));
                 
-                // Professional billing logic:
-                // - If month is paid: Total Due = $0, Previously Paid = completed amount
-                // - If month not paid: Total Due = completed amount, Previously Paid = $0
-                const totalDue = isMonthPaid ? 0 : completedAmount;
-                const previouslyPaid = isMonthPaid ? completedAmount : 0;
+                // Calculate amounts
+                const previouslyPaidAmount = paidCompletedTrips.reduce((sum, trip) => sum + parseFloat(trip.price || 0), 0);
+                const currentlyDueAmount = unpaidCompletedTrips.reduce((sum, trip) => sum + parseFloat(trip.price || 0), 0);
+                const pendingTripsAmount = pendingTrips.reduce((sum, trip) => sum + parseFloat(trip.price || 0), 0);
+                const totalRevenueWhenComplete = previouslyPaidAmount + currentlyDueAmount + pendingTripsAmount;
                 
-                console.log(`✅ Step 9: Professional billing breakdown:`);
-                console.log(`   - Completed trips amount: $${completedAmount.toFixed(2)}`);
-                console.log(`   - Previously paid amount: $${previouslyPaid.toFixed(2)}`);
-                console.log(`   - Currently due amount: $${totalDue.toFixed(2)}`);
+                console.log(`✅ Step 9: Trip-level billing breakdown:`);
+                console.log(`   - Total trips: ${allTrips.length}`);
+                console.log(`   - Completed trips: ${completedTrips.length} (${paidCompletedTrips.length} paid + ${unpaidCompletedTrips.length} unpaid)`);
+                console.log(`   - Pending trips: ${pendingTrips.length}`);
+                console.log(`   - Previously paid amount: $${previouslyPaidAmount.toFixed(2)}`);
+                console.log(`   - Currently due amount: $${currentlyDueAmount.toFixed(2)}`);
                 console.log(`   - Pending trips amount: $${pendingTripsAmount.toFixed(2)}`);
+                console.log(`   - Total revenue when complete: $${totalRevenueWhenComplete.toFixed(2)}`);
                 
-                setTotalAmount(totalDue);
+                // Set state values
+                setTotalAmount(currentlyDueAmount);
                 setPendingAmount(pendingTripsAmount);
+                setPreviouslyPaidAmount(previouslyPaidAmount);
+                setCompletedTripsAmount(totalRevenueWhenComplete);
                 
-                // Store additional billing info for display
-                setPreviouslyPaidAmount(previouslyPaid);
-                setCompletedTripsAmount(completedAmount);
+                // Set trip counts for display
+                setBillableTrips(unpaidCompletedTrips);
+                setPendingTrips(pendingTrips);
                 
                 console.log('✅ Step 10: All processing complete, setting loading to false');
                 setLoading(false);
@@ -1066,8 +1102,8 @@ export default function FacilityMonthlyInvoicePage() {
         );
     }
 
-    const billableTrips = processedTrips.filter(trip => trip.isBillable);
-    const pendingTrips = processedTrips.filter(trip => !trip.isBillable);
+    // Note: Trip categorization is now handled by the state variables billableTrips and pendingTrips
+    // which are set based on actual payment status, not just completion status
 
     return (
         <div className="min-h-screen bg-gray-50 print:bg-white">
@@ -1322,7 +1358,7 @@ export default function FacilityMonthlyInvoicePage() {
                                         <span className="font-bold text-gray-900">{facilityTrips.length}</span>
                                     </div>
                                     <div className="flex justify-between items-center p-3 bg-green-50 rounded border border-green-200">
-                                        <span className="text-green-700 font-medium">Billable Trips:</span>
+                                        <span className="text-green-700 font-medium">Unpaid Trips (Need Payment):</span>
                                         <span className="font-bold text-green-800">{billableTrips.length}</span>
                                     </div>
                                     <div className="flex justify-between items-center p-3 bg-amber-50 rounded border border-amber-200">
@@ -1332,39 +1368,17 @@ export default function FacilityMonthlyInvoicePage() {
                                     <div className="flex justify-between items-center p-3 bg-blue-50 rounded border border-blue-200">
                                         <span className="text-blue-700 font-medium">Payment Status:</span>
                                         <span className={`font-bold px-3 py-1 rounded text-sm ${
-                                            paymentStatus?.status?.includes('PAID') 
+                                            (billableTrips.length === 0 && totalAmount === 0) 
                                                 ? 'bg-green-100 text-green-800 border border-green-300' 
-                                                : paymentStatus?.status === 'PROCESSING PAYMENT'
-                                                ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
-                                                : paymentStatus?.status === 'PENDING'
-                                                ? 'bg-orange-100 text-orange-800 border border-orange-300'
-                                                : paymentStatus?.status?.includes('CHECK PAYMENT - WILL MAIL')
-                                                ? 'bg-blue-100 text-blue-800 border border-blue-300'
-                                                : paymentStatus?.status?.includes('CHECK PAYMENT - IN TRANSIT')
-                                                ? 'bg-indigo-100 text-indigo-800 border border-indigo-300'
-                                                : paymentStatus?.status?.includes('CHECK PAYMENT - BEING VERIFIED')
-                                                ? 'bg-purple-100 text-purple-800 border border-purple-300'
-                                                : paymentStatus?.status?.includes('CHECK PAYMENT - HAS ISSUES')
-                                                ? 'bg-red-100 text-red-800 border border-red-300'
-                                                : paymentStatus?.status?.includes('CHECK PAYMENT - REPLACEMENT REQUESTED')
-                                                ? 'bg-orange-100 text-orange-800 border border-orange-300'
-                                                : paymentStatus?.status?.includes('CHECK PAYMENT')
-                                                ? 'bg-orange-100 text-orange-800 border border-orange-300'
+                                                : totalAmount > 0
+                                                ? 'bg-amber-100 text-amber-800 border border-amber-300'
                                                 : 'bg-amber-100 text-amber-800 border border-amber-300'
                                         }`}>
-                                            {paymentStatus?.status === 'PAID WITH CARD' ? '💳 PAID WITH CARD' :
-                                             paymentStatus?.status === 'PAID WITH BANK TRANSFER' ? '🏦 PAID WITH BANK TRANSFER' :
-                                             paymentStatus?.status === 'PAID WITH CHECK - VERIFIED' ? '✅ PAID WITH CHECK - VERIFIED' :
-                                             paymentStatus?.status === 'PAID WITH CHECK (BEING VERIFIED)' ? '📝 PAID WITH CHECK (BEING VERIFIED)' :
-                                             paymentStatus?.status === 'CHECK PAYMENT - WILL MAIL' ? '📮 CHECK PAYMENT - WILL MAIL' :
-                                             paymentStatus?.status === 'CHECK PAYMENT - IN TRANSIT' ? '🚚 CHECK PAYMENT - IN TRANSIT' :
-                                             paymentStatus?.status === 'CHECK PAYMENT - BEING VERIFIED' ? '🔍 CHECK PAYMENT - BEING VERIFIED' :
-                                             paymentStatus?.status === 'CHECK PAYMENT - HAS ISSUES' ? '⚠️ CHECK PAYMENT - HAS ISSUES' :
-                                             paymentStatus?.status === 'CHECK PAYMENT - REPLACEMENT REQUESTED' ? '🔄 CHECK PAYMENT - REPLACEMENT REQUESTED' :
-                                             paymentStatus?.status === 'PROCESSING PAYMENT' ? '⏳ PROCESSING PAYMENT' :
-                                             paymentStatus?.status === 'PENDING' ? '⚠️ PENDING' :
-                                             paymentStatus?.status === 'NEEDS ATTENTION - RETRY PAYMENT' ? '🚨 NEEDS ATTENTION' :
-                                             paymentStatus?.status === 'PAID' ? '✅ PAID' : '💰 UNPAID'}
+                                            {(billableTrips.length === 0 && totalAmount === 0) 
+                                                ? '✅ FULLY PAID' 
+                                                : totalAmount > 0 
+                                                ? `💳 $${totalAmount.toFixed(2)} DUE`
+                                                : '💰 UNPAID'}
                                         </span>
                                     </div>
                                     {paymentStatus?.payment_date && (
@@ -1390,7 +1404,7 @@ export default function FacilityMonthlyInvoicePage() {
                                     )}
                                     <div className="flex justify-between items-center p-3 bg-green-50 rounded border border-green-200">
                                         <span className="text-green-700 font-medium">
-                                            {totalAmount > 0 ? '💳 Amount Due:' : '✅ Fully Paid:'}
+                                            {totalAmount > 0 ? '💳 Amount Due for New Completed Trips:' : '✅ Fully Paid:'}
                                         </span>
                                         <span className="font-bold text-green-800">${totalAmount.toFixed(2)}</span>
                                     </div>
@@ -1402,7 +1416,7 @@ export default function FacilityMonthlyInvoicePage() {
                                     )}
                                     {(previouslyPaidAmount > 0 || pendingAmount > 0) && (
                                         <div className="flex justify-between items-center p-3 bg-gray-50 rounded border border-gray-300">
-                                            <span className="text-gray-700 font-medium">📊 Total When All Trips Complete:</span>
+                                            <span className="text-gray-700 font-medium">📊 Total Revenue When All Trips Are Paid:</span>
                                             <span className="font-bold text-gray-800">${(previouslyPaidAmount + totalAmount + pendingAmount).toFixed(2)}</span>
                                         </div>
                                     )}
@@ -1738,7 +1752,7 @@ export default function FacilityMonthlyInvoicePage() {
                                         {/* Currently Due Amount */}
                                         <div className="flex justify-between items-center p-4 bg-green-100 rounded-lg border-2 border-green-300">
                                             <span className="text-xl font-bold text-green-900">
-                                                {totalAmount > 0 ? '💳 Total Amount Due:' : '✅ Fully Paid - No Amount Due:'}
+                                                {totalAmount > 0 ? '💳 Total Amount Due for New Completed Trips:' : '✅ Fully Paid - No Amount Due:'}
                                             </span>
                                             <span className="text-2xl font-bold text-green-800">${totalAmount.toFixed(2)}</span>
                                         </div>
@@ -1755,7 +1769,7 @@ export default function FacilityMonthlyInvoicePage() {
                                         {(previouslyPaidAmount > 0 || pendingAmount > 0) && (
                                             <div className="border-t-2 pt-3 mt-3">
                                                 <div className="flex justify-between items-center p-3 bg-gray-100 rounded border border-gray-300">
-                                                    <span className="text-md font-medium text-gray-700">📊 Total All Trips (Paid + Due + Pending):</span>
+                                                    <span className="text-md font-medium text-gray-700">📊 Total Revenue When All Trips Are Paid:</span>
                                                     <span className="text-lg font-bold text-gray-800">${(previouslyPaidAmount + totalAmount + pendingAmount).toFixed(2)}</span>
                                                 </div>
                                             </div>
@@ -1858,10 +1872,10 @@ export default function FacilityMonthlyInvoicePage() {
                         <div className="mb-8">
                             <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">Trip Details:</h3>
                             
-                            {/* Billable Trips */}
+                            {/* Unpaid Trips */}
                             {billableTrips.length > 0 && (
                                 <div className="mb-6">
-                                    <h4 className="text-md font-medium text-green-700 mb-3">✅ Billable Trips (Completed)</h4>
+                                    <h4 className="text-md font-medium text-green-700 mb-3">💳 Unpaid Trips (Need Payment)</h4>
                                     <div className="overflow-x-auto">
                                         <table className="w-full border border-gray-200">
                                             <thead className="bg-green-50">
