@@ -562,6 +562,40 @@ export default function FacilityMonthlyInvoicePage() {
                         });
                         console.log('✅ Added paid trip IDs from payments, total:', Array.from(paidTripIds));
                     }
+                    
+                    // FALLBACK: If no trip-level records found, use the existing payment status logic
+                    // This handles older payments that don't have trip_ids stored
+                    if (paidTripIds.size === 0 && paymentStatus) {
+                        const paidStatuses = [
+                            'PAID', 
+                            'PAID WITH CARD', 
+                            'PAID WITH CHECK - VERIFIED',
+                            'PAID WITH CHECK',
+                            'PAID WITH BANK TRANSFER'
+                        ];
+                        
+                        if (paidStatuses.includes(paymentStatus.payment_status || paymentStatus.status)) {
+                            console.log('🔄 No trip-level payments found, using fallback: marking older completed trips as paid');
+                            
+                            // In this fallback, we assume that if there's a PAID status, 
+                            // it covers trips completed before the most recent trip
+                            const completedTrips = enhancedTrips
+                                .filter(trip => trip.status === 'completed' && trip.price > 0)
+                                .sort((a, b) => new Date(a.pickup_time) - new Date(b.pickup_time));
+                            
+                            // Mark all but the newest trip as paid (this handles the case where 
+                            // user had paid for previous trips and just completed a new one)
+                            if (completedTrips.length > 1) {
+                                const newestTrip = completedTrips[completedTrips.length - 1];
+                                completedTrips.forEach(trip => {
+                                    if (trip.id !== newestTrip.id) {
+                                        paidTripIds.add(trip.id);
+                                    }
+                                });
+                                console.log('🔄 Fallback: marked trips as paid except newest:', Array.from(paidTripIds));
+                            }
+                        }
+                    }
                 } catch (error) {
                     console.log('⚠️ Error fetching paid trip IDs:', error);
                 }
@@ -596,9 +630,22 @@ export default function FacilityMonthlyInvoicePage() {
                 setPreviouslyPaidAmount(previouslyPaidAmount);
                 setCompletedTripsAmount(totalRevenueWhenComplete);
                 
+                // Process trips with display properties for the UI
+                const processedUnpaidTrips = unpaidCompletedTrips.map(trip => ({
+                    ...trip,
+                    displayPrice: trip.price || 0,
+                    clientName: trip.clientName || 'Unknown Client'
+                }));
+                
+                const processedPendingTrips = pendingTrips.map(trip => ({
+                    ...trip,
+                    displayPrice: trip.price || 0,
+                    clientName: trip.clientName || 'Unknown Client'
+                }));
+                
                 // Set trip counts for display
-                setBillableTrips(unpaidCompletedTrips);
-                setPendingTrips(pendingTrips);
+                setBillableTrips(processedUnpaidTrips);
+                setPendingTrips(processedPendingTrips);
                 
                 console.log('✅ Step 10: All processing complete, setting loading to false');
                 setLoading(false);
@@ -1941,7 +1988,7 @@ export default function FacilityMonthlyInvoicePage() {
                                                         </td>
                                                         <td className="px-4 py-3 border-b text-right">
                                                             <span className="text-sm font-bold text-green-700 bg-green-50 px-2 py-1 rounded">
-                                                                ${trip.displayPrice.toFixed(2)}
+                                                                ${(trip.displayPrice || trip.price || 0).toFixed(2)}
                                                             </span>
                                                         </td>
                                                     </tr>
@@ -2073,7 +2120,7 @@ export default function FacilityMonthlyInvoicePage() {
                                                                 
                                                                 {/* Price */}
                                                                 <div className="text-sm font-bold text-green-800 bg-green-100 px-3 py-1 rounded border border-green-300">
-                                                                    ${trip.displayPrice?.toFixed(2) || '0.00'}
+                                                                    ${(trip.displayPrice || trip.price || 0).toFixed(2)}
                                                                 </div>
                                                             </div>
                                                         </div>
