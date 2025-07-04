@@ -1457,7 +1457,7 @@ export default function FacilityMonthlyInvoicePage() {
                                                 )}
                                                 
                                                 {/* Paid and Verified Button - Final step */}
-                                                {paymentStatus.status === 'CHECK PAYMENT - RECEIVED' && (
+                                                {paymentStatus.status === 'PAID WITH CHECK (BEING VERIFIED)' && (
                                                     <button
                                                         onClick={() => setShowVerificationDialog(true)}
                                                         disabled={updatingPaymentStatus}

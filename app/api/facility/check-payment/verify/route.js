@@ -192,7 +192,7 @@ export async function POST(request) {
         break
 
       case 'check_received':
-        newPaymentStatus = 'CHECK PAYMENT - RECEIVED'
+        newPaymentStatus = 'PAID WITH CHECK (BEING VERIFIED)'
         auditNote = `Check payment received by dispatcher on ${now.toLocaleDateString('en-US', { 
           month: 'long', 
           day: 'numeric', 
