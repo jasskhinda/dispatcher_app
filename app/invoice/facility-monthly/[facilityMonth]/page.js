@@ -532,8 +532,13 @@ export default function FacilityMonthlyInvoicePage() {
                 const pendingTripsAmount = pendingTrips.reduce((sum, trip) => sum + parseFloat(trip.price || 0), 0);
                 const totalMonthlyRevenue = monthlyCompletedAmount + pendingTripsAmount;
                 
-                // Check if this month has been paid (simple status check)
-                const isMonthPaid = paymentStatus && ['PAID', 'PAID WITH CARD', 'PAID WITH CHECK - VERIFIED', 'PAID WITH CHECK', 'PAID WITH BANK TRANSFER'].includes(paymentStatus.payment_status || paymentStatus.status);
+                // Check if this month has been paid (with month-end validation)
+                const now = new Date();
+                const currentMonth = now.toISOString().slice(0, 7); // YYYY-MM format
+                const isCurrentMonth = targetMonth === currentMonth;
+                
+                // MONTHLY BILLING RULE: Current month cannot be marked as paid until month ends
+                const isMonthPaid = !isCurrentMonth && paymentStatus && ['PAID', 'PAID WITH CARD', 'PAID WITH CHECK - VERIFIED', 'PAID WITH CHECK', 'PAID WITH BANK TRANSFER'].includes(paymentStatus.payment_status || paymentStatus.status);
                 
                 console.log(`✅ Step 9: Monthly billing summary:`);
                 console.log(`   - Total trips this month: ${allTrips.length}`);
@@ -542,7 +547,8 @@ export default function FacilityMonthlyInvoicePage() {
                 console.log(`   - Monthly completed amount: $${monthlyCompletedAmount.toFixed(2)}`);
                 console.log(`   - Pending trips amount: $${pendingTripsAmount.toFixed(2)}`);
                 console.log(`   - Total monthly revenue: $${totalMonthlyRevenue.toFixed(2)}`);
-                console.log(`   - Month payment status: ${isMonthPaid ? 'PAID' : 'UNPAID'}`);
+                console.log(`   - Is current month: ${isCurrentMonth ? 'YES' : 'NO'}`);
+                console.log(`   - Month payment status: ${isMonthPaid ? 'PAID' : (isCurrentMonth ? 'CURRENT MONTH - CANNOT PAY YET' : 'UNPAID')}`);
                 
                 // Set state values for monthly billing
                 setTotalAmount(isMonthPaid ? 0 : monthlyCompletedAmount); // If paid, show 0 due
@@ -1138,16 +1144,42 @@ export default function FacilityMonthlyInvoicePage() {
                             
                             {/* Action Buttons */}
                             <div className="flex items-center space-x-2">
-                                {/* Only show MARK PAID button if not already paid */}
-                                {!String(paymentStatus?.payment_status || paymentStatus?.status || 'UNPAID').includes('PAID') && (
-                                    <button
-                                        onClick={() => setShowPaymentConfirmation(true)}
-                                        disabled={updatingPaymentStatus}
-                                        className="bg-green-100 hover:bg-green-200 text-green-700 px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50"
-                                    >
-                                        {updatingPaymentStatus ? '⏳ Updating...' : '✅ MARK PAID'}
-                                    </button>
-                                )}
+                                {/* Only show MARK PAID button if not already paid AND month has ended */}
+                                {(() => {
+                                    const now = new Date();
+                                    const currentMonth = now.toISOString().slice(0, 7); // YYYY-MM format
+                                    const isCurrentMonth = invoiceMonth === currentMonth;
+                                    const isPaid = String(paymentStatus?.payment_status || paymentStatus?.status || 'UNPAID').includes('PAID');
+                                    
+                                    if (isPaid) return null; // Already paid
+                                    if (isCurrentMonth) {
+                                        // Current month - show disabled button with explanation
+                                        return (
+                                            <div className="relative group">
+                                                <button
+                                                    disabled={true}
+                                                    className="bg-gray-100 text-gray-400 px-4 py-2 rounded-md text-sm font-medium cursor-not-allowed"
+                                                >
+                                                    🚫 Cannot Mark Paid
+                                                </button>
+                                                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                                    Monthly billing: Can only mark as paid after month ends
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+                                    
+                                    // Past month - show normal MARK PAID button
+                                    return (
+                                        <button
+                                            onClick={() => setShowPaymentConfirmation(true)}
+                                            disabled={updatingPaymentStatus}
+                                            className="bg-green-100 hover:bg-green-200 text-green-700 px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50"
+                                        >
+                                            {updatingPaymentStatus ? '⏳ Updating...' : '✅ MARK PAID'}
+                                        </button>
+                                    );
+                                })()}
                                 
                                 <button
                                     onClick={() => window.print()}
@@ -1308,17 +1340,39 @@ export default function FacilityMonthlyInvoicePage() {
                                     <div className="flex justify-between items-center p-3 bg-blue-50 rounded border border-blue-200">
                                         <span className="text-blue-700 font-medium">Payment Status:</span>
                                         <span className={`font-bold px-3 py-1 rounded text-sm ${
-                                            (billableTrips.length === 0 && totalAmount === 0) 
-                                                ? 'bg-green-100 text-green-800 border border-green-300' 
-                                                : totalAmount > 0
-                                                ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                                                : 'bg-amber-100 text-amber-800 border border-amber-300'
+                                            (() => {
+                                                const now = new Date();
+                                                const currentMonth = now.toISOString().slice(0, 7);
+                                                const isCurrentMonth = invoiceMonth === currentMonth;
+                                                const isPaid = (billableTrips.length === 0 && totalAmount === 0);
+                                                
+                                                if (isPaid && !isCurrentMonth) {
+                                                    return 'bg-green-100 text-green-800 border border-green-300';
+                                                } else if (isCurrentMonth) {
+                                                    return 'bg-blue-100 text-blue-800 border border-blue-300';
+                                                } else {
+                                                    return 'bg-amber-100 text-amber-800 border border-amber-300';
+                                                }
+                                            })()
                                         }`}>
-                                            {(billableTrips.length === 0 && totalAmount === 0) 
-                                                ? '✅ FULLY PAID' 
-                                                : totalAmount > 0 
-                                                ? `💳 $${totalAmount.toFixed(2)} DUE`
-                                                : '💰 UNPAID'}
+                                            {(() => {
+                                                const now = new Date();
+                                                const currentMonth = now.toISOString().slice(0, 7);
+                                                const isCurrentMonth = invoiceMonth === currentMonth;
+                                                const isPaid = (billableTrips.length === 0 && totalAmount === 0);
+                                                
+                                                if (isPaid && !isCurrentMonth) {
+                                                    return '✅ FULLY PAID';
+                                                } else if (isCurrentMonth) {
+                                                    return totalAmount > 0 
+                                                        ? `📅 CURRENT MONTH - $${totalAmount.toFixed(2)} RUNNING TOTAL`
+                                                        : '📅 CURRENT MONTH - NO TRIPS YET';
+                                                } else {
+                                                    return totalAmount > 0 
+                                                        ? `💳 $${totalAmount.toFixed(2)} DUE`
+                                                        : '💰 UNPAID';
+                                                }
+                                            })()}
                                         </span>
                                     </div>
                                     {paymentStatus?.payment_date && (
