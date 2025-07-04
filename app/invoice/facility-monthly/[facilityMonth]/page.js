@@ -24,6 +24,7 @@ export default function FacilityMonthlyInvoicePage() {
     const [showEditForm, setShowEditForm] = useState(false);
     const [editingTrip, setEditingTrip] = useState(null);
     const [showPaymentConfirmation, setShowPaymentConfirmation] = useState(false);
+    const [showVerificationDialog, setShowVerificationDialog] = useState(false);
     const [facilityContract, setFacilityContract] = useState(null);
     const [contractLoading, setContractLoading] = useState(false);
     const [contractError, setContractError] = useState(null);
@@ -1441,50 +1442,36 @@ export default function FacilityMonthlyInvoicePage() {
                                             </div>
                                             
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                {/* Mark Received Button */}
-                                                {['CHECK PAYMENT - WILL MAIL', 'CHECK PAYMENT - IN TRANSIT'].includes(paymentStatus.status) && (
+                                                {/* Check Received Button - First step */}
+                                                {['CHECK PAYMENT - WILL MAIL', 'CHECK PAYMENT - ALREADY SENT'].includes(paymentStatus.status) && (
                                                     <button
-                                                        onClick={() => handleCheckVerification('mark_received')}
+                                                        onClick={() => handleCheckVerification('check_received')}
                                                         disabled={updatingPaymentStatus}
                                                         className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center"
                                                     >
                                                         <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                                                         </svg>
-                                                        {paymentStatus.status === 'CHECK PAYMENT - WILL MAIL' ? 'Mark as Received' : 'Ready for Verification'}
+                                                        CHECK RECEIVED
                                                     </button>
                                                 )}
                                                 
-                                                {/* Verify Check Sent Button - for ALREADY SENT status */}
-                                                {paymentStatus.status === 'CHECK PAYMENT - ALREADY SENT' && (
+                                                {/* Paid and Verified Button - Final step */}
+                                                {paymentStatus.status === 'CHECK PAYMENT - RECEIVED' && (
                                                     <button
-                                                        onClick={() => handleCheckVerification('mark_verified')}
+                                                        onClick={() => setShowVerificationDialog(true)}
                                                         disabled={updatingPaymentStatus}
                                                         className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center"
                                                     >
                                                         <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                         </svg>
-                                                        Verify Check Sent
+                                                        PAID AND VERIFIED
                                                     </button>
                                                 )}
                                                 
-                                                {/* Mark Verified Button */}
-                                                {['CHECK PAYMENT - BEING VERIFIED', 'CHECK PAYMENT - IN TRANSIT'].includes(paymentStatus.status) && (
-                                                    <button
-                                                        onClick={() => handleCheckVerification('mark_verified')}
-                                                        disabled={updatingPaymentStatus}
-                                                        className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center"
-                                                    >
-                                                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                        </svg>
-                                                        Verify & Complete Payment
-                                                    </button>
-                                                )}
-                                                
-                                                {/* Mark Issues Button - Only show if not already marked as having issues */}
-                                                {!paymentStatus.status.includes('HAS ISSUES') && (
+                                                {/* Mark Issues Button - Only show if not already marked as having issues and not completed */}
+                                                {!paymentStatus.status.includes('HAS ISSUES') && !paymentStatus.status.includes('VERIFIED') && !paymentStatus.status.includes('PAID') && (
                                                     <button
                                                         onClick={() => handleCheckVerification('mark_issues')}
                                                         disabled={updatingPaymentStatus}
@@ -1547,13 +1534,23 @@ export default function FacilityMonthlyInvoicePage() {
                                                     </div>
                                                     <div className={`flex items-center text-xs ${
                                                         paymentStatus.status === 'CHECK PAYMENT - IN TRANSIT' ? 'text-indigo-600 font-bold' : 
-                                                        ['CHECK PAYMENT - BEING VERIFIED', 'PAID WITH CHECK - VERIFIED'].includes(paymentStatus.status) ? 'text-gray-600' : 'text-gray-400'
+                                                        ['CHECK PAYMENT - RECEIVED', 'CHECK PAYMENT - BEING VERIFIED', 'PAID WITH CHECK - VERIFIED'].includes(paymentStatus.status) ? 'text-gray-600' : 'text-gray-400'
                                                     }`}>
                                                         <div className={`w-3 h-3 rounded-full mr-2 ${
                                                             paymentStatus.status === 'CHECK PAYMENT - IN TRANSIT' ? 'bg-indigo-500' : 
-                                                            ['CHECK PAYMENT - BEING VERIFIED', 'PAID WITH CHECK - VERIFIED'].includes(paymentStatus.status) ? 'bg-gray-400' : 'bg-gray-300'
+                                                            ['CHECK PAYMENT - RECEIVED', 'CHECK PAYMENT - BEING VERIFIED', 'PAID WITH CHECK - VERIFIED'].includes(paymentStatus.status) ? 'bg-gray-400' : 'bg-gray-300'
                                                         }`}></div>
                                                         Step 2: Check in transit / received by office
+                                                    </div>
+                                                    <div className={`flex items-center text-xs ${
+                                                        paymentStatus.status === 'CHECK PAYMENT - RECEIVED' ? 'text-orange-600 font-bold' : 
+                                                        ['CHECK PAYMENT - BEING VERIFIED', 'PAID WITH CHECK - VERIFIED'].includes(paymentStatus.status) ? 'text-gray-600' : 'text-gray-400'
+                                                    }`}>
+                                                        <div className={`w-3 h-3 rounded-full mr-2 ${
+                                                            paymentStatus.status === 'CHECK PAYMENT - RECEIVED' ? 'bg-orange-500' : 
+                                                            ['CHECK PAYMENT - BEING VERIFIED', 'PAID WITH CHECK - VERIFIED'].includes(paymentStatus.status) ? 'bg-gray-400' : 'bg-gray-300'
+                                                        }`}></div>
+                                                        Step 3: Check received - ready for verification
                                                     </div>
                                                     <div className={`flex items-center text-xs ${
                                                         paymentStatus.status === 'CHECK PAYMENT - BEING VERIFIED' ? 'text-purple-600 font-bold' : 
@@ -1563,7 +1560,7 @@ export default function FacilityMonthlyInvoicePage() {
                                                             paymentStatus.status === 'CHECK PAYMENT - BEING VERIFIED' ? 'bg-purple-500' : 
                                                             paymentStatus.status === 'PAID WITH CHECK - VERIFIED' ? 'bg-gray-400' : 'bg-gray-300'
                                                         }`}></div>
-                                                        Step 3: Dispatcher verification & processing
+                                                        Step 4: Dispatcher verification & processing
                                                     </div>
                                                     <div className={`flex items-center text-xs ${
                                                         paymentStatus.status === 'PAID WITH CHECK - VERIFIED' ? 'text-green-600 font-bold' : 'text-gray-400'
@@ -1571,7 +1568,7 @@ export default function FacilityMonthlyInvoicePage() {
                                                         <div className={`w-3 h-3 rounded-full mr-2 ${
                                                             paymentStatus.status === 'PAID WITH CHECK - VERIFIED' ? 'bg-green-500' : 'bg-gray-300'
                                                         }`}></div>
-                                                        Step 4: Payment verified & completed
+                                                        Step 5: Payment verified & completed
                                                         {paymentStatus.status === 'PAID WITH CHECK - VERIFIED' && paymentStatus.verification_date && (
                                                             <span className="ml-auto text-green-600 font-medium">
                                                                 {new Date(paymentStatus.verification_date).toLocaleDateString('en-US', {
@@ -2261,6 +2258,109 @@ export default function FacilityMonthlyInvoicePage() {
                                     onClick={() => setShowPaymentConfirmation(false)}
                                     disabled={updatingPaymentStatus}
                                     className="flex-1 bg-gray-300 hover:bg-gray-400 disabled:bg-gray-200 text-gray-700 font-medium py-3 px-4 rounded-md transition-colors text-sm"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Professional Verification Dialog */}
+            {showVerificationDialog && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-lg w-full">
+                        <div className="p-6">
+                            <div className="flex items-center mb-6">
+                                <div className="flex-shrink-0">
+                                    <svg className="h-8 w-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.5-4L16 3l-4 4m0 0l-4 4m4-4v12" />
+                                    </svg>
+                                </div>
+                                <div className="ml-4">
+                                    <h3 className="text-xl font-semibold text-gray-900">Professional Verification Required</h3>
+                                    <p className="text-sm text-gray-600 mt-1">Quality assurance confirmation</p>
+                                </div>
+                            </div>
+                            
+                            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                                <div className="flex items-start">
+                                    <svg className="h-5 w-5 text-blue-500 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <div>
+                                        <h4 className="text-sm font-semibold text-blue-800 mb-1">📋 Professional Standards</h4>
+                                        <p className="text-sm text-blue-700">
+                                            <strong>Quality verification required.</strong> Please confirm that all service documentation, billing accuracy, and compliance standards have been thoroughly reviewed and verified.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="mb-6">
+                                <h4 className="text-sm font-medium text-gray-900 mb-3">Verification Checklist:</h4>
+                                <div className="space-y-2">
+                                    <div className="flex items-center text-sm text-gray-700">
+                                        <svg className="h-4 w-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        All trip documentation has been reviewed
+                                    </div>
+                                    <div className="flex items-center text-sm text-gray-700">
+                                        <svg className="h-4 w-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        Billing calculations have been verified
+                                    </div>
+                                    <div className="flex items-center text-sm text-gray-700">
+                                        <svg className="h-4 w-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        Service quality standards have been met
+                                    </div>
+                                    <div className="flex items-center text-sm text-gray-700">
+                                        <svg className="h-4 w-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        Compliance requirements have been satisfied
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-gray-50 p-4 rounded-lg mb-6">
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="font-medium text-gray-700">Invoice Amount:</span>
+                                    <span className="font-bold text-gray-900">${totalAmount.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm mt-1">
+                                    <span className="font-medium text-gray-700">Facility:</span>
+                                    <span className="font-medium text-gray-900">{facilityInfo?.name}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm mt-1">
+                                    <span className="font-medium text-gray-700">Period:</span>
+                                    <span className="font-medium text-gray-900">{getMonthDisplayName()}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm mt-1">
+                                    <span className="font-medium text-gray-700">Total Trips:</span>
+                                    <span className="font-medium text-gray-900">{facilityTrips.length}</span>
+                                </div>
+                            </div>
+                            
+                            <div className="flex space-x-3">
+                                <button
+                                    onClick={() => {
+                                        setShowVerificationDialog(false);
+                                        handleCheckVerification('mark_verified');
+                                    }}
+                                    disabled={updatingPaymentStatus}
+                                    className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium py-3 px-4 rounded-md transition-colors text-sm"
+                                >
+                                    ✅ Confirm Professional Verification
+                                </button>
+                                <button
+                                    onClick={() => setShowVerificationDialog(false)}
+                                    className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 font-medium py-3 px-4 rounded-md transition-colors text-sm"
                                 >
                                     Cancel
                                 </button>

@@ -191,6 +191,24 @@ export async function POST(request) {
         })}. Reason: ${verification_notes || 'No specific reason noted'}.`
         break
 
+      case 'check_received':
+        newPaymentStatus = 'CHECK PAYMENT - RECEIVED'
+        auditNote = `Check payment received by dispatcher on ${now.toLocaleDateString('en-US', { 
+          month: 'long', 
+          day: 'numeric', 
+          year: 'numeric' 
+        })}. Check is now ready for verification processing.`
+        break
+
+      case 'mark_not_received':
+        newPaymentStatus = 'CHECK PAYMENT - NOT RECEIVED'
+        auditNote = `Check payment marked as not received by dispatcher on ${now.toLocaleDateString('en-US', { 
+          month: 'long', 
+          day: 'numeric', 
+          year: 'numeric' 
+        })}. Facility will be contacted to resolve this issue.`
+        break
+
       default:
         return Response.json(
           { error: 'Invalid verification action' },
@@ -326,6 +344,10 @@ function getSuccessMessage(action, status) {
       return 'Check payment marked as having issues. Facility will be notified to resolve.'
     case 'request_new_check':
       return 'Replacement check requested. Facility will be notified to send a new check.'
+    case 'check_received':
+      return 'Check payment received and ready for verification processing.'
+    case 'mark_not_received':
+      return 'Check payment marked as not received. Facility will be contacted to resolve this issue.'
     default:
       return 'Check verification action completed successfully.'
   }
