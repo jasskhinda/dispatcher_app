@@ -28,6 +28,10 @@ export default function FacilityMonthlyInvoicePage() {
     const [contractLoading, setContractLoading] = useState(false);
     const [contractError, setContractError] = useState(null);
     
+    // Professional billing breakdown states
+    const [previouslyPaidAmount, setPreviouslyPaidAmount] = useState(0);
+    const [completedTripsAmount, setCompletedTripsAmount] = useState(0);
+    
     const router = useRouter();
     const params = useParams();
     const facilityMonth = params.facilityMonth; // This will be in format: facilityId-YYYY-MM
@@ -512,24 +516,53 @@ export default function FacilityMonthlyInvoicePage() {
                     setFacilityTrips([]);
                 }
                 
-                // Calculate total for billable trips and pending amount
-                console.log('🔍 Step 9: Calculating billable and pending amounts...');
+                // Calculate professional billing breakdown
+                console.log('🔍 Step 9: Calculating professional billing breakdown...');
                 const enhancedTrips = facilityTrips.length > 0 ? facilityTrips : (trips || []);
                 
-                // Billable amount (completed trips only)
-                const billableAmount = enhancedTrips
-                    .filter(trip => trip.status === 'completed' && trip.price > 0)
-                    .reduce((sum, trip) => sum + parseFloat(trip.price || 0), 0);
+                // Determine if this month has been paid
+                const paidStatuses = [
+                    'PAID', 
+                    'PAID WITH CARD', 
+                    'PAID WITH CHECK - VERIFIED',
+                    'PAID WITH CHECK',
+                    'PAID WITH BANK TRANSFER'
+                ];
+                const isMonthPaid = paymentStatus && paidStatuses.includes(paymentStatus.payment_status || paymentStatus.status);
+                
+                console.log('💰 Payment status analysis:', {
+                    hasPaymentStatus: !!paymentStatus,
+                    paymentStatusValue: paymentStatus?.payment_status || paymentStatus?.status,
+                    isMonthPaid
+                });
+                
+                // Professional billing calculation
+                const completedTrips = enhancedTrips.filter(trip => trip.status === 'completed' && trip.price > 0);
+                const completedAmount = completedTrips.reduce((sum, trip) => sum + parseFloat(trip.price || 0), 0);
                 
                 // Pending amount (upcoming/pending trips)
                 const pendingTripsAmount = enhancedTrips
                     .filter(trip => ['upcoming', 'pending', 'confirmed'].includes(trip.status) && trip.price > 0)
                     .reduce((sum, trip) => sum + parseFloat(trip.price || 0), 0);
                 
-                console.log(`✅ Step 9: Calculated billable amount: $${billableAmount.toFixed(2)}`);
-                console.log(`✅ Step 9: Calculated pending amount: $${pendingTripsAmount.toFixed(2)}`);
-                setTotalAmount(billableAmount);
+                // Professional billing logic:
+                // - If month is paid: Total Due = $0, Previously Paid = completed amount
+                // - If month not paid: Total Due = completed amount, Previously Paid = $0
+                const totalDue = isMonthPaid ? 0 : completedAmount;
+                const previouslyPaid = isMonthPaid ? completedAmount : 0;
+                
+                console.log(`✅ Step 9: Professional billing breakdown:`);
+                console.log(`   - Completed trips amount: $${completedAmount.toFixed(2)}`);
+                console.log(`   - Previously paid amount: $${previouslyPaid.toFixed(2)}`);
+                console.log(`   - Currently due amount: $${totalDue.toFixed(2)}`);
+                console.log(`   - Pending trips amount: $${pendingTripsAmount.toFixed(2)}`);
+                
+                setTotalAmount(totalDue);
                 setPendingAmount(pendingTripsAmount);
+                
+                // Store additional billing info for display
+                setPreviouslyPaidAmount(previouslyPaid);
+                setCompletedTripsAmount(completedAmount);
                 
                 console.log('✅ Step 10: All processing complete, setting loading to false');
                 setLoading(false);
@@ -1348,6 +1381,32 @@ export default function FacilityMonthlyInvoicePage() {
                                         </div>
                                     )}
                                     
+                                    {/* Professional Billing Breakdown */}
+                                    {previouslyPaidAmount > 0 && (
+                                        <div className="flex justify-between items-center p-3 bg-blue-50 rounded border border-blue-200">
+                                            <span className="text-blue-700 font-medium">💰 Previously Paid:</span>
+                                            <span className="font-bold text-blue-800">${previouslyPaidAmount.toFixed(2)}</span>
+                                        </div>
+                                    )}
+                                    <div className="flex justify-between items-center p-3 bg-green-50 rounded border border-green-200">
+                                        <span className="text-green-700 font-medium">
+                                            {totalAmount > 0 ? '💳 Amount Due:' : '✅ Fully Paid:'}
+                                        </span>
+                                        <span className="font-bold text-green-800">${totalAmount.toFixed(2)}</span>
+                                    </div>
+                                    {pendingAmount > 0 && (
+                                        <div className="flex justify-between items-center p-3 bg-purple-50 rounded border border-purple-200">
+                                            <span className="text-purple-700 font-medium">⏳ Pending Amount:</span>
+                                            <span className="font-bold text-purple-800">${pendingAmount.toFixed(2)}</span>
+                                        </div>
+                                    )}
+                                    {(previouslyPaidAmount > 0 || pendingAmount > 0) && (
+                                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded border border-gray-300">
+                                            <span className="text-gray-700 font-medium">📊 Total When All Trips Complete:</span>
+                                            <span className="font-bold text-gray-800">${(previouslyPaidAmount + totalAmount + pendingAmount).toFixed(2)}</span>
+                                        </div>
+                                    )}
+                                    
                                     {/* Payment Notes for Dispatcher */}
                                     {paymentStatus?.payment_notes && (
                                         <div className="p-3 bg-blue-50 rounded border border-blue-200">
@@ -1666,23 +1725,39 @@ export default function FacilityMonthlyInvoicePage() {
                                         </div>
                                     )}
                                     
-                                    {/* Pending Amount */}
-                                    {pendingAmount > 0 && (
-                                        <div className="flex justify-between items-center p-3 bg-purple-50 rounded border border-purple-200">
-                                            <span className="text-purple-700 font-medium">Pending Amount:</span>
-                                            <span className="font-bold text-purple-800">${pendingAmount.toFixed(2)}</span>
-                                        </div>
-                                    )}
-                                    
-                                    <div className="border-t-2 pt-4 mt-4">
+                                    {/* Professional Billing Breakdown */}
+                                    <div className="space-y-3">
+                                        {/* Previously Paid Amount */}
+                                        {previouslyPaidAmount > 0 && (
+                                            <div className="flex justify-between items-center p-3 bg-blue-50 rounded border border-blue-200">
+                                                <span className="text-blue-700 font-medium">💰 Previously Paid (Completed Trips):</span>
+                                                <span className="font-bold text-blue-800">${previouslyPaidAmount.toFixed(2)}</span>
+                                            </div>
+                                        )}
+                                        
+                                        {/* Currently Due Amount */}
                                         <div className="flex justify-between items-center p-4 bg-green-100 rounded-lg border-2 border-green-300">
-                                            <span className="text-xl font-bold text-green-900">Total Amount Due:</span>
+                                            <span className="text-xl font-bold text-green-900">
+                                                {totalAmount > 0 ? '💳 Total Amount Due:' : '✅ Fully Paid - No Amount Due:'}
+                                            </span>
                                             <span className="text-2xl font-bold text-green-800">${totalAmount.toFixed(2)}</span>
                                         </div>
+                                        
+                                        {/* Pending Amount */}
                                         {pendingAmount > 0 && (
-                                            <div className="flex justify-between items-center p-3 bg-purple-100 rounded-lg border border-purple-300 mt-2">
-                                                <span className="text-md font-medium text-purple-900">Total When All Trips Complete:</span>
-                                                <span className="text-lg font-bold text-purple-800">${(totalAmount + pendingAmount).toFixed(2)}</span>
+                                            <div className="flex justify-between items-center p-3 bg-purple-100 rounded-lg border border-purple-300">
+                                                <span className="text-md font-medium text-purple-900">⏳ Pending Amount (Awaiting Completion):</span>
+                                                <span className="font-bold text-purple-800">${pendingAmount.toFixed(2)}</span>
+                                            </div>
+                                        )}
+                                        
+                                        {/* Total Summary */}
+                                        {(previouslyPaidAmount > 0 || pendingAmount > 0) && (
+                                            <div className="border-t-2 pt-3 mt-3">
+                                                <div className="flex justify-between items-center p-3 bg-gray-100 rounded border border-gray-300">
+                                                    <span className="text-md font-medium text-gray-700">📊 Total All Trips (Paid + Due + Pending):</span>
+                                                    <span className="text-lg font-bold text-gray-800">${(previouslyPaidAmount + totalAmount + pendingAmount).toFixed(2)}</span>
+                                                </div>
                                             </div>
                                         )}
                                     </div>
