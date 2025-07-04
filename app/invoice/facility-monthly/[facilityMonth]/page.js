@@ -550,18 +550,9 @@ export default function FacilityMonthlyInvoicePage() {
                 setPreviouslyPaidAmount(isMonthPaid ? monthlyCompletedAmount : 0);
                 setCompletedTripsAmount(totalMonthlyRevenue);
                 
-                // Process all trips for display (no complex categorization)
-                const processedCompletedTrips = completedTrips.map(trip => ({
-                    ...trip,
-                    displayPrice: trip.price || 0,
-                    clientName: trip.clientName || 'Unknown Client'
-                }));
-                
-                const processedPendingTrips = pendingTrips.map(trip => ({
-                    ...trip,
-                    displayPrice: trip.price || 0,
-                    clientName: trip.clientName || 'Unknown Client'
-                }));
+                // Process all trips for display with proper client names
+                const processedCompletedTrips = processTripsWithFacilityInfo(completedTrips);
+                const processedPendingTrips = processTripsWithFacilityInfo(pendingTrips);
                 
                 // Set simplified trip lists
                 setBillableTrips(isMonthPaid ? [] : processedCompletedTrips); // If paid, show no billable trips
@@ -1310,10 +1301,6 @@ export default function FacilityMonthlyInvoicePage() {
                                         <span className="text-gray-700 font-medium">Total Trips:</span>
                                         <span className="font-bold text-gray-900">{facilityTrips.length}</span>
                                     </div>
-                                    <div className="flex justify-between items-center p-3 bg-green-50 rounded border border-green-200">
-                                        <span className="text-green-700 font-medium">Unpaid Trips (Need Payment):</span>
-                                        <span className="font-bold text-green-800">{billableTrips.length}</span>
-                                    </div>
                                     <div className="flex justify-between items-center p-3 bg-amber-50 rounded border border-amber-200">
                                         <span className="text-amber-700 font-medium">Pending Trips:</span>
                                         <span className="font-bold text-amber-800">{pendingTrips.length}</span>
@@ -1347,20 +1334,6 @@ export default function FacilityMonthlyInvoicePage() {
                                             </span>
                                         </div>
                                     )}
-                                    
-                                    {/* Professional Billing Breakdown */}
-                                    {previouslyPaidAmount > 0 && (
-                                        <div className="flex justify-between items-center p-3 bg-blue-50 rounded border border-blue-200">
-                                            <span className="text-blue-700 font-medium">💰 Previously Paid:</span>
-                                            <span className="font-bold text-blue-800">${previouslyPaidAmount.toFixed(2)}</span>
-                                        </div>
-                                    )}
-                                    <div className="flex justify-between items-center p-3 bg-green-50 rounded border border-green-200">
-                                        <span className="text-green-700 font-medium">
-                                            {totalAmount > 0 ? '💳 Amount Due for New Completed Trips:' : '✅ Fully Paid:'}
-                                        </span>
-                                        <span className="font-bold text-green-800">${totalAmount.toFixed(2)}</span>
-                                    </div>
                                     {pendingAmount > 0 && (
                                         <div className="flex justify-between items-center p-3 bg-purple-50 rounded border border-purple-200">
                                             <span className="text-purple-700 font-medium">⏳ Pending Amount:</span>
