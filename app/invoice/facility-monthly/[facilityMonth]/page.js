@@ -21,7 +21,6 @@ export default function FacilityMonthlyInvoicePage() {
     const [updatingPaymentStatus, setUpdatingPaymentStatus] = useState(false);
     const [processingTripAction, setProcessingTripAction] = useState(null);
     const [pendingAmount, setPendingAmount] = useState(0);
-    const [showUnpaidConfirmation, setShowUnpaidConfirmation] = useState(false);
     const [showEditForm, setShowEditForm] = useState(false);
     const [editingTrip, setEditingTrip] = useState(null);
     const [facilityContract, setFacilityContract] = useState(null);
@@ -1227,30 +1226,16 @@ export default function FacilityMonthlyInvoicePage() {
                             
                             {/* Action Buttons */}
                             <div className="flex items-center space-x-2">
-                                <button
-                                    onClick={() => {
-                                        const currentStatus = paymentStatus?.payment_status || paymentStatus?.status || 'UNPAID';
-                                        const statusString = String(currentStatus || 'UNPAID');
-                                        if (statusString.includes('PAID')) {
-                                            setShowUnpaidConfirmation(true);
-                                        } else {
-                                            handleTogglePaymentStatus();
-                                        }
-                                    }}
-                                    disabled={updatingPaymentStatus}
-                                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                                        String(paymentStatus?.payment_status || paymentStatus?.status || 'UNPAID').includes('PAID')
-                                            ? 'bg-red-100 hover:bg-red-200 text-red-700'
-                                            : 'bg-green-100 hover:bg-green-200 text-green-700'
-                                    } disabled:opacity-50`}
-                                >
-                                    {updatingPaymentStatus 
-                                        ? '⏳ Updating...' 
-                                        : String(paymentStatus?.payment_status || paymentStatus?.status || 'UNPAID').includes('PAID') 
-                                            ? '❌ MARK UNPAID' 
-                                            : '✅ MARK PAID'
-                                    }
-                                </button>
+                                {/* Only show MARK PAID button if not already paid */}
+                                {!String(paymentStatus?.payment_status || paymentStatus?.status || 'UNPAID').includes('PAID') && (
+                                    <button
+                                        onClick={() => handleTogglePaymentStatus()}
+                                        disabled={updatingPaymentStatus}
+                                        className="bg-green-100 hover:bg-green-200 text-green-700 px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50"
+                                    >
+                                        {updatingPaymentStatus ? '⏳ Updating...' : '✅ MARK PAID'}
+                                    </button>
+                                )}
                                 
                                 <button
                                     onClick={() => window.print()}
@@ -2214,54 +2199,6 @@ export default function FacilityMonthlyInvoicePage() {
                 </div>
             </div>
 
-            {/* Confirmation Dialog for Marking as Unpaid */}
-            {showUnpaidConfirmation && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-                        <div className="p-6">
-                            <div className="flex items-center mb-4">
-                                <div className="flex-shrink-0">
-                                    <svg className="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                                    </svg>
-                                </div>
-                                <div className="ml-3">
-                                    <h3 className="text-lg font-medium text-gray-900">Confirm Mark as Unpaid</h3>
-                                </div>
-                            </div>
-                            
-                            <div className="mb-6">
-                                <p className="text-sm text-gray-700 mb-4">
-                                    Are you sure you want to mark this invoice as unpaid? This will revert the status back to DUE and the facility will have the option to retry and pay the invoice again.
-                                </p>
-                                <p className="text-sm text-gray-700 mb-4">
-                                    Only click this if the payment failed or you didn't receive the payment. Please check with your bank first.
-                                </p>
-                            </div>
-                            
-                            <div className="flex space-x-3">
-                                <button
-                                    onClick={() => {
-                                        setShowUnpaidConfirmation(false);
-                                        handleTogglePaymentStatus();
-                                    }}
-                                    disabled={updatingPaymentStatus}
-                                    className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 text-white font-medium py-2 px-4 rounded-md transition-colors"
-                                >
-                                    {updatingPaymentStatus ? 'Processing...' : 'Yes, Mark as Unpaid'}
-                                </button>
-                                <button
-                                    onClick={() => setShowUnpaidConfirmation(false)}
-                                    disabled={updatingPaymentStatus}
-                                    className="flex-1 bg-gray-300 hover:bg-gray-400 disabled:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded-md transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* Edit Trip Form Modal */}
             {showEditForm && editingTrip && (
