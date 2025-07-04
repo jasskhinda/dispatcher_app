@@ -1455,6 +1455,20 @@ export default function FacilityMonthlyInvoicePage() {
                                                     </button>
                                                 )}
                                                 
+                                                {/* Verify Check Sent Button - for ALREADY SENT status */}
+                                                {paymentStatus.status === 'CHECK PAYMENT - ALREADY SENT' && (
+                                                    <button
+                                                        onClick={() => handleCheckVerification('mark_verified')}
+                                                        disabled={updatingPaymentStatus}
+                                                        className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center"
+                                                    >
+                                                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                        </svg>
+                                                        Verify Check Sent
+                                                    </button>
+                                                )}
+                                                
                                                 {/* Mark Verified Button */}
                                                 {['CHECK PAYMENT - BEING VERIFIED', 'CHECK PAYMENT - IN TRANSIT'].includes(paymentStatus.status) && (
                                                     <button
@@ -1469,29 +1483,33 @@ export default function FacilityMonthlyInvoicePage() {
                                                     </button>
                                                 )}
                                                 
-                                                {/* Mark Issues Button */}
-                                                <button
-                                                    onClick={() => handleCheckVerification('mark_issues')}
-                                                    disabled={updatingPaymentStatus}
-                                                    className="bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center"
-                                                >
-                                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                    </svg>
-                                                    Mark as Having Issues
-                                                </button>
+                                                {/* Mark Issues Button - Only show if not already marked as having issues */}
+                                                {!paymentStatus.status.includes('HAS ISSUES') && (
+                                                    <button
+                                                        onClick={() => handleCheckVerification('mark_issues')}
+                                                        disabled={updatingPaymentStatus}
+                                                        className="bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center"
+                                                    >
+                                                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                        </svg>
+                                                        Mark as Having Issues
+                                                    </button>
+                                                )}
                                                 
-                                                {/* Request New Check Button */}
-                                                <button
-                                                    onClick={() => handleCheckVerification('request_new_check')}
-                                                    disabled={updatingPaymentStatus}
-                                                    className="bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center"
-                                                >
-                                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                                    </svg>
-                                                    Request New Check
-                                                </button>
+                                                {/* Request New Check Button - Only show if issues exist */}
+                                                {paymentStatus.status.includes('HAS ISSUES') && (
+                                                    <button
+                                                        onClick={() => handleCheckVerification('request_new_check')}
+                                                        disabled={updatingPaymentStatus}
+                                                        className="bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center"
+                                                    >
+                                                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                        </svg>
+                                                        Request New Check
+                                                    </button>
+                                                )}
                                             </div>
                                             
                                             {/* Verification Notes */}

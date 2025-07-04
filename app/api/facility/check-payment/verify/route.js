@@ -150,18 +150,27 @@ export async function POST(request) {
         break
 
       case 'mark_verified':
-        if (!['CHECK PAYMENT - BEING VERIFIED', 'CHECK PAYMENT - IN TRANSIT'].includes(currentInvoice.payment_status)) {
+        if (!['CHECK PAYMENT - BEING VERIFIED', 'CHECK PAYMENT - IN TRANSIT', 'CHECK PAYMENT - ALREADY SENT'].includes(currentInvoice.payment_status)) {
           return Response.json(
             { error: 'Check must be in verification status to mark as verified' },
             { status: 400 }
           )
         }
         newPaymentStatus = 'PAID WITH CHECK - VERIFIED'
-        auditNote = `Check payment verified and deposited by dispatcher on ${now.toLocaleDateString('en-US', { 
-          month: 'long', 
-          day: 'numeric', 
-          year: 'numeric' 
-        })}. Payment process completed successfully.`
+        
+        if (currentInvoice.payment_status === 'CHECK PAYMENT - ALREADY SENT') {
+          auditNote = `Check payment verified by dispatcher on ${now.toLocaleDateString('en-US', { 
+            month: 'long', 
+            day: 'numeric', 
+            year: 'numeric' 
+          })}. Facility-reported sent check confirmed and payment process completed successfully.`
+        } else {
+          auditNote = `Check payment verified and deposited by dispatcher on ${now.toLocaleDateString('en-US', { 
+            month: 'long', 
+            day: 'numeric', 
+            year: 'numeric' 
+          })}. Payment process completed successfully.`
+        }
         break
 
       case 'mark_issues':
