@@ -1786,42 +1786,6 @@ export default function FacilityMonthlyInvoicePage() {
                                         </div>
                                     )}
                                     
-                                    {/* Professional Billing Breakdown */}
-                                    <div className="space-y-3">
-                                        {/* Previously Paid Amount */}
-                                        {previouslyPaidAmount > 0 && (
-                                            <div className="flex justify-between items-center p-3 bg-blue-50 rounded border border-blue-200">
-                                                <span className="text-blue-700 font-medium">💰 Previously Paid (Completed Trips):</span>
-                                                <span className="font-bold text-blue-800">${previouslyPaidAmount.toFixed(2)}</span>
-                                            </div>
-                                        )}
-                                        
-                                        {/* Currently Due Amount */}
-                                        <div className="flex justify-between items-center p-4 bg-green-100 rounded-lg border-2 border-green-300">
-                                            <span className="text-xl font-bold text-green-900">
-                                                {totalAmount > 0 ? '💳 Total Amount Due for New Completed Trips:' : '✅ Fully Paid - No Amount Due:'}
-                                            </span>
-                                            <span className="text-2xl font-bold text-green-800">${totalAmount.toFixed(2)}</span>
-                                        </div>
-                                        
-                                        {/* Pending Amount */}
-                                        {pendingAmount > 0 && (
-                                            <div className="flex justify-between items-center p-3 bg-purple-100 rounded-lg border border-purple-300">
-                                                <span className="text-md font-medium text-purple-900">⏳ Pending Amount (Awaiting Completion):</span>
-                                                <span className="font-bold text-purple-800">${pendingAmount.toFixed(2)}</span>
-                                            </div>
-                                        )}
-                                        
-                                        {/* Total Summary */}
-                                        {(previouslyPaidAmount > 0 || pendingAmount > 0) && (
-                                            <div className="border-t-2 pt-3 mt-3">
-                                                <div className="flex justify-between items-center p-3 bg-gray-100 rounded border border-gray-300">
-                                                    <span className="text-md font-medium text-gray-700">📊 Total Revenue When All Trips Are Paid:</span>
-                                                    <span className="text-lg font-bold text-gray-800">${(previouslyPaidAmount + totalAmount + pendingAmount).toFixed(2)}</span>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
                                 </div>
                             </div>
                         </div>
