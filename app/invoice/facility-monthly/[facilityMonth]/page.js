@@ -25,6 +25,7 @@ export default function FacilityMonthlyInvoicePage() {
     const [editingTrip, setEditingTrip] = useState(null);
     const [showPaymentConfirmation, setShowPaymentConfirmation] = useState(false);
     const [showVerificationDialog, setShowVerificationDialog] = useState(false);
+    const [showCheckReceivedDialog, setShowCheckReceivedDialog] = useState(false);
     const [facilityContract, setFacilityContract] = useState(null);
     const [contractLoading, setContractLoading] = useState(false);
     const [contractError, setContractError] = useState(null);
@@ -734,10 +735,22 @@ export default function FacilityMonthlyInvoicePage() {
         }
     };
 
-    // Handle check payment verification
+    // Handle check payment verification - with confirmation for check_received
     const handleCheckVerification = async (verificationAction) => {
         if (!facilityInfo || !paymentStatus?.id || updatingPaymentStatus) return;
+        
+        // For check_received action, show confirmation dialog first
+        if (verificationAction === 'check_received') {
+            setShowCheckReceivedDialog(true);
+            return;
+        }
 
+        // Continue with normal verification process for other actions
+        await processCheckVerification(verificationAction);
+    };
+
+    // Process check verification (separated for confirmation workflow)
+    const processCheckVerification = async (verificationAction) => {
         // Debug: Check cookies from frontend
         console.log('🍪 Frontend cookies:', document.cookie);
         const supabaseCookies = document.cookie.split(';').filter(cookie => 
@@ -1345,9 +1358,14 @@ export default function FacilityMonthlyInvoicePage() {
                                                 const now = new Date();
                                                 const currentMonth = now.toISOString().slice(0, 7);
                                                 const isCurrentMonth = invoiceMonth === currentMonth;
-                                                const isPaid = (billableTrips.length === 0 && totalAmount === 0);
+                                                const isFutureMonth = invoiceMonth > currentMonth;
+                                                const actualPaymentStatus = String(paymentStatus?.payment_status || paymentStatus?.status || 'UNPAID');
+                                                const isActuallyPaid = actualPaymentStatus.includes('PAID');
+                                                const hasTrips = billableTrips.length > 0 || totalAmount > 0;
                                                 
-                                                if (isPaid && !isCurrentMonth) {
+                                                if (isFutureMonth) {
+                                                    return 'bg-gray-100 text-gray-600 border border-gray-300';
+                                                } else if (isActuallyPaid) {
                                                     return 'bg-green-100 text-green-800 border border-green-300';
                                                 } else if (isCurrentMonth) {
                                                     return 'bg-blue-100 text-blue-800 border border-blue-300';
@@ -1360,9 +1378,13 @@ export default function FacilityMonthlyInvoicePage() {
                                                 const now = new Date();
                                                 const currentMonth = now.toISOString().slice(0, 7);
                                                 const isCurrentMonth = invoiceMonth === currentMonth;
-                                                const isPaid = (billableTrips.length === 0 && totalAmount === 0);
+                                                const isFutureMonth = invoiceMonth > currentMonth;
+                                                const actualPaymentStatus = String(paymentStatus?.payment_status || paymentStatus?.status || 'UNPAID');
+                                                const isActuallyPaid = actualPaymentStatus.includes('PAID');
                                                 
-                                                if (isPaid && !isCurrentMonth) {
+                                                if (isFutureMonth) {
+                                                    return '📅 FUTURE MONTH - NO INVOICE YET';
+                                                } else if (isActuallyPaid) {
                                                     return '✅ FULLY PAID';
                                                 } else if (isCurrentMonth) {
                                                     return totalAmount > 0 
@@ -1371,7 +1393,7 @@ export default function FacilityMonthlyInvoicePage() {
                                                 } else {
                                                     return totalAmount > 0 
                                                         ? `💳 $${totalAmount.toFixed(2)} DUE`
-                                                        : '💰 UNPAID';
+                                                        : '💰 NO BILLABLE TRIPS';
                                                 }
                                             })()}
                                         </span>
@@ -2351,7 +2373,7 @@ export default function FacilityMonthlyInvoicePage() {
                                 <button
                                     onClick={() => {
                                         setShowVerificationDialog(false);
-                                        handleCheckVerification('mark_verified');
+                                        processCheckVerification('mark_verified');
                                     }}
                                     disabled={updatingPaymentStatus}
                                     className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium py-3 px-4 rounded-md transition-colors text-sm"
@@ -2360,6 +2382,103 @@ export default function FacilityMonthlyInvoicePage() {
                                 </button>
                                 <button
                                     onClick={() => setShowVerificationDialog(false)}
+                                    className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 font-medium py-3 px-4 rounded-md transition-colors text-sm"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Check Received Confirmation Dialog */}
+            {showCheckReceivedDialog && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-lg w-full">
+                        <div className="p-6">
+                            <div className="flex items-center mb-6">
+                                <div className="flex-shrink-0">
+                                    <svg className="h-8 w-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                                    </svg>
+                                </div>
+                                <div className="ml-4">
+                                    <h3 className="text-xl font-semibold text-gray-900">⚠️ Check Receipt Confirmation</h3>
+                                    <p className="text-sm text-gray-600 mt-1">Critical financial verification</p>
+                                </div>
+                            </div>
+                            
+                            <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                                <div className="flex items-start">
+                                    <svg className="h-5 w-5 text-orange-500 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                                    </svg>
+                                    <div>
+                                        <h4 className="text-sm font-semibold text-orange-800 mb-2">🏦 Banking Verification Required</h4>
+                                        <p className="text-sm text-orange-700 mb-3">
+                                            <strong>Are you sure you have RECEIVED and DEPOSITED the check?</strong>
+                                        </p>
+                                        <p className="text-sm text-orange-700">
+                                            Please make sure the money is deposited to your bank because once it's marked as <strong>PAID & VERIFIED</strong>, this action cannot be undone.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="mb-6">
+                                <h4 className="text-sm font-medium text-gray-900 mb-3">Before confirming, please verify:</h4>
+                                <div className="space-y-2">
+                                    <div className="flex items-center text-sm text-gray-700">
+                                        <svg className="h-4 w-4 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        Physical check has been received in office
+                                    </div>
+                                    <div className="flex items-center text-sm text-gray-700">
+                                        <svg className="h-4 w-4 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        Check amount matches invoice total ($${totalAmount.toFixed(2)})
+                                    </div>
+                                    <div className="flex items-center text-sm text-gray-700">
+                                        <svg className="h-4 w-4 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        Check appears valid (proper signatures, dates, etc.)
+                                    </div>
+                                    <div className="flex items-center text-sm text-gray-700">
+                                        <svg className="h-4 w-4 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        Ready to proceed to bank deposit verification
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-red-50 p-4 rounded-lg mb-6 border border-red-200">
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="font-medium text-red-700">⚠️ IMPORTANT:</span>
+                                    <span className="font-bold text-red-800">IRREVERSIBLE ACTION</span>
+                                </div>
+                                <p className="text-xs text-red-600 mt-2">
+                                    This will mark the check as received and move it to verification status. The facility will be notified that their payment is being processed.
+                                </p>
+                            </div>
+                            
+                            <div className="flex space-x-3">
+                                <button
+                                    onClick={() => {
+                                        setShowCheckReceivedDialog(false);
+                                        processCheckVerification('check_received');
+                                    }}
+                                    disabled={updatingPaymentStatus}
+                                    className="flex-1 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white font-medium py-3 px-4 rounded-md transition-colors text-sm"
+                                >
+                                    ✅ Yes, Check Received & Ready for Deposit
+                                </button>
+                                <button
+                                    onClick={() => setShowCheckReceivedDialog(false)}
                                     className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 font-medium py-3 px-4 rounded-md transition-colors text-sm"
                                 >
                                     Cancel
