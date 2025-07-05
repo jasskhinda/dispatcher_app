@@ -454,7 +454,8 @@ export default function FacilityMonthlyInvoicePage() {
                             status: invoiceData.payment_status, // Keep both for compatibility
                             total_amount: invoiceData.total_amount,
                             last_updated: invoiceData.last_updated,
-                            invoice_number: invoiceData.invoice_number
+                            invoice_number: invoiceData.invoice_number,
+                            payment_notes: invoiceData.notes // Include professional notes for dispatcher
                         };
                         console.log('✅ Step 7.5: Found payment status in facility_invoices:', paymentStatus);
                     } else {
