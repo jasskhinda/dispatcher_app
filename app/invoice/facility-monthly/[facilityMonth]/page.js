@@ -1373,26 +1373,6 @@ export default function FacilityMonthlyInvoicePage() {
                             
                             {/* Action Buttons */}
                             <div className="flex items-center space-x-2">
-                                {/* Only show MARK PAID button if not already paid AND month has ended */}
-                                {(() => {
-                                    const now = new Date();
-                                    const currentMonth = now.toISOString().slice(0, 7); // YYYY-MM format
-                                    const isCurrentMonth = invoiceMonth === currentMonth;
-                                    const isPaid = String(paymentStatus?.payment_status || paymentStatus?.status || 'UNPAID').includes('PAID');
-                                    
-                                    if (isPaid) return null; // Already paid
-                                    
-                                    // Show normal MARK PAID button for all months
-                                    return (
-                                        <button
-                                            onClick={() => setShowPaymentConfirmation(true)}
-                                            disabled={updatingPaymentStatus}
-                                            className="bg-green-100 hover:bg-green-200 text-green-700 px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50"
-                                        >
-                                            {updatingPaymentStatus ? '⏳ Updating...' : '✅ MARK PAID'}
-                                        </button>
-                                    );
-                                })()}
                                 
                                 <button
                                     onClick={() => window.print()}
