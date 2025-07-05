@@ -1926,13 +1926,45 @@ export default function FacilityMonthlyInvoicePage() {
                                             const actualPaymentStatus = String(paymentStatus?.payment_status || paymentStatus?.status || 'UNPAID');
                                             const isActuallyPaid = actualPaymentStatus.includes('PAID');
                                             
+                                            // Always show as COMPLETED TRIPS with payment status indicator
                                             if (isActuallyPaid) {
-                                                return '✅ PAID TRIPS (Payment Verified)';
+                                                return '✅ COMPLETED TRIPS (Payment Verified)';
                                             } else {
-                                                return '💳 DUE TRIPS (Need Payment)';
+                                                return '🚗 COMPLETED TRIPS (Awaiting Payment)';
                                             }
                                         })()}
                                     </h4>
+                                    
+                                    {/* Summary Box for Completed Trips */}
+                                    <div className="mb-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <p className="text-sm font-medium text-gray-600">Total Completed Trips</p>
+                                                <p className="text-2xl font-bold text-gray-900">{billableTrips.length}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-sm font-medium text-gray-600">Total Amount</p>
+                                                <p className={`text-2xl font-bold ${
+                                                    String(paymentStatus?.payment_status || paymentStatus?.status || 'UNPAID').includes('PAID')
+                                                        ? 'text-green-700'
+                                                        : 'text-blue-700'
+                                                }`}>
+                                                    ${billableTrips.reduce((sum, trip) => sum + (trip.displayPrice || 0), 0).toFixed(2)}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        {String(paymentStatus?.payment_status || paymentStatus?.status || 'UNPAID').includes('PAID') && (
+                                            <div className="mt-3 pt-3 border-t border-gray-200">
+                                                <p className="text-sm text-green-600 font-medium flex items-center">
+                                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                                                    </svg>
+                                                    Payment has been verified and processed
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                    
                                     <div className="overflow-x-auto">
                                         <table className="w-full border border-gray-200">
                                             <thead className={`${
@@ -2011,6 +2043,25 @@ export default function FacilityMonthlyInvoicePage() {
                                                 ))}
                                             </tbody>
                                         </table>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* No Completed Trips Message */}
+                            {billableTrips.length === 0 && (
+                                <div className="mb-6">
+                                    <h4 className="text-md font-medium text-gray-700 mb-3">🚗 COMPLETED TRIPS</h4>
+                                    <div className="bg-gray-50 border border-gray-300 rounded-lg p-8 text-center">
+                                        <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <h5 className="text-lg font-medium text-gray-600 mb-2">No Completed Trips Yet</h5>
+                                        <p className="text-sm text-gray-500">
+                                            Once trips are marked as completed, they will appear here for billing.
+                                        </p>
+                                        <p className="text-xs text-gray-400 mt-2">
+                                            Pending trips below will move here once completed.
+                                        </p>
                                     </div>
                                 </div>
                             )}
