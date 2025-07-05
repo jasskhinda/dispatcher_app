@@ -94,12 +94,19 @@ export default function FacilityMonthlyInvoicePage() {
                 
                 // Try to load cached data first
                 const cacheKey = `facility_invoice_${facilityMonth}`;
+                
+                // TEMPORARY: Clear old cache to fix stale data issue
+                sessionStorage.removeItem(cacheKey);
+                console.log('🗑️ Cleared potentially stale cache');
+                
                 const cachedData = sessionStorage.getItem(cacheKey);
                 
                 if (cachedData) {
                     try {
                         const parsed = JSON.parse(cachedData);
                         console.log('📦 Loading data from cache...');
+                        console.log('📦 Cached billable trips count:', parsed.billableTrips?.length || 0);
+                        console.log('📦 Sample cached billable trip:', parsed.billableTrips?.[0] || 'None');
                         
                         // Set cached data immediately to prevent blank screen
                         setBillableTrips(parsed.billableTrips || []);
@@ -676,8 +683,10 @@ export default function FacilityMonthlyInvoicePage() {
                 });
                 
                 // Set simplified trip lists - always show completed trips for transparency
+                console.log('🔄 About to set billable trips. Count:', processedCompletedTrips.length);
                 setBillableTrips(processedCompletedTrips); // Always show completed trips, regardless of payment status
                 setPendingTrips(processedPendingTrips);
+                console.log('✅ State updated - billable trips set to:', processedCompletedTrips.length, 'items');
                 
                 // Cache the successfully loaded data
                 try {
