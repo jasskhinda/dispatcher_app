@@ -1381,24 +1381,8 @@ export default function FacilityMonthlyInvoicePage() {
                                     const isPaid = String(paymentStatus?.payment_status || paymentStatus?.status || 'UNPAID').includes('PAID');
                                     
                                     if (isPaid) return null; // Already paid
-                                    if (isCurrentMonth) {
-                                        // Current month - show disabled button with explanation
-                                        return (
-                                            <div className="relative group">
-                                                <button
-                                                    disabled={true}
-                                                    className="bg-gray-100 text-gray-400 px-4 py-2 rounded-md text-sm font-medium cursor-not-allowed"
-                                                >
-                                                    🚫 Cannot Mark Paid
-                                                </button>
-                                                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                                                    Monthly billing: Can only mark as paid after month ends
-                                                </div>
-                                            </div>
-                                        );
-                                    }
                                     
-                                    // Past month - show normal MARK PAID button
+                                    // Show normal MARK PAID button for all months
                                     return (
                                         <button
                                             onClick={() => setShowPaymentConfirmation(true)}
