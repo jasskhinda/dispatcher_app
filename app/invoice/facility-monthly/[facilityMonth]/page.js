@@ -905,39 +905,91 @@ export default function FacilityMonthlyInvoicePage() {
                         : trip
                 );
                 
-                // Recalculate totals after status change
+                // Recalculate totals and update trip categorization after status change
                 setTimeout(() => {
-                    const billableAmount = updatedTrips
-                        .filter(trip => trip.status === 'completed' && trip.price > 0)
-                        .reduce((sum, trip) => sum + parseFloat(trip.price || 0), 0);
+                    // Separate completed and pending trips
+                    const completedTrips = updatedTrips.filter(trip => trip.status === 'completed' && trip.price > 0);
+                    const pendingTripsFiltered = updatedTrips.filter(trip => ['upcoming', 'pending', 'confirmed'].includes(trip.status) && trip.price > 0);
                     
-                    const pendingTripsAmount = updatedTrips
-                        .filter(trip => ['upcoming', 'pending', 'confirmed'].includes(trip.status) && trip.price > 0)
-                        .reduce((sum, trip) => sum + parseFloat(trip.price || 0), 0);
+                    // Calculate amounts
+                    const billableAmount = completedTrips.reduce((sum, trip) => sum + parseFloat(trip.price || 0), 0);
+                    const pendingTripsAmount = pendingTripsFiltered.reduce((sum, trip) => sum + parseFloat(trip.price || 0), 0);
                     
+                    // Process trips with facility info for proper display
+                    const processedCompletedTrips = processTripsWithFacilityInfo(completedTrips);
+                    const processedPendingTrips = processTripsWithFacilityInfo(pendingTripsFiltered);
+                    
+                    // Update all related states
                     setTotalAmount(billableAmount);
                     setPendingAmount(pendingTripsAmount);
+                    setBillableTrips(processedCompletedTrips);
+                    setPendingTrips(processedPendingTrips);
+                    
+                    console.log(`🔄 Updated after trip action - Completed: ${processedCompletedTrips.length}, Pending: ${processedPendingTrips.length}`);
                     console.log(`🔄 Updated totals - Billable: $${billableAmount.toFixed(2)}, Pending: $${pendingTripsAmount.toFixed(2)}`);
                 }, 100);
                 
                 return updatedTrips;
             });
 
-            // Show success message briefly
-            const actionText = {
-                approve: 'approved',
-                reject: 'rejected', 
-                complete: 'completed',
-                cancel: 'cancelled'
+            // Show professional success message
+            const actionMessages = {
+                approve: 'Trip approved and ready for scheduling',
+                reject: 'Trip rejected and removed from active queue', 
+                complete: 'Trip completed successfully and moved to billing section',
+                cancel: 'Trip cancelled and removed from schedule'
             };
             
             setTimeout(() => {
-                alert(`✅ Trip ${actionText[action]} successfully!`);
+                // Create a more professional notification
+                const notification = document.createElement('div');
+                notification.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-6 py-3 rounded-lg shadow-lg z-50';
+                notification.innerHTML = `
+                    <div class="flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        <span class="font-medium">${actionMessages[action]}</span>
+                    </div>
+                `;
+                document.body.appendChild(notification);
+                
+                // Remove notification after 4 seconds
+                setTimeout(() => {
+                    if (document.body.contains(notification)) {
+                        notification.style.opacity = '0';
+                        notification.style.transform = 'translateX(100%)';
+                        notification.style.transition = 'all 0.3s ease-out';
+                        setTimeout(() => document.body.removeChild(notification), 300);
+                    }
+                }, 4000);
             }, 100);
 
         } catch (err) {
             console.error(`❌ Error ${action}ing trip:`, err);
-            alert(`❌ Failed to ${action} trip: ${err.message}`);
+            
+            // Create professional error notification
+            const errorNotification = document.createElement('div');
+            errorNotification.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-6 py-3 rounded-lg shadow-lg z-50';
+            errorNotification.innerHTML = `
+                <div class="flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span class="font-medium">Failed to ${action} trip: ${err.message}</span>
+                </div>
+            `;
+            document.body.appendChild(errorNotification);
+            
+            // Remove error notification after 6 seconds
+            setTimeout(() => {
+                if (document.body.contains(errorNotification)) {
+                    errorNotification.style.opacity = '0';
+                    errorNotification.style.transform = 'translateX(100%)';
+                    errorNotification.style.transition = 'all 0.3s ease-out';
+                    setTimeout(() => document.body.removeChild(errorNotification), 300);
+                }
+            }, 6000);
         } finally {
             setProcessingTripAction(null);
         }
