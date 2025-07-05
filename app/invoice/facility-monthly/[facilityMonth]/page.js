@@ -91,6 +91,34 @@ export default function FacilityMonthlyInvoicePage() {
         async function fetchMonthlyInvoiceData() {
             try {
                 console.log('🔍 Step 1: Starting fetchMonthlyInvoiceData...');
+                
+                // Try to load cached data first
+                const cacheKey = `facility_invoice_${facilityMonth}`;
+                const cachedData = sessionStorage.getItem(cacheKey);
+                
+                if (cachedData) {
+                    try {
+                        const parsed = JSON.parse(cachedData);
+                        console.log('📦 Loading data from cache...');
+                        
+                        // Set cached data immediately to prevent blank screen
+                        setBillableTrips(parsed.billableTrips || []);
+                        setPendingTrips(parsed.pendingTrips || []);
+                        setFacilityTrips(parsed.facilityTrips || []);
+                        setFacilityInfo(parsed.facilityInfo || null);
+                        setTotalAmount(parsed.totalAmount || 0);
+                        setPendingAmount(parsed.pendingAmount || 0);
+                        setCompletedTripsAmount(parsed.completedTripsAmount || 0);
+                        setPreviouslyPaidAmount(parsed.previouslyPaidAmount || 0);
+                        setPaymentStatus(parsed.paymentStatus || null);
+                        setInvoiceMonth(parsed.invoiceMonth || '');
+                        
+                        console.log('✅ Cached data loaded successfully');
+                    } catch (cacheError) {
+                        console.log('⚠️ Cache parsing error, proceeding with fresh fetch');
+                    }
+                }
+                
                 setLoading(true);
                 
                 // Check authentication
@@ -315,7 +343,7 @@ export default function FacilityMonthlyInvoicePage() {
                         .eq('facility_id', facilityId)
                         .gte('pickup_time', startISO)
                         .lte('pickup_time', endISO)
-                        .in('status', ['completed', 'upcoming', 'pending', 'confirmed'])
+                        .in('status', ['completed', 'upcoming', 'pending', 'confirmed', 'approved', 'in_process', 'paid_in_progress', 'approved_pending_payment'])
                         .order('pickup_time', { ascending: false });
                     
                     console.log('✅ Step 6: Trips query built successfully');
@@ -325,7 +353,7 @@ export default function FacilityMonthlyInvoicePage() {
                 }
 
                 console.log('🔍 Step 7: Executing trips query...');
-                const { data: trips, error: tripsError } = await tripsQuery;
+                let { data: trips, error: tripsError } = await tripsQuery;
 
                 if (tripsError) {
                     console.error('❌ Step 7 FAILED: Error fetching trips:', tripsError);
@@ -337,6 +365,51 @@ export default function FacilityMonthlyInvoicePage() {
 
                 console.log(`✅ Step 7: Found ${trips?.length || 0} trips for the month`);
                 console.log('🔍 Sample trip data:', trips?.[0] || 'No trips found');
+                
+                // For historical months (older than current month), add fallback query to catch completed trips
+                // that might have been missed due to status filtering
+                const currentDateForHistory = new Date();
+                const currentMonthForHistory = currentDateForHistory.toISOString().slice(0, 7); // YYYY-MM format
+                const isHistoricalMonth = targetMonth < currentMonthForHistory;
+                
+                if (isHistoricalMonth && (!trips || trips.length === 0)) {
+                    console.log('🔄 Historical month with no trips found, trying fallback query...');
+                    
+                    try {
+                        // Broader query for historical months - include all possible completed statuses
+                        const { data: fallbackTrips, error: fallbackError } = await supabase
+                            .from('trips')
+                            .select(`
+                                id,
+                                pickup_address,
+                                destination_address,
+                                pickup_time,
+                                price,
+                                status,
+                                wheelchair_type,
+                                is_round_trip,
+                                additional_passengers,
+                                managed_client_id,
+                                user_id,
+                                last_edited_by,
+                                last_edited_at,
+                                edited_by_role
+                            `)
+                            .eq('facility_id', facilityId)
+                            .gte('pickup_time', startISO)
+                            .lte('pickup_time', endISO)
+                            .not('price', 'is', null)
+                            .gt('price', 0)
+                            .order('pickup_time', { ascending: false });
+                        
+                        if (!fallbackError && fallbackTrips && fallbackTrips.length > 0) {
+                            console.log(`🔄 Fallback query found ${fallbackTrips.length} trips for historical month`);
+                            trips = fallbackTrips;
+                        }
+                    } catch (fallbackErr) {
+                        console.log('⚠️ Fallback query failed:', fallbackErr);
+                    }
+                }
                 
                 // Debug price data for all trips
                 if (trips && trips.length > 0) {
@@ -606,6 +679,27 @@ export default function FacilityMonthlyInvoicePage() {
                 setBillableTrips(processedCompletedTrips); // Always show completed trips, regardless of payment status
                 setPendingTrips(processedPendingTrips);
                 
+                // Cache the successfully loaded data
+                try {
+                    const dataToCache = {
+                        billableTrips: processedCompletedTrips,
+                        pendingTrips: processedPendingTrips,
+                        facilityTrips: trips || [], // Use the original trips data
+                        facilityInfo: facilityInfo,
+                        totalAmount: isMonthPaid ? 0 : monthlyCompletedAmount,
+                        pendingAmount: pendingTripsAmount,
+                        completedTripsAmount: totalMonthlyRevenue,
+                        previouslyPaidAmount: isMonthPaid ? monthlyCompletedAmount : 0,
+                        paymentStatus: paymentStatus,
+                        invoiceMonth: `${facilityInfo?.name || 'Facility'} - ${new Date(year, month - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`,
+                        timestamp: Date.now()
+                    };
+                    sessionStorage.setItem(cacheKey, JSON.stringify(dataToCache));
+                    console.log('💾 Data cached successfully');
+                } catch (cacheError) {
+                    console.log('⚠️ Failed to cache data:', cacheError);
+                }
+                
                 console.log('✅ Step 10: All processing complete, setting loading to false');
                 setLoading(false);
 
@@ -622,7 +716,7 @@ export default function FacilityMonthlyInvoicePage() {
         if (facilityMonth) {
             fetchMonthlyInvoiceData();
         }
-    }, [facilityMonth, router, supabase]);
+    }, [facilityMonth]);
 
     // Process trips with facility information (moved to separate function)
     const processTripsWithFacilityInfo = (trips) => {
@@ -967,6 +1061,11 @@ export default function FacilityMonthlyInvoicePage() {
                     
                     console.log(`🔄 Updated after trip action - Completed: ${processedCompletedTrips.length}, Pending: ${processedPendingTrips.length}`);
                     console.log(`🔄 Updated totals - Billable: $${billableAmount.toFixed(2)}, Pending: $${pendingTripsAmount.toFixed(2)}`);
+                    
+                    // Invalidate cache when trip status changes
+                    const cacheKey = `facility_invoice_${facilityMonth}`;
+                    sessionStorage.removeItem(cacheKey);
+                    console.log('🗑️ Cache invalidated after trip status update');
                 }, 100);
                 
                 return updatedTrips;
