@@ -562,8 +562,8 @@ export default function FacilityMonthlyInvoicePage() {
                 const processedCompletedTrips = processTripsWithFacilityInfo(completedTrips);
                 const processedPendingTrips = processTripsWithFacilityInfo(pendingTrips);
                 
-                // Set simplified trip lists
-                setBillableTrips(isMonthPaid ? [] : processedCompletedTrips); // If paid, show no billable trips
+                // Set simplified trip lists - always show completed trips for transparency
+                setBillableTrips(processedCompletedTrips); // Always show completed trips, regardless of payment status
                 setPendingTrips(processedPendingTrips);
                 
                 console.log('✅ Step 10: All processing complete, setting loading to false');
@@ -1853,13 +1853,43 @@ export default function FacilityMonthlyInvoicePage() {
                         <div className="mb-8">
                             <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">Trip Details:</h3>
                             
-                            {/* Unpaid Trips */}
+                            {/* Trip Details - Dynamic based on payment status */}
                             {billableTrips.length > 0 && (
                                 <div className="mb-6">
-                                    <h4 className="text-md font-medium text-green-700 mb-3">💳 Unpaid Trips (Need Payment)</h4>
+                                    <h4 className={`text-md font-medium mb-3 ${
+                                        (() => {
+                                            const now = new Date();
+                                            const currentMonth = now.toISOString().slice(0, 7);
+                                            const isFutureMonth = invoiceMonth > currentMonth;
+                                            const actualPaymentStatus = String(paymentStatus?.payment_status || paymentStatus?.status || 'UNPAID');
+                                            const isActuallyPaid = actualPaymentStatus.includes('PAID');
+                                            
+                                            return isActuallyPaid ? 'text-green-700' : 'text-blue-700';
+                                        })()
+                                    }`}>
+                                        {(() => {
+                                            const now = new Date();
+                                            const currentMonth = now.toISOString().slice(0, 7);
+                                            const isFutureMonth = invoiceMonth > currentMonth;
+                                            const actualPaymentStatus = String(paymentStatus?.payment_status || paymentStatus?.status || 'UNPAID');
+                                            const isActuallyPaid = actualPaymentStatus.includes('PAID');
+                                            
+                                            if (isActuallyPaid) {
+                                                return '✅ PAID TRIPS (Payment Verified)';
+                                            } else {
+                                                return '💳 DUE TRIPS (Need Payment)';
+                                            }
+                                        })()}
+                                    </h4>
                                     <div className="overflow-x-auto">
                                         <table className="w-full border border-gray-200">
-                                            <thead className="bg-green-50">
+                                            <thead className={`${
+                                                (() => {
+                                                    const actualPaymentStatus = String(paymentStatus?.payment_status || paymentStatus?.status || 'UNPAID');
+                                                    const isActuallyPaid = actualPaymentStatus.includes('PAID');
+                                                    return isActuallyPaid ? 'bg-green-50' : 'bg-blue-50';
+                                                })()
+                                            }`}>
                                                 <tr>
                                                     <th className="text-left px-4 py-3 text-xs font-medium text-gray-700 uppercase border-b">Date</th>
                                                     <th className="text-left px-4 py-3 text-xs font-medium text-gray-700 uppercase border-b">Client</th>
