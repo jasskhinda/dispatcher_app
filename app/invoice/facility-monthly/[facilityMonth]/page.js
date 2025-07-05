@@ -520,14 +520,42 @@ export default function FacilityMonthlyInvoicePage() {
                     setFacilityTrips([]);
                 }
                 
+                // Also ensure we set the enhanced data for the billing calculation
+                console.log('🔍 Setting facility trips state for consistency...');
+                
                 // SIMPLIFIED monthly billing calculation
                 console.log('🔍 Step 9: Monthly billing calculation...');
-                const enhancedTrips = facilityTrips.length > 0 ? facilityTrips : (trips || []);
+                // Use the freshly enhanced trips from Step 8
+                const tripsForBilling = trips && trips.length > 0 ? trips.map(trip => {
+                    const enhancedTrip = { ...trip };
+                    
+                    // Add user profile if exists
+                    if (trip.user_id) {
+                        enhancedTrip.user_profile = userProfiles.find(profile => profile.id === trip.user_id) || null;
+                    }
+                    
+                    // Add managed client if exists
+                    if (trip.managed_client_id) {
+                        enhancedTrip.managed_client = managedClients.find(client => client.id === trip.managed_client_id) || null;
+                    }
+                    
+                    return enhancedTrip;
+                }) : [];
                 
                 // Simple monthly billing: all completed trips for the month
-                const allTrips = enhancedTrips.filter(trip => trip.price > 0);
+                const allTrips = tripsForBilling.filter(trip => trip.price > 0);
                 const completedTrips = allTrips.filter(trip => trip.status === 'completed');
                 const pendingTrips = allTrips.filter(trip => ['upcoming', 'pending', 'confirmed'].includes(trip.status));
+                
+                // Debug logging for trip categorization
+                console.log('🔍 TRIP CATEGORIZATION DEBUG:', {
+                    totalFetchedTrips: tripsForBilling.length,
+                    tripsWithPrice: allTrips.length,
+                    completedTrips: completedTrips.length,
+                    pendingTrips: pendingTrips.length,
+                    completedTripStatuses: completedTrips.map(t => ({ id: t.id?.substring(0, 8), status: t.status, price: t.price })),
+                    allTripStatuses: tripsForBilling.map(t => ({ id: t.id?.substring(0, 8), status: t.status, price: t.price }))
+                });
                 
                 // Calculate monthly totals
                 const monthlyCompletedAmount = completedTrips.reduce((sum, trip) => sum + parseFloat(trip.price || 0), 0);
@@ -561,6 +589,18 @@ export default function FacilityMonthlyInvoicePage() {
                 // Process all trips for display with proper client names
                 const processedCompletedTrips = processTripsWithFacilityInfo(completedTrips);
                 const processedPendingTrips = processTripsWithFacilityInfo(pendingTrips);
+                
+                // Debug the processed trips
+                console.log('🔍 PROCESSED TRIPS DEBUG:', {
+                    processedCompletedCount: processedCompletedTrips.length,
+                    processedPendingCount: processedPendingTrips.length,
+                    sampleProcessedCompleted: processedCompletedTrips.slice(0, 3).map(t => ({ 
+                        id: t.id?.substring(0, 8), 
+                        status: t.status, 
+                        price: t.price,
+                        clientName: t.clientName 
+                    }))
+                });
                 
                 // Set simplified trip lists - always show completed trips for transparency
                 setBillableTrips(processedCompletedTrips); // Always show completed trips, regardless of payment status
