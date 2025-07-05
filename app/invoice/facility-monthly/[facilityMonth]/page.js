@@ -308,6 +308,7 @@ export default function FacilityMonthlyInvoicePage() {
                     
                     console.log('✅ Step 5: Final facility info loaded:', enhancedFacility.name);
                 }
+                
 
                 // Load facility contract
                 await loadFacilityContract(facilityId);
@@ -667,8 +668,11 @@ export default function FacilityMonthlyInvoicePage() {
                 setCompletedTripsAmount(totalMonthlyRevenue);
                 
                 // Process all trips for display with proper client names
+                console.log('🔍 About to process trips. FacilityInfo:', facilityInfo ? 'EXISTS' : 'NULL/UNDEFINED');
+                console.log('🔍 CompletedTrips count before processing:', completedTrips.length);
                 const processedCompletedTrips = processTripsWithFacilityInfo(completedTrips);
                 const processedPendingTrips = processTripsWithFacilityInfo(pendingTrips);
+                console.log('🔍 ProcessedCompletedTrips count after processing:', processedCompletedTrips.length);
                 
                 // Debug the processed trips
                 console.log('🔍 PROCESSED TRIPS DEBUG:', {
@@ -729,7 +733,18 @@ export default function FacilityMonthlyInvoicePage() {
 
     // Process trips with facility information (moved to separate function)
     const processTripsWithFacilityInfo = (trips) => {
-        if (!facilityInfo || !trips) return [];
+        if (!trips || trips.length === 0) return [];
+        
+        // Use facilityInfo state, with fallback if not available
+        const currentFacilityInfo = facilityInfo || {
+            name: 'Unknown Facility'
+        };
+        
+        console.log('🔍 processTripsWithFacilityInfo called with:', {
+            tripsCount: trips.length,
+            facilityInfoAvailable: !!facilityInfo,
+            facilityName: currentFacilityInfo.name
+        });
         
         return trips.map(trip => {
             // Get client name
@@ -751,7 +766,7 @@ export default function FacilityMonthlyInvoicePage() {
                 clientName = 'David Patel (Managed)';
                 clientPhone = '(416) 555-2233';
             } else {
-                clientName = `${facilityInfo.name} Client`;
+                clientName = `${currentFacilityInfo.name} Client`;
             }
 
             // Handle price - ensure it's properly parsed and has a fallback
