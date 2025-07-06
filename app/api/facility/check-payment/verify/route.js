@@ -192,12 +192,12 @@ export async function POST(request) {
         break
 
       case 'check_received':
-        newPaymentStatus = 'PAID WITH CHECK (BEING VERIFIED)'
-        auditNote = `Check payment received by dispatcher on ${now.toLocaleDateString('en-US', { 
+        newPaymentStatus = 'PAID WITH CHECK - VERIFIED'
+        auditNote = `Check payment received and verified by dispatcher on ${now.toLocaleDateString('en-US', { 
           month: 'long', 
           day: 'numeric', 
           year: 'numeric' 
-        })}. Check is now ready for verification processing.`
+        })}. Payment process completed successfully.`
         break
 
       case 'mark_not_received':

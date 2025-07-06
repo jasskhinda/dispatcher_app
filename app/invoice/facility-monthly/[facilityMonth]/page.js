@@ -1934,10 +1934,9 @@ export default function FacilityMonthlyInvoicePage() {
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                     </svg>
                                                     <div>
-                                                        <h4 className="font-semibold text-green-800">Check Payment Completed</h4>
+                                                        <h4 className="font-semibold text-green-800">✅ Payment Verification Complete</h4>
                                                         <p className="text-sm text-green-600 mt-1">
-                                                            Amount: <span className="font-medium">${totalAmount.toFixed(2)}</span> | 
-                                                            Status: <span className="font-medium">{paymentStatus.status}</span>
+                                                            <span className="font-medium">${totalAmount.toFixed(2)}</span> • Check payment verified and processed
                                                         </p>
                                                         {paymentStatus.last_updated && (
                                                             <div className="mt-2 p-2 bg-green-100 border border-green-200 rounded text-xs">
@@ -1965,18 +1964,38 @@ export default function FacilityMonthlyInvoicePage() {
                                                 </div>
                                             </div>
                                             
-                                            <div className="bg-green-100 p-3 rounded mb-3">
-                                                <p className="text-sm text-green-800">
-                                                    <strong>Check Details:</strong> This invoice was paid by check and has been verified.
+                                            <div className="bg-green-100 p-4 rounded mb-3">
+                                                <p className="text-sm text-green-800 font-medium mb-2">
+                                                    ✅ Payment Processing Complete
                                                 </p>
+                                                <div className="grid grid-cols-2 gap-4 text-xs text-green-700">
+                                                    <div>
+                                                        <p className="font-medium">Payment Method:</p>
+                                                        <p>Business Check</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-medium">Verification Status:</p>
+                                                        <p>Fully Verified & Deposited</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-medium">Invoice Status:</p>
+                                                        <p>Paid in Full</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-medium">All Trips:</p>
+                                                        <p>Marked as Paid</p>
+                                                    </div>
+                                                </div>
                                                 {paymentStatus.verification_date && (
-                                                    <p className="text-xs text-green-700 mt-1">
-                                                        Verified on: {new Date(paymentStatus.verification_date).toLocaleDateString('en-US', {
-                                                            month: 'long',
-                                                            day: 'numeric',
-                                                            year: 'numeric'
-                                                        })}
-                                                    </p>
+                                                    <div className="mt-3 pt-2 border-t border-green-200">
+                                                        <p className="text-xs text-green-700">
+                                                            <strong>Official Payment Date:</strong> {new Date(paymentStatus.verification_date).toLocaleDateString('en-US', {
+                                                                month: 'long',
+                                                                day: 'numeric',
+                                                                year: 'numeric'
+                                                            })}
+                                                        </p>
+                                                    </div>
                                                 )}
                                             </div>
                                         </div>
@@ -2782,8 +2801,8 @@ export default function FacilityMonthlyInvoicePage() {
                                     </svg>
                                 </div>
                                 <div className="ml-4">
-                                    <h3 className="text-xl font-semibold text-gray-900">⚠️ Check Receipt Confirmation</h3>
-                                    <p className="text-sm text-gray-600 mt-1">Critical financial verification</p>
+                                    <h3 className="text-xl font-semibold text-gray-900">🏦 Final Payment Verification</h3>
+                                    <p className="text-sm text-gray-600 mt-1">Check received & deposited confirmation</p>
                                 </div>
                             </div>
                             
@@ -2793,54 +2812,71 @@ export default function FacilityMonthlyInvoicePage() {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
                                     </svg>
                                     <div>
-                                        <h4 className="text-sm font-semibold text-orange-800 mb-2">🏦 Banking Verification Required</h4>
+                                        <h4 className="text-sm font-semibold text-orange-800 mb-2">🏦 Final Banking Confirmation</h4>
                                         <p className="text-sm text-orange-700 mb-3">
-                                            <strong>Are you sure you have RECEIVED and DEPOSITED the check?</strong>
+                                            <strong>CONFIRM: Check has been RECEIVED and DEPOSITED into company bank account?</strong>
                                         </p>
                                         <p className="text-sm text-orange-700">
-                                            Please make sure the money is deposited to your bank because once it's marked as <strong>PAID & VERIFIED</strong>, this action cannot be undone.
+                                            This is the <strong>FINAL STEP</strong> in check payment processing. Please ensure the funds are fully deposited because this action <strong>CANNOT BE UNDONE</strong> and will mark the invoice as completely paid.
                                         </p>
                                     </div>
                                 </div>
                             </div>
 
                             <div className="mb-6">
-                                <h4 className="text-sm font-medium text-gray-900 mb-3">Before confirming, please verify:</h4>
+                                <h4 className="text-sm font-medium text-gray-900 mb-3">Final Verification Checklist - ALL MUST BE COMPLETED:</h4>
                                 <div className="space-y-2">
                                     <div className="flex items-center text-sm text-gray-700">
-                                        <svg className="h-4 w-4 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg className="h-4 w-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                                         </svg>
-                                        Physical check has been received in office
+                                        ✓ Physical check received and verified in office
                                     </div>
                                     <div className="flex items-center text-sm text-gray-700">
-                                        <svg className="h-4 w-4 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg className="h-4 w-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                                         </svg>
-                                        Check amount matches invoice total ($${totalAmount.toFixed(2)})
+                                        ✓ Check amount verified: $${totalAmount.toFixed(2)}
                                     </div>
                                     <div className="flex items-center text-sm text-gray-700">
-                                        <svg className="h-4 w-4 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg className="h-4 w-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                                         </svg>
-                                        Check appears valid (proper signatures, dates, etc.)
+                                        ✓ Check authenticity confirmed (signatures, dates, routing)
                                     </div>
                                     <div className="flex items-center text-sm text-gray-700">
-                                        <svg className="h-4 w-4 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg className="h-4 w-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                                         </svg>
-                                        Ready to proceed to bank deposit verification
+                                        ✓ Check DEPOSITED into company bank account
+                                    </div>
+                                    <div className="flex items-center text-sm text-gray-700">
+                                        <svg className="h-4 w-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        ✓ Bank deposit confirmation received
                                     </div>
                                 </div>
                             </div>
 
                             <div className="bg-red-50 p-4 rounded-lg mb-6 border border-red-200">
-                                <div className="flex justify-between items-center text-sm">
-                                    <span className="font-medium text-red-700">⚠️ IMPORTANT:</span>
-                                    <span className="font-bold text-red-800">IRREVERSIBLE ACTION</span>
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="font-bold text-red-800 flex items-center">
+                                        <svg className="h-5 w-5 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                                        </svg>
+                                        FINAL CONFIRMATION REQUIRED
+                                    </span>
+                                    <span className="font-bold text-red-800 bg-red-200 px-2 py-1 rounded text-xs">IRREVERSIBLE</span>
                                 </div>
-                                <p className="text-xs text-red-600 mt-2">
-                                    This will mark the check as received and move it to verification status. The facility will be notified that their payment is being processed.
+                                <p className="text-sm text-red-700 font-medium mb-1">
+                                    This action will IMMEDIATELY mark the invoice as FULLY PAID and notify the facility that payment processing is complete.
+                                </p>
+                                <p className="text-xs text-red-600">
+                                    • No further verification steps required
+                                    • Invoice will show as "Payment Completed Successfully"
+                                    • All trips will be marked as paid
+                                    • Action cannot be reversed
                                 </p>
                             </div>
                             
@@ -2853,7 +2889,7 @@ export default function FacilityMonthlyInvoicePage() {
                                     disabled={updatingPaymentStatus}
                                     className="flex-1 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white font-medium py-3 px-4 rounded-md transition-colors text-sm"
                                 >
-                                    ✅ Yes, Check Received & Ready for Deposit
+                                    ✅ Yes, Check Received & Deposited
                                 </button>
                                 <button
                                     onClick={() => setShowCheckReceivedDialog(false)}
