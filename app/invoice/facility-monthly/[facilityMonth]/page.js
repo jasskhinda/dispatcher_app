@@ -1979,22 +1979,6 @@ export default function FacilityMonthlyInvoicePage() {
                                                     </p>
                                                 )}
                                             </div>
-                                            
-                                            {/* Option to mark as not received if needed */}
-                                            <button
-                                                onClick={() => {
-                                                    if (confirm('Are you sure no check was received? This will mark the payment as unpaid and notify the facility.')) {
-                                                        handleCheckVerification('mark_not_received')
-                                                    }
-                                                }}
-                                                disabled={updatingPaymentStatus}
-                                                className="bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center w-full"
-                                            >
-                                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                                                </svg>
-                                                No Check Received - Contact Facility
-                                            </button>
                                         </div>
                                     )}
                                     
