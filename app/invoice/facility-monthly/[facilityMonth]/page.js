@@ -26,6 +26,8 @@ export default function FacilityMonthlyInvoicePage() {
     const [showPaymentConfirmation, setShowPaymentConfirmation] = useState(false);
     const [showVerificationDialog, setShowVerificationDialog] = useState(false);
     const [showCheckReceivedDialog, setShowCheckReceivedDialog] = useState(false);
+    const [showConfirmPaymentDialog, setShowConfirmPaymentDialog] = useState(false);
+    const [showPaymentFailedDialog, setShowPaymentFailedDialog] = useState(false);
     const [facilityContract, setFacilityContract] = useState(null);
     const [contractLoading, setContractLoading] = useState(false);
     const [contractError, setContractError] = useState(null);
@@ -894,13 +896,23 @@ export default function FacilityMonthlyInvoicePage() {
         }
     };
 
-    // Handle check payment verification - with confirmation for check_received
+    // Handle check payment verification - with confirmation for critical actions
     const handleCheckVerification = async (verificationAction) => {
         if (!facilityInfo || !paymentStatus?.id || updatingPaymentStatus) return;
         
-        // For check_received action, show confirmation dialog first
+        // Show confirmation dialogs for critical actions
         if (verificationAction === 'check_received') {
             setShowCheckReceivedDialog(true);
+            return;
+        }
+        
+        if (verificationAction === 'confirm_payment') {
+            setShowConfirmPaymentDialog(true);
+            return;
+        }
+        
+        if (verificationAction === 'payment_failed') {
+            setShowPaymentFailedDialog(true);
             return;
         }
 
@@ -1563,9 +1575,12 @@ export default function FacilityMonthlyInvoicePage() {
                                                 const actualPaymentStatus = String(paymentStatus?.payment_status || paymentStatus?.status || 'UNPAID');
                                                 const isActuallyPaid = actualPaymentStatus.includes('PAID');
                                                 const isVerified = actualPaymentStatus.includes('VERIFIED');
+                                                const isPaymentFailed = actualPaymentStatus.includes('PAYMENT FAILED');
                                                 
                                                 if (isFutureMonth) {
                                                     return '📅 FUTURE MONTH - NO INVOICE YET';
+                                                } else if (isPaymentFailed) {
+                                                    return '📤 PAYMENT REQUEST SENT';
                                                 } else if (isActuallyPaid && isVerified) {
                                                     return '✅ FULLY PAID';
                                                 } else if (isActuallyPaid && !isVerified) {
@@ -2859,6 +2874,166 @@ export default function FacilityMonthlyInvoicePage() {
                                 <button
                                     onClick={() => setShowCheckReceivedDialog(false)}
                                     className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 font-medium py-3 px-4 rounded-md transition-colors text-sm"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Confirm Payment Dialog */}
+            {showConfirmPaymentDialog && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-lg w-full">
+                        <div className="p-6">
+                            <div className="flex items-center mb-6">
+                                <div className="flex-shrink-0">
+                                    <svg className="h-8 w-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <div className="ml-4">
+                                    <h3 className="text-xl font-semibold text-gray-900">Confirm Payment Received</h3>
+                                    <p className="text-sm text-gray-600 mt-1">Payment verification confirmation</p>
+                                </div>
+                            </div>
+                            
+                            <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                                <div className="flex items-start">
+                                    <svg className="h-5 w-5 text-amber-500 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                                    </svg>
+                                    <div>
+                                        <h4 className="text-sm font-semibold text-amber-800 mb-1">⚠️ Important Notice</h4>
+                                        <p className="text-sm text-amber-700">
+                                            <strong>ARE YOU SURE YOU RECEIVED THE PAYMENT? This action cannot be undone.</strong> Only confirm if you have verified the payment was successfully received and processed.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-gray-50 p-4 rounded-lg mb-6">
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="font-medium text-gray-700">Payment Amount:</span>
+                                    <span className="font-bold text-gray-900">${totalAmount.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm mt-1">
+                                    <span className="font-medium text-gray-700">Payment Method:</span>
+                                    <span className="font-medium text-gray-900">{paymentStatus?.status}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm mt-1">
+                                    <span className="font-medium text-gray-700">Facility:</span>
+                                    <span className="font-medium text-gray-900">{facilityInfo?.name}</span>
+                                </div>
+                            </div>
+                            
+                            <div className="flex space-x-3">
+                                <button
+                                    onClick={() => {
+                                        setShowConfirmPaymentDialog(false);
+                                        processCheckVerification('confirm_payment');
+                                    }}
+                                    disabled={updatingPaymentStatus}
+                                    className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-medium py-3 px-4 rounded-md transition-colors text-sm"
+                                >
+                                    {updatingPaymentStatus ? (
+                                        <div className="flex items-center justify-center">
+                                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Processing...
+                                        </div>
+                                    ) : (
+                                        '✅ Yes, Payment Confirmed'
+                                    )}
+                                </button>
+                                <button
+                                    onClick={() => setShowConfirmPaymentDialog(false)}
+                                    disabled={updatingPaymentStatus}
+                                    className="flex-1 bg-gray-300 hover:bg-gray-400 disabled:bg-gray-200 text-gray-700 font-medium py-3 px-4 rounded-md transition-colors text-sm"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Payment Failed Dialog */}
+            {showPaymentFailedDialog && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-lg w-full">
+                        <div className="p-6">
+                            <div className="flex items-center mb-6">
+                                <div className="flex-shrink-0">
+                                    <svg className="h-8 w-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <div className="ml-4">
+                                    <h3 className="text-xl font-semibold text-gray-900">Mark Payment as Failed</h3>
+                                    <p className="text-sm text-gray-600 mt-1">Payment failure confirmation</p>
+                                </div>
+                            </div>
+                            
+                            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                                <div className="flex items-start">
+                                    <svg className="h-5 w-5 text-red-500 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                                    </svg>
+                                    <div>
+                                        <h4 className="text-sm font-semibold text-red-800 mb-1">⚠️ Critical Warning</h4>
+                                        <p className="text-sm text-red-700">
+                                            <strong>ARE YOU SURE YOU HAVEN'T RECEIVED ANY PAYMENT?</strong> Please check with your bank because this action cannot be undone and the facility will see a retry payment option.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-gray-50 p-4 rounded-lg mb-6">
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="font-medium text-gray-700">Payment Amount:</span>
+                                    <span className="font-bold text-gray-900">${totalAmount.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm mt-1">
+                                    <span className="font-medium text-gray-700">Payment Method:</span>
+                                    <span className="font-medium text-gray-900">{paymentStatus?.status}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm mt-1">
+                                    <span className="font-medium text-gray-700">Facility:</span>
+                                    <span className="font-medium text-gray-900">{facilityInfo?.name}</span>
+                                </div>
+                            </div>
+                            
+                            <div className="flex space-x-3">
+                                <button
+                                    onClick={() => {
+                                        setShowPaymentFailedDialog(false);
+                                        processCheckVerification('payment_failed');
+                                    }}
+                                    disabled={updatingPaymentStatus}
+                                    className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-medium py-3 px-4 rounded-md transition-colors text-sm"
+                                >
+                                    {updatingPaymentStatus ? (
+                                        <div className="flex items-center justify-center">
+                                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Processing...
+                                        </div>
+                                    ) : (
+                                        '❌ Yes, Mark Payment Failed'
+                                    )}
+                                </button>
+                                <button
+                                    onClick={() => setShowPaymentFailedDialog(false)}
+                                    disabled={updatingPaymentStatus}
+                                    className="flex-1 bg-gray-300 hover:bg-gray-400 disabled:bg-gray-200 text-gray-700 font-medium py-3 px-4 rounded-md transition-colors text-sm"
                                 >
                                     Cancel
                                 </button>
