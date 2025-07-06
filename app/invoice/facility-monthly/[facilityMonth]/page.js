@@ -917,8 +917,9 @@ export default function FacilityMonthlyInvoicePage() {
         );
         console.log('🍪 Supabase cookies from frontend:', supabaseCookies);
 
-        // Get verification notes from textarea
-        const verificationNotes = document.getElementById('verification_notes')?.value || '';
+        // Get verification notes from textarea (check payment or card payment)
+        const verificationNotes = document.getElementById('verification_notes')?.value || 
+                                 document.getElementById('card_verification_notes')?.value || '';
 
         setUpdatingPaymentStatus(true);
         try {
@@ -1561,11 +1562,14 @@ export default function FacilityMonthlyInvoicePage() {
                                                 const isFutureMonth = invoiceMonth > currentMonth;
                                                 const actualPaymentStatus = String(paymentStatus?.payment_status || paymentStatus?.status || 'UNPAID');
                                                 const isActuallyPaid = actualPaymentStatus.includes('PAID');
+                                                const isVerified = actualPaymentStatus.includes('VERIFIED');
                                                 
                                                 if (isFutureMonth) {
                                                     return '📅 FUTURE MONTH - NO INVOICE YET';
-                                                } else if (isActuallyPaid) {
+                                                } else if (isActuallyPaid && isVerified) {
                                                     return '✅ FULLY PAID';
+                                                } else if (isActuallyPaid && !isVerified) {
+                                                    return '⏳ PAYMENT NEEDS VERIFICATION';
                                                 } else if (isCurrentMonth) {
                                                     return totalAmount > 0 
                                                         ? `📅 CURRENT MONTH - $${totalAmount.toFixed(2)} RUNNING TOTAL`
@@ -1851,6 +1855,55 @@ export default function FacilityMonthlyInvoicePage() {
                                             <div className="mt-3 p-3 bg-orange-100 rounded border border-orange-200">
                                                 <p className="text-xs text-orange-700">
                                                     <strong>Professional Check Workflow:</strong> Use these controls to track check payment progress and maintain accurate records for facility billing.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+                                    
+                                    {/* Card/Bank Payment Verification Interface (Dispatcher Only) */}
+                                    {paymentStatus?.status && (paymentStatus.status === 'PAID WITH CARD' || paymentStatus.status === 'PAID WITH BANK TRANSFER') && (
+                                        <div className="p-4 bg-blue-50 border-2 border-blue-300 rounded-lg">
+                                            <div className="flex items-start justify-between mb-4">
+                                                <div className="flex items-center">
+                                                    <svg className="w-6 h-6 text-blue-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                                                    </svg>
+                                                    <div>
+                                                        <h4 className="font-semibold text-blue-800">Payment Verification Required</h4>
+                                                        <p className="text-sm text-blue-600 mt-1">
+                                                            Current Status: <span className="font-medium">{paymentStatus.status}</span>
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                <button
+                                                    onClick={() => handleCheckVerification('confirm_payment')}
+                                                    disabled={updatingPaymentStatus}
+                                                    className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center"
+                                                >
+                                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    CONFIRM PAYMENT
+                                                </button>
+                                                
+                                                <button
+                                                    onClick={() => handleCheckVerification('payment_failed')}
+                                                    disabled={updatingPaymentStatus}
+                                                    className="bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center"
+                                                >
+                                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                                    </svg>
+                                                    PAYMENT FAILED
+                                                </button>
+                                            </div>
+                                            
+                                            <div className="mt-3 p-3 bg-blue-100 rounded border border-blue-200">
+                                                <p className="text-xs text-blue-700">
+                                                    <strong>Payment Verification:</strong> Confirm payment was received successfully or mark as failed if there were issues with processing.
                                                 </p>
                                             </div>
                                         </div>
