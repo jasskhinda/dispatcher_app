@@ -1710,6 +1710,33 @@ export default function FacilityMonthlyInvoicePage() {
                                                     </button>
                                                 )}
                                                 
+                                                {/* Card/Bank Transfer Verification Options */}
+                                                {(paymentStatus.status === 'PAID WITH CARD' || paymentStatus.status === 'PAID WITH BANK TRANSFER') && (
+                                                    <>
+                                                        <button
+                                                            onClick={() => handleCheckVerification('confirm_payment')}
+                                                            disabled={updatingPaymentStatus}
+                                                            className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center"
+                                                        >
+                                                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                            </svg>
+                                                            CONFIRM PAYMENT
+                                                        </button>
+                                                        
+                                                        <button
+                                                            onClick={() => handleCheckVerification('payment_failed')}
+                                                            disabled={updatingPaymentStatus}
+                                                            className="bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center"
+                                                        >
+                                                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                                            </svg>
+                                                            PAYMENT FAILED
+                                                        </button>
+                                                    </>
+                                                )}
+
                                                 {/* Mark Issues Button - Only show if not already marked as having issues and not completed */}
                                                 {!paymentStatus.status.includes('HAS ISSUES') && !paymentStatus.status.includes('VERIFIED') && !paymentStatus.status.includes('PAID') && (
                                                     <button

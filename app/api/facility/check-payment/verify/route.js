@@ -209,6 +209,39 @@ export async function POST(request) {
         })}. Facility will be contacted to resolve this issue.`
         break
 
+      case 'confirm_payment':
+        if (currentInvoice.payment_status === 'PAID WITH CARD') {
+          newPaymentStatus = 'PAID WITH CARD - VERIFIED'
+        } else if (currentInvoice.payment_status === 'PAID WITH BANK TRANSFER') {
+          newPaymentStatus = 'PAID WITH BANK TRANSFER - VERIFIED'
+        } else {
+          return Response.json(
+            { error: 'Invalid status for payment confirmation' },
+            { status: 400 }
+          )
+        }
+        auditNote = `${currentInvoice.payment_status.toLowerCase()} payment confirmed and verified by dispatcher on ${now.toLocaleDateString('en-US', { 
+          month: 'long', 
+          day: 'numeric', 
+          year: 'numeric' 
+        })}. Payment verification completed successfully.`
+        break
+
+      case 'payment_failed':
+        if (currentInvoice.payment_status === 'PAID WITH CARD') {
+          newPaymentStatus = 'PAYMENT FAILED - CARD DECLINED'
+        } else if (currentInvoice.payment_status === 'PAID WITH BANK TRANSFER') {
+          newPaymentStatus = 'PAYMENT FAILED - BANK TRANSFER'
+        } else {
+          newPaymentStatus = 'PAYMENT FAILED'
+        }
+        auditNote = `Payment marked as failed by dispatcher on ${now.toLocaleDateString('en-US', { 
+          month: 'long', 
+          day: 'numeric', 
+          year: 'numeric' 
+        })}. Reason: ${verification_notes || 'Payment verification failed'}. Facility will need to retry payment.`
+        break
+
       default:
         return Response.json(
           { error: 'Invalid verification action' },
