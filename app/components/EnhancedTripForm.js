@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter, useSearchParams } from 'next/navigation';
+import GoogleMapsAutocomplete from './GoogleMapsAutocomplete';
 
 export default function EnhancedTripForm({ user, userProfile, individualClients, managedClients, facilities }) {
   const router = useRouter();
@@ -102,25 +103,71 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
   }, []);
 
   const calculatePricing = async () => {
-    // Simplified pricing calculation for now
     if (!formData.pickupAddress || !formData.destinationAddress) {
       setCurrentPricing(null);
       return;
     }
 
-    // Basic pricing estimate
-    const baseFare = 50;
-    const estimatedMiles = 10; // Default estimate
-    const mileageRate = 3.50; // Average rate
-    const estimatedTotal = baseFare + (estimatedMiles * mileageRate);
-    
-    setCurrentPricing({
-      summary: {
-        estimatedTotal: `$${estimatedTotal.toFixed(2)}`,
-        tripType: formData.isRoundTrip ? 'Round Trip' : 'One Way',
-        distance: `${estimatedMiles} miles`
+    // Use the professional pricing calculation
+    try {
+      const { getPricingEstimate } = await import('@/lib/pricing');
+      
+      const pickupDateTime = new Date(`${formData.pickupDate}T${formData.pickupTime}`);
+      
+      // Determine client type for pricing
+      const clientType = selectedClient?.client_type === 'individual' ? 'individual' : 'facility';
+      
+      const result = await getPricingEstimate({
+        pickupAddress: formData.pickupAddress,
+        destinationAddress: formData.destinationAddress,
+        isRoundTrip: formData.isRoundTrip,
+        pickupDateTime: pickupDateTime.toISOString(),
+        wheelchairType: formData.wheelchairType,
+        clientType,
+        additionalPassengers: formData.additionalPassengers || 0,
+        isEmergency: formData.isEmergency || false,
+        preCalculatedDistance: routeInfo ? {
+          miles: routeInfo.distance?.miles || 0,
+          distance: routeInfo.distance?.miles || 0,
+          text: routeInfo.distance?.text || '',
+          duration: routeInfo.duration?.text || ''
+        } : null
+      });
+
+      if (result.success) {
+        setCurrentPricing(result);
+      } else {
+        console.error('Pricing calculation failed:', result.error);
+        // Fallback to basic estimate
+        const baseFare = formData.isRoundTrip ? 100 : 50;
+        const estimatedMiles = 10;
+        const mileageRate = 3.00;
+        const estimatedTotal = baseFare + (estimatedMiles * mileageRate);
+        
+        setCurrentPricing({
+          summary: {
+            estimatedTotal: `$${estimatedTotal.toFixed(2)}`,
+            tripType: formData.isRoundTrip ? 'Round Trip' : 'One Way',
+            distance: `${estimatedMiles} miles (estimated)`
+          }
+        });
       }
-    });
+    } catch (error) {
+      console.error('Error calculating pricing:', error);
+      // Fallback to basic estimate
+      const baseFare = formData.isRoundTrip ? 100 : 50;
+      const estimatedMiles = 10;
+      const mileageRate = 3.00;
+      const estimatedTotal = baseFare + (estimatedMiles * mileageRate);
+      
+      setCurrentPricing({
+        summary: {
+          estimatedTotal: `$${estimatedTotal.toFixed(2)}`,
+          tripType: formData.isRoundTrip ? 'Round Trip' : 'One Way',
+          distance: `${estimatedMiles} miles (estimated)`
+        }
+      });
+    }
   };
 
   // Calculate pricing when relevant form data changes
@@ -200,7 +247,7 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
         is_emergency: formData.isEmergency,
         status: formData.driver_id ? 'assigned' : 'pending',
         driver_id: formData.driver_id || null,
-        price: currentPricing?.summary?.totalAmount || 0,
+        price: currentPricing?.pricing?.total || 0,
         created_by: user.id,
         created_by_role: 'dispatcher'
       };
@@ -229,10 +276,67 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
     }
   };
 
-  // Route calculation will be implemented later
-  // const handleRouteCalculated = (routeData) => {
-  //   setRouteInfo(routeData);
-  // };
+  // Handle route calculation when both addresses are available
+  const calculateRoute = async () => {
+    if (!formData.pickupAddress || !formData.destinationAddress) {
+      setRouteInfo(null);
+      return;
+    }
+
+    try {
+      // Wait for Google Maps to be available
+      const { loadGoogleMaps } = await import('@/lib/google-maps-loader');
+      await loadGoogleMaps();
+
+      if (!window.google || !window.google.maps) {
+        console.warn('Google Maps not available for route calculation');
+        return;
+      }
+
+      const directionsService = new window.google.maps.DirectionsService();
+      
+      directionsService.route({
+        origin: formData.pickupAddress,
+        destination: formData.destinationAddress,
+        travelMode: window.google.maps.TravelMode.DRIVING,
+      }, (result, status) => {
+        if (status === 'OK') {
+          const route = result.routes[0];
+          const leg = route.legs[0];
+          
+          const routeData = {
+            distance: {
+              text: leg.distance.text,
+              value: leg.distance.value,
+              miles: Math.round((leg.distance.value * 0.000621371) * 100) / 100
+            },
+            duration: {
+              text: leg.duration.text,
+              value: leg.duration.value
+            }
+          };
+          
+          console.log('Route calculated:', routeData);
+          setRouteInfo(routeData);
+        } else {
+          console.error('Route calculation failed:', status);
+          setRouteInfo(null);
+        }
+      });
+    } catch (error) {
+      console.error('Error calculating route:', error);
+      setRouteInfo(null);
+    }
+  };
+
+  // Calculate route when addresses change
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      calculateRoute();
+    }, 500); // Debounce route calculation
+
+    return () => clearTimeout(timeoutId);
+  }, [formData.pickupAddress, formData.destinationAddress]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -271,7 +375,7 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
               <select
                 value={formData.clientId}
                 onChange={(e) => setFormData(prev => ({ ...prev, clientId: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent text-gray-900 bg-white"
                 required
               >
                 <option value="">Choose a client...</option>
@@ -310,7 +414,7 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
                   type="date"
                   value={formData.pickupDate}
                   onChange={(e) => setFormData(prev => ({ ...prev, pickupDate: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent text-gray-900 bg-white"
                   required
                 />
               </div>
@@ -322,7 +426,7 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
                   type="time"
                   value={formData.pickupTime}
                   onChange={(e) => setFormData(prev => ({ ...prev, pickupTime: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent text-gray-900 bg-white"
                   required
                 />
               </div>
@@ -334,12 +438,11 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Pickup Address *
                 </label>
-                <input
-                  type="text"
-                  placeholder="Enter pickup address"
+                <GoogleMapsAutocomplete
                   value={formData.pickupAddress}
-                  onChange={(e) => setFormData(prev => ({ ...prev, pickupAddress: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent"
+                  onChange={(address) => setFormData(prev => ({ ...prev, pickupAddress: address }))}
+                  placeholder="Enter pickup address"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent text-gray-900 bg-white placeholder-gray-500"
                   required
                 />
                 <input
@@ -347,7 +450,7 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
                   placeholder="Apartment, suite, building entrance, etc. (optional)"
                   value={formData.pickupDetails}
                   onChange={(e) => setFormData(prev => ({ ...prev, pickupDetails: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent mt-2"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent mt-2 text-gray-900 bg-white placeholder-gray-500"
                 />
               </div>
 
@@ -355,12 +458,11 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Destination Address *
                 </label>
-                <input
-                  type="text"
-                  placeholder="Enter destination address"
+                <GoogleMapsAutocomplete
                   value={formData.destinationAddress}
-                  onChange={(e) => setFormData(prev => ({ ...prev, destinationAddress: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent"
+                  onChange={(address) => setFormData(prev => ({ ...prev, destinationAddress: address }))}
+                  placeholder="Enter destination address"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent text-gray-900 bg-white placeholder-gray-500"
                   required
                 />
                 <input
@@ -368,7 +470,7 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
                   placeholder="Building, entrance, room number, etc. (optional)"
                   value={formData.destinationDetails}
                   onChange={(e) => setFormData(prev => ({ ...prev, destinationDetails: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent mt-2"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent mt-2 text-gray-900 bg-white placeholder-gray-500"
                 />
               </div>
             </div>
@@ -408,7 +510,7 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
                   type="time"
                   value={formData.returnTime}
                   onChange={(e) => setFormData(prev => ({ ...prev, returnTime: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent text-gray-900 bg-white"
                 />
               </div>
             )}
@@ -450,7 +552,7 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
                 max="3"
                 value={formData.additionalPassengers}
                 onChange={(e) => setFormData(prev => ({ ...prev, additionalPassengers: parseInt(e.target.value) || 0 }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent text-gray-900 bg-white"
               />
             </div>
 
@@ -464,50 +566,110 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
                 value={formData.tripNotes}
                 onChange={(e) => setFormData(prev => ({ ...prev, tripNotes: e.target.value }))}
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent text-gray-900 bg-white placeholder-gray-500"
               />
             </div>
 
             {/* Pricing Display */}
             {currentPricing && (
               <div className="bg-gradient-to-br from-[#7CCFD0]/10 to-[#60BFC0]/5 rounded-lg border border-[#7CCFD0]/20 p-4">
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">Fare Estimate</h3>
-                <div className="flex justify-between items-center p-3 bg-white/60 rounded-lg">
-                  <div>
-                    <p className="text-sm text-gray-600">
-                      {currentPricing.summary.tripType} • {currentPricing.summary.distance}
-                    </p>
-                    {currentPricing.distance?.duration && (
-                      <p className="text-xs text-gray-500">
-                        Est. travel time: {currentPricing.distance.duration}
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                    <svg className="w-5 h-5 mr-2 text-[#7CCFD0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                    </svg>
+                    Fare Estimate
+                  </h3>
+                </div>
+
+                <div className="space-y-3">
+                  {/* Quick Summary */}
+                  <div className="flex justify-between items-center p-3 bg-white/60 rounded-lg">
+                    <div>
+                      <p className="text-sm text-gray-600">
+                        {currentPricing.summary.tripType} • {currentPricing.summary.distance}
+                        {currentPricing.distance?.isEstimated && (
+                          <span className="ml-1 text-xs text-orange-600">
+                            (estimated)
+                          </span>
+                        )}
                       </p>
-                    )}
+                      {currentPricing.distance?.duration && (
+                        <p className="text-xs text-gray-500">
+                          Est. travel time: {currentPricing.distance.duration}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-gray-900">
+                        {currentPricing.summary.estimatedTotal}
+                      </p>
+                      {currentPricing.pricing?.veteranDiscount > 0 && (
+                        <p className="text-xs text-green-600">
+                          20% veteran discount applied
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-bold text-gray-900">
-                      {currentPricing.summary.estimatedTotal}
-                    </p>
+
+                  {/* Detailed Breakdown */}
+                  {currentPricing.pricing && (
+                    <details className="group">
+                      <summary className="cursor-pointer text-sm font-medium text-[#7CCFD0] hover:text-[#60BFC0] flex items-center">
+                        <span>View price breakdown</span>
+                        <svg className="w-4 h-4 ml-1 transform group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </summary>
+                      
+                      <div className="mt-3 space-y-2">
+                        {(() => {
+                          const { createPricingBreakdown } = require('@/lib/pricing');
+                          return createPricingBreakdown(currentPricing.pricing).map((item, index) => (
+                            <div 
+                              key={index} 
+                              className={`flex justify-between items-center py-1 ${
+                                item.type === 'total' ? 'border-t border-gray-200 pt-2 font-semibold' :
+                                item.type === 'subtotal' ? 'border-t border-gray-200 pt-2' : ''
+                              }`}
+                            >
+                              <span className={`text-sm ${
+                                item.type === 'total' ? 'text-gray-900 font-semibold' :
+                                item.type === 'discount' ? 'text-green-600' :
+                                item.type === 'premium' ? 'text-orange-600' :
+                                'text-gray-700'
+                              }`}>
+                                {item.label}
+                              </span>
+                              <span className={`text-sm ${
+                                item.type === 'total' ? 'text-gray-900 font-semibold' :
+                                item.type === 'discount' ? 'text-green-600' :
+                                item.type === 'premium' ? 'text-orange-600' :
+                                'text-gray-700'
+                              }`}>
+                                ${Math.abs(item.amount).toFixed(2)}
+                              </span>
+                            </div>
+                          ));
+                        })()}
+                      </div>
+                    </details>
+                  )}
+
+                  {/* Pricing Notes */}
+                  <div className="text-xs text-gray-500 space-y-1">
+                    {currentPricing.distance?.isEstimated && (
+                      <p>• Distance is estimated - actual fare may vary based on route</p>
+                    )}
+                    {currentPricing.summary?.hasPremiums && (
+                      <p>• Additional charges apply for off-hours, weekends, or wheelchair accessibility</p>
+                    )}
+                    {currentPricing.summary?.hasDiscounts && (
+                      <p>• 20% veteran discount applied</p>
+                    )}
+                    <p>• Final fare may vary based on actual route and traffic conditions</p>
                   </div>
                 </div>
-                
-                {/* Price breakdown */}
-                {currentPricing.breakdown && (
-                  <div className="mt-3 space-y-1">
-                    <button
-                      type="button"
-                      className="text-sm text-[#7CCFD0] hover:text-[#60BFC0] underline"
-                      onClick={() => setShowBreakdown(!showBreakdown)}
-                    >
-                      View price breakdown
-                    </button>
-                    <p className="text-xs text-gray-500">
-                      • Additional charges apply for off-hours, weekends, or wheelchair accessibility
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      • Final fare may vary based on actual route and traffic conditions
-                    </p>
-                  </div>
-                )}
               </div>
             )}
 
