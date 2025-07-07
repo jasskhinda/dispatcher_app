@@ -86,7 +86,7 @@ export default function Header() {
               activeRoute === '/dashboard' ? 'text-[#7CCFD0] border-b-2 border-[#7CCFD0]' : ''
             }`}
           >
-            Dashboard
+            DASHBOARD
           </Link>
           <Link 
             href="/trips/new" 
@@ -94,7 +94,7 @@ export default function Header() {
               activeRoute.includes('/trips/new') ? 'text-[#7CCFD0] border-b-2 border-[#7CCFD0]' : ''
             }`}
           >
-            New Trip
+            NEW TRIP
           </Link>
           <Link 
             href="/calendar" 
@@ -102,7 +102,7 @@ export default function Header() {
               activeRoute.includes('/calendar') ? 'text-[#7CCFD0] border-b-2 border-[#7CCFD0]' : ''
             }`}
           >
-            Calendar
+            CALENDAR
           </Link>
           <Link 
             href="/drivers" 
@@ -110,7 +110,7 @@ export default function Header() {
               activeRoute.includes('/drivers') ? 'text-[#7CCFD0] border-b-2 border-[#7CCFD0]' : ''
             }`}
           >
-            Drivers
+            DRIVERS
           </Link>
           <Link 
             href="/clients" 
@@ -118,7 +118,7 @@ export default function Header() {
               activeRoute.includes('/clients') ? 'text-[#7CCFD0] border-b-2 border-[#7CCFD0]' : ''
             }`}
           >
-            Clients
+            CLIENTS
           </Link>
           <Link 
             href="/map" 
@@ -126,7 +126,7 @@ export default function Header() {
               activeRoute.includes('/map') ? 'text-[#7CCFD0] border-b-2 border-[#7CCFD0]' : ''
             }`}
           >
-            Map
+            MAP
           </Link>
         </div>
         
