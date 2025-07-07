@@ -17,6 +17,9 @@ export default function AddClient() {
   const [lastName, setLastName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [address, setAddress] = useState('');
+  const [accessibilityNeeds, setAccessibilityNeeds] = useState('');
+  const [medicalRequirements, setMedicalRequirements] = useState('');
+  const [emergencyContact, setEmergencyContact] = useState('');
   const [notes, setNotes] = useState('');
   const [isVeteran, setIsVeteran] = useState(false);
   const [error, setError] = useState('');
@@ -87,6 +90,13 @@ export default function AddClient() {
           return;
         }
         
+        // Validate required fields to match facility app
+        if (!firstName.trim() || !lastName.trim() || !email.trim() || !phoneNumber.trim() || !address.trim()) {
+          setError('Please fill in all required fields (First Name, Last Name, Email, Phone Number, and Address).');
+          setLoading(false);
+          return;
+        }
+        
         // Create facility managed client
         const { data, error } = await supabase
           .from('facility_managed_clients')
@@ -97,6 +107,9 @@ export default function AddClient() {
               email: email,
               phone_number: phoneNumber,
               address: address,
+              accessibility_needs: accessibilityNeeds,
+              medical_requirements: medicalRequirements,
+              emergency_contact: emergencyContact,
               notes: notes,
               facility_id: selectedFacilityId,
               is_veteran: isVeteran,
@@ -121,6 +134,9 @@ export default function AddClient() {
         setLastName('');
         setPhoneNumber('');
         setAddress('');
+        setAccessibilityNeeds('');
+        setMedicalRequirements('');
+        setEmergencyContact('');
         setNotes('');
         setIsVeteran(false);
       }
@@ -296,14 +312,16 @@ export default function AddClient() {
               </div>
 
               <div className="mt-4">
-                <label htmlFor="email" className="block text-sm font-medium mb-1 text-purple-900">Email</label>
+                <label htmlFor="email" className="block text-sm font-medium mb-1 text-purple-900">Email *</label>
                 <input
                   id="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  required
                   className="w-full p-2 border border-purple-300 rounded-md bg-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
+                <p className="text-xs text-purple-600 mt-1">Required to create client account and send login credentials</p>
               </div>
 
               <div className="mt-4">
@@ -324,12 +342,49 @@ export default function AddClient() {
               <h3 className="text-md font-medium mb-4 text-purple-900">Additional Information</h3>
               
               <div>
-                <label htmlFor="address" className="block text-sm font-medium mb-1 text-purple-900">Address</label>
-                <input
+                <label htmlFor="address" className="block text-sm font-medium mb-1 text-purple-900">Address *</label>
+                <textarea
                   id="address"
-                  type="text"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
+                  required
+                  rows={3}
+                  className="w-full p-2 border border-purple-300 rounded-md bg-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+              </div>
+              
+              <div className="mt-4">
+                <label htmlFor="accessibilityNeeds" className="block text-sm font-medium mb-1 text-purple-900">Accessibility Needs</label>
+                <textarea
+                  id="accessibilityNeeds"
+                  value={accessibilityNeeds}
+                  onChange={(e) => setAccessibilityNeeds(e.target.value)}
+                  rows={2}
+                  placeholder="Wheelchair, mobility aids, visual/hearing assistance, etc."
+                  className="w-full p-2 border border-purple-300 rounded-md bg-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+              </div>
+              
+              <div className="mt-4">
+                <label htmlFor="medicalRequirements" className="block text-sm font-medium mb-1 text-purple-900">Medical Requirements</label>
+                <textarea
+                  id="medicalRequirements"
+                  value={medicalRequirements}
+                  onChange={(e) => setMedicalRequirements(e.target.value)}
+                  rows={2}
+                  placeholder="Oxygen, medical equipment, allergies, medications, etc."
+                  className="w-full p-2 border border-purple-300 rounded-md bg-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+              </div>
+              
+              <div className="mt-4">
+                <label htmlFor="emergencyContact" className="block text-sm font-medium mb-1 text-purple-900">Emergency Contact</label>
+                <input
+                  id="emergencyContact"
+                  type="text"
+                  value={emergencyContact}
+                  onChange={(e) => setEmergencyContact(e.target.value)}
+                  placeholder="Name and phone number"
                   className="w-full p-2 border border-purple-300 rounded-md bg-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
               </div>
