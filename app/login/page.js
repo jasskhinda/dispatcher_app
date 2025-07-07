@@ -65,7 +65,7 @@ export default function Login() {
     <div className="flex min-h-screen flex-col items-center justify-center p-6 bg-brand-background">
       <div className="w-full max-w-md p-8 space-y-8 bg-brand-card rounded-lg shadow-md border border-brand-border">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-brand-accent">Compassionate Transportation</h1>
+          <h1 className="text-3xl font-bold text-brand-accent">Compassionate Care Transportation</h1>
           <h2 className="text-xl font-semibold mt-2">Dispatcher Login</h2>
         </div>
 

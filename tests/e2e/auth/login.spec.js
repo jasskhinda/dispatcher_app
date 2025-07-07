@@ -51,7 +51,7 @@ test.describe('Login Functionality', () => {
   test('should show login form with correct elements', async ({ page, baseURL }) => {
     console.log(`Running test with baseURL: ${baseURL}`);
     // Verify login page elements are visible
-    await expect(page.getByRole('heading', { name: 'Compassionate Transportation' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Compassionate Care Transportation' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Dispatcher Login' })).toBeVisible();
     await expect(page.getByLabel('Email')).toBeVisible();
     await expect(page.getByLabel('Password')).toBeVisible();

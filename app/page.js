@@ -16,11 +16,11 @@ export default function Home() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-8">
       <div className="text-center mb-10">
-        <h1 className="text-4xl font-bold mb-4">Compassionate Transportation</h1>
+        <h1 className="text-4xl font-bold mb-4">Compassionate Care Transportation</h1>
         <h2 className="text-2xl font-semibold mb-8">Dispatcher Portal</h2>
         
         <div className="flex flex-col items-center justify-center space-y-6">
-          <p className="text-lg">Welcome to the Compassionate Transportation dispatcher portal.</p>
+          <p className="text-lg">Welcome to the Compassionate Care Transportation dispatcher portal.</p>
           <p>Redirecting to login...</p>
           
           <div className="flex space-x-4 mt-8">

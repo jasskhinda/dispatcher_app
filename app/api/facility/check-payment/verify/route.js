@@ -193,11 +193,11 @@ export async function POST(request) {
 
       case 'check_received':
         newPaymentStatus = 'PAID WITH CHECK - VERIFIED'
-        auditNote = `Check payment received and verified by dispatcher on ${now.toLocaleDateString('en-US', { 
+        auditNote = `✅ FINAL VERIFICATION COMPLETE: Check payment received, deposited, and fully verified by dispatcher on ${now.toLocaleDateString('en-US', { 
           month: 'long', 
           day: 'numeric', 
           year: 'numeric' 
-        })}. Payment process completed successfully.`
+        })}. Funds have been deposited into company bank account. Invoice marked as PAID IN FULL. Payment process completed successfully and all transportation services for this billing period are now settled.`
         break
 
       case 'mark_not_received':
@@ -378,7 +378,7 @@ function getSuccessMessage(action, status) {
     case 'request_new_check':
       return 'Replacement check requested. Facility will be notified to send a new check.'
     case 'check_received':
-      return 'Check payment received and ready for verification processing.'
+      return '✅ Check payment successfully received, deposited, and verified. Payment is now FULLY PAID and the invoice has been marked as complete. All transportation services for this billing period are settled.'
     case 'mark_not_received':
       return 'Check payment marked as not received. Facility will be contacted to resolve this issue.'
     default:

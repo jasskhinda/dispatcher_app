@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "Compassionate Transportation Dispatcher",
-  description: "Dispatch application for Compassionate Transportation",
+  title: "Compassionate Care Transportation Dispatcher",
+  description: "Dispatch application for Compassionate Care Transportation",
   icons: {
     icon: '/favicon.png',
   },

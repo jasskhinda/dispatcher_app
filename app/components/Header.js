@@ -65,9 +65,16 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-10 bg-brand-background border-b border-brand-border">
       <div className="w-full px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Link href="/dashboard" className="text-xl font-bold text-brand-accent">
-            Compassionate Transportation
+        <div className="flex items-center gap-3">
+          <Link href="/dashboard" className="flex items-center gap-3">
+            <img 
+              src="/LOGO2.png" 
+              alt="Compassionate Care Transportation" 
+              className="h-12 w-12 object-contain"
+            />
+            <span className="px-3 py-1 bg-[#7CCFD0] text-white rounded-full text-sm font-medium">
+              Dispatcher
+            </span>
           </Link>
         </div>
         
