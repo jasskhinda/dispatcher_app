@@ -21,7 +21,6 @@ export default function AddClient() {
   const [medicalRequirements, setMedicalRequirements] = useState('');
   const [emergencyContact, setEmergencyContact] = useState('');
   const [notes, setNotes] = useState('');
-  const [isVeteran, setIsVeteran] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
@@ -112,7 +111,6 @@ export default function AddClient() {
               emergency_contact: emergencyContact,
               notes: notes,
               facility_id: selectedFacilityId,
-              is_veteran: isVeteran,
               created_at: new Date().toISOString()
             }
           ])
@@ -138,7 +136,6 @@ export default function AddClient() {
         setMedicalRequirements('');
         setEmergencyContact('');
         setNotes('');
-        setIsVeteran(false);
       }
       
     } catch (err) {
@@ -399,18 +396,6 @@ export default function AddClient() {
                   placeholder="Special needs, preferences, etc."
                   className="w-full p-2 border border-purple-300 rounded-md bg-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
-              </div>
-              
-              <div className="mt-4">
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={isVeteran}
-                    onChange={(e) => setIsVeteran(e.target.checked)}
-                    className="rounded border-purple-300 text-purple-600 focus:ring-purple-500"
-                  />
-                  <span className="text-sm font-medium text-purple-900">Veteran (eligible for 20% discount)</span>
-                </label>
               </div>
             </div>
             </>
