@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter, useSearchParams } from 'next/navigation';
 import GoogleMapsAutocomplete from './GoogleMapsAutocomplete';
@@ -44,7 +44,8 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
     needsProvided: false,
     customType: '',
     hasWheelchairFee: false,
-    fee: 0
+    fee: 0,
+    requirements: '' // Add requirements field
   });
 
   // Combine all clients into one list
@@ -81,10 +82,31 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
 
   useEffect(() => {
     if (formData.clientId) {
-      const client = allClients.find(c => c.id === formData.clientId);
+      // Search in both individual and managed clients
+      let client = individualClients?.find(c => c.id === formData.clientId);
+      if (!client) {
+        client = managedClients?.find(c => c.id === formData.clientId);
+        if (client) {
+          // Add facility info for managed clients
+          const facility = facilities?.find(f => f.id === client.facility_id);
+          client = {
+            ...client,
+            client_type: 'managed',
+            facility_name: facility?.name || 'Unknown Facility'
+          };
+        }
+      } else {
+        // Mark as individual client
+        client = {
+          ...client,
+          client_type: 'individual'
+        };
+      }
       setSelectedClient(client);
+    } else {
+      setSelectedClient(null);
     }
-  }, [formData.clientId, allClients]);
+  }, [formData.clientId, individualClients, managedClients, facilities]);
 
   // Handle wheelchair selection changes
   const handleWheelchairChange = useCallback((newWheelchairData) => {
@@ -379,11 +401,64 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
                 required
               >
                 <option value="">Choose a client...</option>
-                {allClients.map(client => (
-                  <option key={client.id} value={client.id}>
-                    {client.display_name}
-                  </option>
-                ))}
+                
+                {/* Individual Clients Section */}
+                {individualClients && individualClients.length > 0 && (
+                  <>
+                    <option disabled className="font-semibold text-gray-900 bg-gray-100">
+                      ═══ Individual Clients ═══
+                    </option>
+                    {individualClients
+                      .filter(client => client.first_name)
+                      .sort((a, b) => (a.first_name || '').localeCompare(b.first_name || ''))
+                      .map(client => (
+                        <option key={`individual-${client.id}`} value={client.id}>
+                          📋 {client.first_name} {client.last_name}
+                        </option>
+                      ))}
+                  </>
+                )}
+
+                {/* Facility Clients Section */}
+                {managedClients && managedClients.length > 0 && (
+                  <>
+                    <option disabled className="font-semibold text-gray-900 bg-gray-100">
+                      ═══ Facility Clients ═══
+                    </option>
+                    {(() => {
+                      // Group managed clients by facility
+                      const clientsByFacility = managedClients
+                        .filter(client => client.first_name)
+                        .reduce((groups, client) => {
+                          const facility = facilities.find(f => f.id === client.facility_id);
+                          const facilityName = facility?.name || 'Unknown Facility';
+                          if (!groups[facilityName]) {
+                            groups[facilityName] = [];
+                          }
+                          groups[facilityName].push(client);
+                          return groups;
+                        }, {});
+
+                      // Sort facilities alphabetically and render
+                      return Object.keys(clientsByFacility)
+                        .sort()
+                        .map(facilityName => (
+                          <React.Fragment key={facilityName}>
+                            <option disabled className="font-medium text-blue-800 bg-blue-50">
+                              🏢 {facilityName}
+                            </option>
+                            {clientsByFacility[facilityName]
+                              .sort((a, b) => (a.first_name || '').localeCompare(b.first_name || ''))
+                              .map(client => (
+                                <option key={`facility-${client.id}`} value={client.id}>
+                                  &nbsp;&nbsp;&nbsp;👤 {client.first_name} {client.last_name}
+                                </option>
+                              ))}
+                          </React.Fragment>
+                        ));
+                    })()}
+                  </>
+                )}
               </select>
 
               {selectedClient && (
@@ -708,13 +783,15 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
 // Simple Wheelchair Selection Component
 function WheelchairSelectionFlow({ onSelectionChange, selectedType, needsProvided }) {
   const [showDetails, setShowDetails] = useState(false);
+  const [requirements, setRequirements] = useState('');
 
   const handleTypeChange = (type) => {
     onSelectionChange({
       type,
       needsProvided: false,
       hasWheelchairFee: type === 'provided',
-      fee: type === 'provided' ? 25 : 0
+      fee: type === 'provided' ? 25 : 0,
+      requirements: ''
     });
   };
 
@@ -723,7 +800,19 @@ function WheelchairSelectionFlow({ onSelectionChange, selectedType, needsProvide
       type: 'none',
       needsProvided: provided,
       hasWheelchairFee: provided,
-      fee: provided ? 25 : 0
+      fee: provided ? 25 : 0,
+      requirements: provided ? requirements : ''
+    });
+  };
+
+  const handleRequirementsChange = (newRequirements) => {
+    setRequirements(newRequirements);
+    onSelectionChange({
+      type: 'none',
+      needsProvided: true,
+      hasWheelchairFee: true,
+      fee: 25,
+      requirements: newRequirements
     });
   };
 
