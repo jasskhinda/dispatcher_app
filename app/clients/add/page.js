@@ -9,6 +9,9 @@ export default function AddClient() {
   const supabase = createClientComponentClient();
   
   const [user, setUser] = useState(null);
+  const [clientType, setClientType] = useState(''); // 'individual' or 'facility'
+  const [selectedFacilityId, setSelectedFacilityId] = useState('');
+  const [facilities, setFacilities] = useState([]);
   const [email, setEmail] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -20,7 +23,7 @@ export default function AddClient() {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   
-  // Check auth status when component mounts
+  // Check auth status and load facilities when component mounts
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -43,6 +46,21 @@ export default function AddClient() {
         // Not a dispatcher, redirect to login
         supabase.auth.signOut();
         router.push('/login?error=Access%20denied');
+        return;
+      }
+      
+      // Load facilities for facility client type
+      try {
+        const { data: facilitiesData, error: facilitiesError } = await supabase
+          .from('facilities')
+          .select('*')
+          .order('name', { ascending: true });
+        
+        if (!facilitiesError && facilitiesData) {
+          setFacilities(facilitiesData);
+        }
+      } catch (err) {
+        console.error('Error loading facilities:', err);
       }
     };
     
@@ -56,63 +74,56 @@ export default function AddClient() {
     setLoading(true);
 
     try {
-      // Generate a random password for the client's account
-      const password = Math.random().toString(36).slice(-10) + Math.random().toString(10).slice(-2);
-      
-      // Prepare client profile data - email is stored in auth.users, not in profiles
-      // Don't set full_name as it's calculated automatically by the database
-      const userProfile = {
-        first_name: firstName,
-        last_name: lastName,
-        phone_number: phoneNumber,
-        address,
-        notes,
-        metadata: { veteran: isVeteran }
-      };
-      
-      // Call the serverless function to create the user and profile
-      const response = await fetch('/api/users', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email,
-          password,
-          userProfile,
-          role: 'client'
-        }),
-      });
-      
-      const result = await response.json();
-      
-      if (!response.ok) {
-        // If there's already a profile but with a different role, this is a real error
-        if (result.error && result.error.includes('already has a') && !result.error.includes('client profile')) {
-          throw new Error(result.error || 'Failed to create client');
-        }
-        
-        // Otherwise, the API might be handling auto-created profiles, so check the error message
-        if (result.error && !result.error.includes('already has a')) {
-          throw new Error(result.error || 'Failed to create client');
-        }
-        
-        // If we get here, it might be an existing profile that was handled correctly,
-        // so we'll treat it as a success
-        console.log('User profile existed, but API handled it:', result);
+      if (clientType === 'individual') {
+        setError('Individual client creation is coming soon! Please use the booking app for now.');
+        setLoading(false);
+        return;
       }
-
-      // Success!
-      setSuccess('Client account successfully created');
       
-      // Reset the form
-      setEmail('');
-      setFirstName('');
-      setLastName('');
-      setPhoneNumber('');
-      setAddress('');
-      setNotes('');
-      setIsVeteran(false);
+      if (clientType === 'facility') {
+        if (!selectedFacilityId) {
+          setError('Please select a facility for this client.');
+          setLoading(false);
+          return;
+        }
+        
+        // Create facility managed client
+        const { data, error } = await supabase
+          .from('facility_managed_clients')
+          .insert([
+            {
+              first_name: firstName,
+              last_name: lastName,
+              email: email,
+              phone_number: phoneNumber,
+              address: address,
+              notes: notes,
+              facility_id: selectedFacilityId,
+              is_veteran: isVeteran,
+              created_at: new Date().toISOString()
+            }
+          ])
+          .select()
+          .single();
+        
+        if (error) {
+          throw new Error(error.message || 'Failed to create facility client');
+        }
+        
+        // Success!
+        setSuccess('Facility client successfully created and assigned to the selected facility.');
+        
+        // Reset the form
+        setClientType('');
+        setSelectedFacilityId('');
+        setEmail('');
+        setFirstName('');
+        setLastName('');
+        setPhoneNumber('');
+        setAddress('');
+        setNotes('');
+        setIsVeteran(false);
+      }
       
     } catch (err) {
       console.error('Error creating client:', err);
@@ -141,7 +152,7 @@ export default function AddClient() {
         </div>
         
         <div className="bg-brand-card shadow rounded-lg p-6 border border-brand-border">
-          <h2 className="text-lg font-medium mb-6">Client Information</h2>
+          <h2 className="text-lg font-medium mb-6">Add New Client</h2>
           
           {error && (
             <div className="mb-6 p-4 border-l-4 border-red-500 bg-red-50 text-red-700 rounded">
@@ -156,85 +167,181 @@ export default function AddClient() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Personal Information */}
+            {/* Client Type Selection */}
             <div className="bg-brand-border/5 p-4 rounded-md">
-              <h3 className="text-md font-medium mb-4">Personal Information</h3>
+              <h3 className="text-md font-medium mb-4">Select Client Type</h3>
+              
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div 
+                  onClick={() => setClientType('individual')}
+                  className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                    clientType === 'individual' 
+                      ? 'border-blue-500 bg-blue-50' 
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      name="clientType"
+                      value="individual"
+                      checked={clientType === 'individual'}
+                      onChange={(e) => setClientType(e.target.value)}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                    />
+                    <div className="ml-3">
+                      <div className="text-sm font-medium text-gray-900">Individual Client</div>
+                      <div className="text-sm text-gray-500">Direct booking client from booking app</div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div 
+                  onClick={() => setClientType('facility')}
+                  className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                    clientType === 'facility' 
+                      ? 'border-purple-500 bg-purple-50' 
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      name="clientType"
+                      value="facility"
+                      checked={clientType === 'facility'}
+                      onChange={(e) => setClientType(e.target.value)}
+                      className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300"
+                    />
+                    <div className="ml-3">
+                      <div className="text-sm font-medium text-gray-900">Facility Client</div>
+                      <div className="text-sm text-gray-500">Client managed by a facility</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Facility Selection for Facility Clients */}
+            {clientType === 'facility' && (
+              <div className="bg-purple-50 p-4 rounded-md border border-purple-200">
+                <h3 className="text-md font-medium mb-4 text-purple-900">Select Facility</h3>
+                <div>
+                  <label htmlFor="facility" className="block text-sm font-medium mb-1 text-purple-900">Assign to Facility *</label>
+                  <select
+                    id="facility"
+                    value={selectedFacilityId}
+                    onChange={(e) => setSelectedFacilityId(e.target.value)}
+                    required={clientType === 'facility'}
+                    className="w-full p-2 border border-purple-300 rounded-md bg-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  >
+                    <option value="">Select a facility...</option>
+                    {facilities.map((facility) => (
+                      <option key={facility.id} value={facility.id}>
+                        {facility.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+            
+            {/* Coming Soon Message for Individual Clients */}
+            {clientType === 'individual' && (
+              <div className="bg-blue-50 p-4 rounded-md border border-blue-200">
+                <div className="flex items-center">
+                  <svg className="w-6 h-6 text-blue-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div>
+                    <h3 className="text-md font-medium text-blue-900">COMING SOON</h3>
+                    <p className="text-sm text-blue-700 mt-1">
+                      Individual client creation from dispatcher app is coming soon. For now, clients can register directly through our booking app.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Personal Information - Only show if facility client type is selected */}
+            {clientType === 'facility' && (
+            <div className="bg-purple-50 p-4 rounded-md border border-purple-200">
+              <h3 className="text-md font-medium mb-4 text-purple-900">Client Information</h3>
               
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label htmlFor="firstName" className="block text-sm font-medium mb-1">First Name</label>
+                  <label htmlFor="firstName" className="block text-sm font-medium mb-1 text-purple-900">First Name *</label>
                   <input
                     id="firstName"
                     type="text"
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
                     required
-                    className="w-full p-2 border border-brand-border rounded-md bg-brand-background"
+                    className="w-full p-2 border border-purple-300 rounded-md bg-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
                 </div>
                 
                 <div>
-                  <label htmlFor="lastName" className="block text-sm font-medium mb-1">Last Name</label>
+                  <label htmlFor="lastName" className="block text-sm font-medium mb-1 text-purple-900">Last Name *</label>
                   <input
                     id="lastName"
                     type="text"
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
                     required
-                    className="w-full p-2 border border-brand-border rounded-md bg-brand-background"
+                    className="w-full p-2 border border-purple-300 rounded-md bg-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
                 </div>
               </div>
 
               <div className="mt-4">
-                <label htmlFor="email" className="block text-sm font-medium mb-1">Email</label>
+                <label htmlFor="email" className="block text-sm font-medium mb-1 text-purple-900">Email</label>
                 <input
                   id="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="w-full p-2 border border-brand-border rounded-md bg-brand-background"
+                  className="w-full p-2 border border-purple-300 rounded-md bg-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
               </div>
 
               <div className="mt-4">
-                <label htmlFor="phoneNumber" className="block text-sm font-medium mb-1">Phone Number</label>
+                <label htmlFor="phoneNumber" className="block text-sm font-medium mb-1 text-purple-900">Phone Number *</label>
                 <input
                   id="phoneNumber"
                   type="tel"
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
                   required
-                  className="w-full p-2 border border-brand-border rounded-md bg-brand-background"
+                  className="w-full p-2 border border-purple-300 rounded-md bg-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
               </div>
             </div>
 
-            {/* Client Specific Information */}
-            <div className="bg-brand-border/5 p-4 rounded-md">
-              <h3 className="text-md font-medium mb-4">Additional Information</h3>
+            {/* Additional Information */}
+            <div className="bg-purple-50 p-4 rounded-md border border-purple-200">
+              <h3 className="text-md font-medium mb-4 text-purple-900">Additional Information</h3>
               
               <div>
-                <label htmlFor="address" className="block text-sm font-medium mb-1">Address</label>
+                <label htmlFor="address" className="block text-sm font-medium mb-1 text-purple-900">Address</label>
                 <input
                   id="address"
                   type="text"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  className="w-full p-2 border border-brand-border rounded-md bg-brand-background"
+                  className="w-full p-2 border border-purple-300 rounded-md bg-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
               </div>
               
               <div className="mt-4">
-                <label htmlFor="notes" className="block text-sm font-medium mb-1">Notes</label>
+                <label htmlFor="notes" className="block text-sm font-medium mb-1 text-purple-900">Notes</label>
                 <textarea
                   id="notes"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   rows={3}
                   placeholder="Special needs, preferences, etc."
-                  className="w-full p-2 border border-brand-border rounded-md bg-brand-background"
+                  className="w-full p-2 border border-purple-300 rounded-md bg-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
               </div>
               
@@ -244,12 +351,13 @@ export default function AddClient() {
                     type="checkbox"
                     checked={isVeteran}
                     onChange={(e) => setIsVeteran(e.target.checked)}
-                    className="rounded border-brand-border text-brand-accent focus:ring-brand-accent"
+                    className="rounded border-purple-300 text-purple-600 focus:ring-purple-500"
                   />
-                  <span className="text-sm font-medium">Veteran (eligible for 20% discount)</span>
+                  <span className="text-sm font-medium text-purple-900">Veteran (eligible for 20% discount)</span>
                 </label>
               </div>
             </div>
+            )}
 
             <div className="flex justify-end">
               <button
@@ -261,10 +369,17 @@ export default function AddClient() {
               </button>
               <button
                 type="submit"
-                disabled={loading}
-                className="px-4 py-2 bg-brand-accent text-brand-buttonText rounded-md hover:opacity-90 transition-opacity disabled:opacity-70"
+                disabled={loading || !clientType || (clientType === 'facility' && !selectedFacilityId)}
+                className={`px-4 py-2 rounded-md transition-all disabled:opacity-70 ${
+                  clientType === 'facility' 
+                    ? 'bg-purple-600 text-white hover:bg-purple-700' 
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
               >
-                {loading ? 'Creating...' : 'Create Client'}
+                {loading ? 'Creating...' : 
+                 clientType === 'individual' ? 'Coming Soon' :
+                 clientType === 'facility' ? 'Create Facility Client' :
+                 'Select Client Type'}
               </button>
             </div>
           </form>
