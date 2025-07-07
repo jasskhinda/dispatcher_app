@@ -361,7 +361,7 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
                 <svg className="w-5 h-5 text-green-400 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
-                <p className="text-green-700">Trip created successfully! Redirecting to dashboard...</p>
+                <p className="text-green-700">Client trip booked successfully! Redirecting to dashboard...</p>
               </div>
             </div>
           )}
@@ -530,7 +530,7 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
                 </label>
               </div>
               <p className="text-xs text-red-600 mt-1">
-                Check this box if this is an emergency trip requiring immediate attention. Additional $40 emergency fee applies.
+                Check this box if this client trip is an emergency requiring immediate attention. Additional $40 emergency fee applies.
               </p>
             </div>
 
@@ -562,7 +562,7 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
                 Trip Notes
               </label>
               <textarea
-                placeholder="Special instructions, medical equipment, etc."
+                placeholder="Special instructions for driver, medical equipment, client needs, etc."
                 value={formData.tripNotes}
                 onChange={(e) => setFormData(prev => ({ ...prev, tripNotes: e.target.value }))}
                 rows={3}
@@ -695,7 +695,7 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
                 disabled={loading}
                 className="px-6 py-2 bg-[#7CCFD0] text-white rounded-md hover:bg-[#60BFC0] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {loading ? 'Creating Trip...' : 'Book Trip'}
+                {loading ? 'Booking Trip...' : 'Book Client Trip'}
               </button>
             </div>
           </form>
@@ -731,12 +731,14 @@ function WheelchairSelectionFlow({ onSelectionChange, selectedType, needsProvide
     <div className="space-y-4">
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <div className="flex items-center mb-3">
-          <span className="text-lg mr-2">♿</span>
+          <svg className="w-6 h-6 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
           <h3 className="font-medium text-gray-900">Wheelchair Transportation</h3>
         </div>
         
         <div className="space-y-3">
-          <p className="text-sm font-medium text-gray-700">What type of wheelchair do you have?</p>
+          <p className="text-sm font-medium text-gray-700">What type of wheelchair does the client have?</p>
           
           <div className="space-y-2">
             <label className="flex items-center">
@@ -764,8 +766,8 @@ function WheelchairSelectionFlow({ onSelectionChange, selectedType, needsProvide
                 className="h-4 w-4 text-[#7CCFD0] focus:ring-[#7CCFD0]"
               />
               <div className="ml-3">
-                <div className="font-medium text-gray-900">Manual wheelchair (I have my own)</div>
-                <div className="text-sm text-gray-600">Standard manual wheelchair that you bring</div>
+                <div className="font-medium text-gray-900">Manual wheelchair (client has their own)</div>
+                <div className="text-sm text-gray-600">Standard manual wheelchair that client will bring</div>
                 <div className="text-sm text-green-600 font-medium">No additional fee</div>
               </div>
             </label>
@@ -780,8 +782,8 @@ function WheelchairSelectionFlow({ onSelectionChange, selectedType, needsProvide
                 className="h-4 w-4 text-[#7CCFD0] focus:ring-[#7CCFD0]"
               />
               <div className="ml-3">
-                <div className="font-medium text-gray-900">Power wheelchair (I have my own)</div>
-                <div className="text-sm text-gray-600">Electric/motorized wheelchair that you bring</div>
+                <div className="font-medium text-gray-900">Power wheelchair (client has their own)</div>
+                <div className="text-sm text-gray-600">Electric/motorized wheelchair that client will bring</div>
                 <div className="text-sm text-green-600 font-medium">No additional fee</div>
               </div>
             </label>
@@ -794,7 +796,7 @@ function WheelchairSelectionFlow({ onSelectionChange, selectedType, needsProvide
           </div>
 
           <div className="pt-3 border-t border-blue-200">
-            <p className="text-sm font-medium text-gray-700 mb-2">Do you want us to provide a wheelchair?</p>
+            <p className="text-sm font-medium text-gray-700 mb-2">Does the client need us to provide a wheelchair?</p>
             
             <div className="space-y-2">
               <label className="flex items-center">
@@ -807,7 +809,7 @@ function WheelchairSelectionFlow({ onSelectionChange, selectedType, needsProvide
                 />
                 <div className="ml-3">
                   <div className="font-medium text-gray-900">Yes, please provide a wheelchair</div>
-                  <div className="text-sm text-gray-600">We will provide a suitable wheelchair for your trip</div>
+                  <div className="text-sm text-gray-600">We will provide a suitable wheelchair for the client's trip</div>
                   <div className="text-sm text-blue-600 font-medium">+$25 wheelchair rental fee</div>
                 </div>
               </label>
@@ -822,7 +824,7 @@ function WheelchairSelectionFlow({ onSelectionChange, selectedType, needsProvide
                 />
                 <div className="ml-3">
                   <div className="font-medium text-gray-900">No, wheelchair not needed</div>
-                  <div className="text-sm text-gray-600">Passenger can walk or transfer independently</div>
+                  <div className="text-sm text-gray-600">Client can walk or transfer independently</div>
                 </div>
               </label>
             </div>
