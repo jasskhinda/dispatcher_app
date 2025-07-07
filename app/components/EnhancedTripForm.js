@@ -1,26 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import dynamic from 'next/dynamic';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { getPricingEstimate, formatCurrency } from '@/lib/pricing';
-
-// Dynamically import Google Maps components to prevent SSR issues
-const SuperSimpleMap = dynamic(() => import('./SuperSimpleMap'), {
-  ssr: false,
-  loading: () => <div className="w-full h-64 bg-gray-100 rounded-lg flex items-center justify-center">
-    <div className="text-center">
-      <div className="animate-spin h-6 w-6 border-2 border-gray-400 border-t-transparent rounded-full mx-auto mb-2"></div>
-      <p className="text-gray-600 text-sm">Loading map...</p>
-    </div>
-  </div>
-});
-
-const SimpleAutocomplete = dynamic(() => import('./SimpleAutocomplete'), {
-  ssr: false,
-  loading: () => <div className="animate-pulse bg-gray-200 h-12 rounded"></div>
-});
 
 export default function EnhancedTripForm({ user, userProfile, individualClients, managedClients, facilities }) {
   const router = useRouter();
@@ -71,7 +53,7 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
       ...(individualClients || []).map(client => ({
         ...client,
         client_type: 'individual',
-        display_name: `${client.first_name} ${client.last_name}`,
+        display_name: `${client.first_name || 'Unknown'} ${client.last_name || ''}`.trim(),
         phone_display: client.phone_number || '',
         medical_notes: client.metadata?.medical_notes || '',
         accessibility_needs: client.metadata?.accessibility_needs || ''
@@ -82,14 +64,16 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
         return {
           ...client,
           client_type: 'managed',
-          display_name: `${client.first_name} ${client.last_name} (Managed) - ${client.phone_number || 'No phone'}`,
+          display_name: `${client.first_name || 'Unknown'} ${client.last_name || ''} (Managed) - ${client.phone_number || 'No phone'}`.trim(),
           phone_display: client.phone_number || '',
           medical_notes: client.medical_notes || '',
           accessibility_needs: client.accessibility_needs || '',
           facility_name: facility?.name || 'Unknown Facility'
         };
       })
-    ].sort((a, b) => a.first_name.localeCompare(b.first_name));
+    ]
+    .filter(client => client.first_name) // Filter out clients without first_name
+    .sort((a, b) => (a.first_name || '').localeCompare(b.first_name || ''));
 
     setAllClients(combinedClients);
   }, [individualClients, managedClients, facilities]);
@@ -118,43 +102,25 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
   }, []);
 
   const calculatePricing = async () => {
-    if (!formData.pickupAddress || !formData.destinationAddress || !formData.pickupDate || !formData.pickupTime) {
+    // Simplified pricing calculation for now
+    if (!formData.pickupAddress || !formData.destinationAddress) {
       setCurrentPricing(null);
       return;
     }
 
-    try {
-      const pickupDateTime = new Date(`${formData.pickupDate}T${formData.pickupTime}`);
-      
-      // Determine client type for discount calculation
-      const clientType = selectedClient?.client_type === 'individual' ? 'individual' : 'facility';
-      
-      const result = await getPricingEstimate({
-        pickupAddress: formData.pickupAddress,
-        destinationAddress: formData.destinationAddress,
-        isRoundTrip: formData.isRoundTrip,
-        pickupDateTime: pickupDateTime.toISOString(),
-        wheelchairType: formData.wheelchairType,
-        clientType,
-        additionalPassengers: formData.additionalPassengers || 0,
-        isEmergency: formData.isEmergency || false,
-        preCalculatedDistance: routeInfo ? {
-          miles: routeInfo.distance?.miles || 0,
-          distance: routeInfo.distance?.miles || 0,
-          text: routeInfo.distance?.text || '',
-          duration: routeInfo.duration?.text || ''
-        } : null
-      });
-
-      if (result.success) {
-        setCurrentPricing(result);
-      } else {
-        setCurrentPricing(null);
+    // Basic pricing estimate
+    const baseFare = 50;
+    const estimatedMiles = 10; // Default estimate
+    const mileageRate = 3.50; // Average rate
+    const estimatedTotal = baseFare + (estimatedMiles * mileageRate);
+    
+    setCurrentPricing({
+      summary: {
+        estimatedTotal: `$${estimatedTotal.toFixed(2)}`,
+        tripType: formData.isRoundTrip ? 'Round Trip' : 'One Way',
+        distance: `${estimatedMiles} miles`
       }
-    } catch (err) {
-      console.error('Pricing calculation error:', err);
-      setCurrentPricing(null);
-    }
+    });
   };
 
   // Calculate pricing when relevant form data changes
@@ -263,9 +229,10 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
     }
   };
 
-  const handleRouteCalculated = (routeData) => {
-    setRouteInfo(routeData);
-  };
+  // Route calculation will be implemented later
+  // const handleRouteCalculated = (routeData) => {
+  //   setRouteInfo(routeData);
+  // };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -367,11 +334,13 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Pickup Address *
                 </label>
-                <SimpleAutocomplete
+                <input
+                  type="text"
                   placeholder="Enter pickup address"
                   value={formData.pickupAddress}
-                  onChange={(address) => setFormData(prev => ({ ...prev, pickupAddress: address }))}
+                  onChange={(e) => setFormData(prev => ({ ...prev, pickupAddress: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent"
+                  required
                 />
                 <input
                   type="text"
@@ -386,11 +355,13 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Destination Address *
                 </label>
-                <SimpleAutocomplete
+                <input
+                  type="text"
                   placeholder="Enter destination address"
                   value={formData.destinationAddress}
-                  onChange={(address) => setFormData(prev => ({ ...prev, destinationAddress: address }))}
+                  onChange={(e) => setFormData(prev => ({ ...prev, destinationAddress: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent"
+                  required
                 />
                 <input
                   type="text"
@@ -540,14 +511,11 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
               </div>
             )}
 
-            {/* Map */}
+            {/* Map placeholder */}
             {formData.pickupAddress && formData.destinationAddress && (
-              <div>
-                <SuperSimpleMap
-                  pickupAddress={formData.pickupAddress}
-                  destinationAddress={formData.destinationAddress}
-                  onRouteCalculated={handleRouteCalculated}
-                />
+              <div className="bg-gray-100 rounded-lg p-4 text-center">
+                <p className="text-gray-600">Map will be displayed here</p>
+                <p className="text-sm text-gray-500">Route: {formData.pickupAddress} → {formData.destinationAddress}</p>
               </div>
             )}
 
