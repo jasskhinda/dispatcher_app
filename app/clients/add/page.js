@@ -265,6 +265,7 @@ export default function AddClient() {
             
             {/* Personal Information - Only show if facility client type is selected */}
             {clientType === 'facility' && (
+            <>
             <div className="bg-purple-50 p-4 rounded-md border border-purple-200">
               <h3 className="text-md font-medium mb-4 text-purple-900">Client Information</h3>
               
@@ -357,6 +358,7 @@ export default function AddClient() {
                 </label>
               </div>
             </div>
+            </>
             )}
 
             <div className="flex justify-end">
