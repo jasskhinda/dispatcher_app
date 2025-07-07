@@ -3,6 +3,7 @@ import Script from "next/script";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
+import LoadingProvider from "./components/LoadingProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -46,7 +47,9 @@ export default function RootLayout({ children }) {
         
         <ThemeProvider>
           <AuthProvider>
-            {children}
+            <LoadingProvider>
+              {children}
+            </LoadingProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>
