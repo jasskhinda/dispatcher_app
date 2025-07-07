@@ -841,7 +841,7 @@ function WheelchairSelectionFlow({ onSelectionChange, selectedType, needsProvide
               />
               <div className="ml-3">
                 <div className="font-medium text-gray-900">None</div>
-                <div className="text-sm text-gray-600">No wheelchair needed</div>
+                <div className="text-sm text-gray-600">Client has no wheelchair</div>
               </div>
             </label>
 
@@ -884,40 +884,62 @@ function WheelchairSelectionFlow({ onSelectionChange, selectedType, needsProvide
             </div>
           </div>
 
-          <div className="pt-3 border-t border-blue-200">
-            <p className="text-sm font-medium text-gray-700 mb-2">Does the client need us to provide a wheelchair?</p>
-            
-            <div className="space-y-2">
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  name="wheelchairProvided"
-                  checked={needsProvided}
-                  onChange={() => handleProvidedChange(true)}
-                  className="h-4 w-4 text-[#7CCFD0] focus:ring-[#7CCFD0]"
-                />
-                <div className="ml-3">
-                  <div className="font-medium text-gray-900">Yes, please provide a wheelchair</div>
-                  <div className="text-sm text-gray-600">We will provide a suitable wheelchair for the client's trip</div>
-                  <div className="text-sm text-blue-600 font-medium">+$25 wheelchair rental fee</div>
-                </div>
-              </label>
+          {/* Show "provide wheelchair" options only when "None" is selected */}
+          {selectedType === 'none' && !needsProvided && (
+            <div className="pt-3 border-t border-blue-200">
+              <p className="text-sm font-medium text-gray-700 mb-2">Does the client need us to provide a wheelchair?</p>
+              
+              <div className="space-y-2">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="wheelchairProvided"
+                    checked={needsProvided}
+                    onChange={() => handleProvidedChange(true)}
+                    className="h-4 w-4 text-[#7CCFD0] focus:ring-[#7CCFD0]"
+                  />
+                  <div className="ml-3">
+                    <div className="font-medium text-gray-900">Yes, please provide a wheelchair</div>
+                    <div className="text-sm text-gray-600">We will provide a suitable wheelchair for the client's trip</div>
+                    <div className="text-sm text-blue-600 font-medium">+$25 wheelchair rental fee</div>
+                  </div>
+                </label>
 
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  name="wheelchairProvided"
-                  checked={!needsProvided}
-                  onChange={() => handleProvidedChange(false)}
-                  className="h-4 w-4 text-[#7CCFD0] focus:ring-[#7CCFD0]"
-                />
-                <div className="ml-3">
-                  <div className="font-medium text-gray-900">No, wheelchair not needed</div>
-                  <div className="text-sm text-gray-600">Client can walk or transfer independently</div>
-                </div>
-              </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="wheelchairProvided"
+                    checked={!needsProvided}
+                    onChange={() => handleProvidedChange(false)}
+                    className="h-4 w-4 text-[#7CCFD0] focus:ring-[#7CCFD0]"
+                  />
+                  <div className="ml-3">
+                    <div className="font-medium text-gray-900">No, wheelchair not needed</div>
+                    <div className="text-sm text-gray-600">Client can walk or transfer independently</div>
+                  </div>
+                </label>
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Show requirements input when "provide wheelchair" is selected */}
+          {selectedType === 'none' && needsProvided && (
+            <div className="pt-3 border-t border-blue-200 bg-blue-25 p-3 rounded">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Please specify wheelchair requirements for the client:
+              </label>
+              <textarea
+                value={requirements}
+                onChange={(e) => handleRequirementsChange(e.target.value)}
+                placeholder="Example: Standard manual wheelchair, lightweight transport chair, power chair with joystick controls, etc."
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent text-gray-900 bg-white placeholder-gray-500"
+              />
+              <p className="text-xs text-gray-600 mt-1">
+                Provide specific details about the type of wheelchair needed, any special features, or client requirements.
+              </p>
+            </div>
+          )}
 
           <div className="bg-blue-100 rounded p-3 mt-3">
             <p className="text-sm text-blue-800">
