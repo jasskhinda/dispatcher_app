@@ -158,14 +158,14 @@ export default function AddClient() {
           <h1 className="text-2xl font-semibold">Add New Client</h1>
           <button
             onClick={() => router.push('/clients')}
-            className="px-4 py-2 border border-brand-border rounded-md text-sm hover:bg-brand-border/10"
+            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md text-sm hover:bg-gray-50 transition-colors"
           >
             Back to Clients
           </button>
         </div>
         
-        <div className="bg-brand-card shadow rounded-lg p-6 border border-brand-border">
-          <h2 className="text-lg font-medium mb-6">Add New Client</h2>
+        <div className="bg-white shadow rounded-lg p-6 border border-gray-200">
+          <h2 className="text-lg font-medium mb-6 text-gray-900">Add New Client</h2>
           
           {error && (
             <div className="mb-6 p-4 border-l-4 border-red-500 bg-red-50 text-red-700 rounded">
@@ -181,15 +181,15 @@ export default function AddClient() {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Client Type Selection */}
-            <div className="bg-brand-border/5 p-4 rounded-md">
-              <h3 className="text-md font-medium mb-4">Select Client Type</h3>
+            <div className="bg-gray-50 p-4 rounded-md">
+              <h3 className="text-md font-medium mb-4 text-gray-900">Select Client Type</h3>
               
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div 
                   onClick={() => setClientType('individual')}
                   className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
                     clientType === 'individual' 
-                      ? 'border-blue-500 bg-blue-50' 
+                      ? 'border-[#7bcfd0] bg-[#7bcfd0]/10' 
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
@@ -200,7 +200,7 @@ export default function AddClient() {
                       value="individual"
                       checked={clientType === 'individual'}
                       onChange={(e) => setClientType(e.target.value)}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                      className="h-4 w-4 text-[#7bcfd0] focus:ring-[#7bcfd0] border-gray-300"
                     />
                     <div className="ml-3">
                       <div className="text-sm font-medium text-gray-900">Individual Client</div>
@@ -213,7 +213,7 @@ export default function AddClient() {
                   onClick={() => setClientType('facility')}
                   className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
                     clientType === 'facility' 
-                      ? 'border-purple-500 bg-purple-50' 
+                      ? 'border-[#7bcfd0] bg-[#7bcfd0]/10' 
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
@@ -224,7 +224,7 @@ export default function AddClient() {
                       value="facility"
                       checked={clientType === 'facility'}
                       onChange={(e) => setClientType(e.target.value)}
-                      className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300"
+                      className="h-4 w-4 text-[#7bcfd0] focus:ring-[#7bcfd0] border-gray-300"
                     />
                     <div className="ml-3">
                       <div className="text-sm font-medium text-gray-900">Facility Client</div>
@@ -237,16 +237,16 @@ export default function AddClient() {
             
             {/* Facility Selection for Facility Clients */}
             {clientType === 'facility' && (
-              <div className="bg-purple-50 p-4 rounded-md border border-purple-200">
-                <h3 className="text-md font-medium mb-4 text-purple-900">Select Facility</h3>
+              <div className="bg-[#7bcfd0]/10 p-4 rounded-md border border-[#7bcfd0]/30">
+                <h3 className="text-md font-medium mb-4 text-gray-900">Select Facility</h3>
                 <div>
-                  <label htmlFor="facility" className="block text-sm font-medium mb-1 text-purple-900">Assign to Facility *</label>
+                  <label htmlFor="facility" className="block text-sm font-medium mb-1 text-gray-900">Assign to Facility *</label>
                   <select
                     id="facility"
                     value={selectedFacilityId}
                     onChange={(e) => setSelectedFacilityId(e.target.value)}
                     required={clientType === 'facility'}
-                    className="w-full p-2 border border-purple-300 rounded-md bg-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-[#7bcfd0] focus:border-transparent text-gray-900"
                   >
                     <option value="">Select a facility...</option>
                     {facilities.map((facility) => (
@@ -261,14 +261,14 @@ export default function AddClient() {
             
             {/* Coming Soon Message for Individual Clients */}
             {clientType === 'individual' && (
-              <div className="bg-blue-50 p-4 rounded-md border border-blue-200">
+              <div className="bg-[#7bcfd0]/10 p-4 rounded-md border border-[#7bcfd0]/30">
                 <div className="flex items-center">
-                  <svg className="w-6 h-6 text-blue-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-6 h-6 text-[#7bcfd0] mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <div>
-                    <h3 className="text-md font-medium text-blue-900">COMING SOON</h3>
-                    <p className="text-sm text-blue-700 mt-1">
+                    <h3 className="text-md font-medium text-gray-900">COMING SOON</h3>
+                    <p className="text-sm text-gray-700 mt-1">
                       Individual client creation from dispatcher app is coming soon. For now, clients can register directly through our booking app.
                     </p>
                   </div>
@@ -279,122 +279,122 @@ export default function AddClient() {
             {/* Personal Information - Only show if facility client type is selected */}
             {clientType === 'facility' && (
             <>
-            <div className="bg-purple-50 p-4 rounded-md border border-purple-200">
-              <h3 className="text-md font-medium mb-4 text-purple-900">Client Information</h3>
+            <div className="bg-white p-4 rounded-md border border-gray-200">
+              <h3 className="text-md font-medium mb-4 text-gray-900">Client Information</h3>
               
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label htmlFor="firstName" className="block text-sm font-medium mb-1 text-purple-900">First Name *</label>
+                  <label htmlFor="firstName" className="block text-sm font-medium mb-1 text-gray-900">First Name *</label>
                   <input
                     id="firstName"
                     type="text"
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
                     required
-                    className="w-full p-2 border border-purple-300 rounded-md bg-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-[#7bcfd0] focus:border-transparent text-gray-900"
                   />
                 </div>
                 
                 <div>
-                  <label htmlFor="lastName" className="block text-sm font-medium mb-1 text-purple-900">Last Name *</label>
+                  <label htmlFor="lastName" className="block text-sm font-medium mb-1 text-gray-900">Last Name *</label>
                   <input
                     id="lastName"
                     type="text"
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
                     required
-                    className="w-full p-2 border border-purple-300 rounded-md bg-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-[#7bcfd0] focus:border-transparent text-gray-900"
                   />
                 </div>
               </div>
 
               <div className="mt-4">
-                <label htmlFor="email" className="block text-sm font-medium mb-1 text-purple-900">Email *</label>
+                <label htmlFor="email" className="block text-sm font-medium mb-1 text-gray-900">Email *</label>
                 <input
                   id="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="w-full p-2 border border-purple-300 rounded-md bg-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-[#7bcfd0] focus:border-transparent text-gray-900"
                 />
-                <p className="text-xs text-purple-600 mt-1">Required to create client account and send login credentials</p>
+                <p className="text-xs text-[#7bcfd0] mt-1">Required to create client account and send login credentials</p>
               </div>
 
               <div className="mt-4">
-                <label htmlFor="phoneNumber" className="block text-sm font-medium mb-1 text-purple-900">Phone Number *</label>
+                <label htmlFor="phoneNumber" className="block text-sm font-medium mb-1 text-gray-900">Phone Number *</label>
                 <input
                   id="phoneNumber"
                   type="tel"
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
                   required
-                  className="w-full p-2 border border-purple-300 rounded-md bg-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-[#7bcfd0] focus:border-transparent text-gray-900"
                 />
               </div>
             </div>
 
             {/* Additional Information */}
-            <div className="bg-purple-50 p-4 rounded-md border border-purple-200">
-              <h3 className="text-md font-medium mb-4 text-purple-900">Additional Information</h3>
+            <div className="bg-white p-4 rounded-md border border-gray-200">
+              <h3 className="text-md font-medium mb-4 text-gray-900">Additional Information</h3>
               
               <div>
-                <label htmlFor="address" className="block text-sm font-medium mb-1 text-purple-900">Address *</label>
+                <label htmlFor="address" className="block text-sm font-medium mb-1 text-gray-900">Address *</label>
                 <textarea
                   id="address"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   required
                   rows={3}
-                  className="w-full p-2 border border-purple-300 rounded-md bg-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-[#7bcfd0] focus:border-transparent text-gray-900"
                 />
               </div>
               
               <div className="mt-4">
-                <label htmlFor="accessibilityNeeds" className="block text-sm font-medium mb-1 text-purple-900">Accessibility Needs</label>
+                <label htmlFor="accessibilityNeeds" className="block text-sm font-medium mb-1 text-gray-900">Accessibility Needs</label>
                 <textarea
                   id="accessibilityNeeds"
                   value={accessibilityNeeds}
                   onChange={(e) => setAccessibilityNeeds(e.target.value)}
                   rows={2}
                   placeholder="Wheelchair, mobility aids, visual/hearing assistance, etc."
-                  className="w-full p-2 border border-purple-300 rounded-md bg-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-[#7bcfd0] focus:border-transparent text-gray-900"
                 />
               </div>
               
               <div className="mt-4">
-                <label htmlFor="medicalRequirements" className="block text-sm font-medium mb-1 text-purple-900">Medical Requirements</label>
+                <label htmlFor="medicalRequirements" className="block text-sm font-medium mb-1 text-gray-900">Medical Requirements</label>
                 <textarea
                   id="medicalRequirements"
                   value={medicalRequirements}
                   onChange={(e) => setMedicalRequirements(e.target.value)}
                   rows={2}
                   placeholder="Oxygen, medical equipment, allergies, medications, etc."
-                  className="w-full p-2 border border-purple-300 rounded-md bg-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-[#7bcfd0] focus:border-transparent text-gray-900"
                 />
               </div>
               
               <div className="mt-4">
-                <label htmlFor="emergencyContact" className="block text-sm font-medium mb-1 text-purple-900">Emergency Contact</label>
+                <label htmlFor="emergencyContact" className="block text-sm font-medium mb-1 text-gray-900">Emergency Contact</label>
                 <input
                   id="emergencyContact"
                   type="text"
                   value={emergencyContact}
                   onChange={(e) => setEmergencyContact(e.target.value)}
                   placeholder="Name and phone number"
-                  className="w-full p-2 border border-purple-300 rounded-md bg-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-[#7bcfd0] focus:border-transparent text-gray-900"
                 />
               </div>
               
               <div className="mt-4">
-                <label htmlFor="notes" className="block text-sm font-medium mb-1 text-purple-900">Notes</label>
+                <label htmlFor="notes" className="block text-sm font-medium mb-1 text-gray-900">Notes</label>
                 <textarea
                   id="notes"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   rows={3}
                   placeholder="Special needs, preferences, etc."
-                  className="w-full p-2 border border-purple-300 rounded-md bg-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-[#7bcfd0] focus:border-transparent text-gray-900"
                 />
               </div>
             </div>
@@ -405,18 +405,14 @@ export default function AddClient() {
               <button
                 type="button"
                 onClick={() => router.push('/clients')}
-                className="px-4 py-2 border border-brand-border rounded-md mr-3 hover:bg-brand-border/10"
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md mr-3 hover:bg-gray-50 transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={loading || !clientType || (clientType === 'facility' && !selectedFacilityId)}
-                className={`px-4 py-2 rounded-md transition-all disabled:opacity-70 ${
-                  clientType === 'facility' 
-                    ? 'bg-purple-600 text-white hover:bg-purple-700' 
-                    : 'bg-blue-600 text-white hover:bg-blue-700'
-                }`}
+                className="px-4 py-2 bg-[#7bcfd0] text-white rounded-md hover:bg-[#6bb8ba] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Creating...' : 
                  clientType === 'individual' ? 'Coming Soon' :
