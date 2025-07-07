@@ -1,0 +1,711 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import dynamic from 'next/dynamic';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { getPricingEstimate, formatCurrency } from '@/lib/pricing';
+
+// Dynamically import Google Maps components to prevent SSR issues
+const SuperSimpleMap = dynamic(() => import('./SuperSimpleMap'), {
+  ssr: false,
+  loading: () => <div className="w-full h-64 bg-gray-100 rounded-lg flex items-center justify-center">
+    <div className="text-center">
+      <div className="animate-spin h-6 w-6 border-2 border-gray-400 border-t-transparent rounded-full mx-auto mb-2"></div>
+      <p className="text-gray-600 text-sm">Loading map...</p>
+    </div>
+  </div>
+});
+
+const SimpleAutocomplete = dynamic(() => import('./SimpleAutocomplete'), {
+  ssr: false,
+  loading: () => <div className="animate-pulse bg-gray-200 h-12 rounded"></div>
+});
+
+export default function EnhancedTripForm({ user, userProfile, individualClients, managedClients, facilities }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const driverId = searchParams.get('driver_id');
+  const supabase = createClientComponentClient();
+  
+  const [loading, setLoading] = useState(false);
+  const [allClients, setAllClients] = useState([]);
+  
+  const [formData, setFormData] = useState({
+    clientId: '',
+    pickupAddress: '',
+    pickupDetails: '',
+    destinationAddress: '',
+    destinationDetails: '',
+    pickupDate: new Date().toISOString().split('T')[0], // Today's date
+    pickupTime: '08:15',
+    isRoundTrip: false,
+    returnTime: '08:30',
+    wheelchairType: 'no_wheelchair',
+    additionalPassengers: 0,
+    tripNotes: '',
+    isEmergency: false,
+    driver_id: driverId || null
+  });
+
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+  const [currentPricing, setCurrentPricing] = useState(null);
+  const [routeInfo, setRouteInfo] = useState(null);
+  const [showBreakdown, setShowBreakdown] = useState(false);
+
+  // Wheelchair selection data
+  const [wheelchairData, setWheelchairData] = useState({
+    type: 'none',
+    needsProvided: false,
+    customType: '',
+    hasWheelchairFee: false,
+    fee: 0
+  });
+
+  // Combine all clients into one list
+  useEffect(() => {
+    const combinedClients = [
+      // Individual clients from booking app
+      ...(individualClients || []).map(client => ({
+        ...client,
+        client_type: 'individual',
+        display_name: `${client.first_name} ${client.last_name}`,
+        phone_display: client.phone_number || '',
+        medical_notes: client.metadata?.medical_notes || '',
+        accessibility_needs: client.metadata?.accessibility_needs || ''
+      })),
+      // Managed clients from facilities
+      ...(managedClients || []).map(client => {
+        const facility = facilities.find(f => f.id === client.facility_id);
+        return {
+          ...client,
+          client_type: 'managed',
+          display_name: `${client.first_name} ${client.last_name} (Managed) - ${client.phone_number || 'No phone'}`,
+          phone_display: client.phone_number || '',
+          medical_notes: client.medical_notes || '',
+          accessibility_needs: client.accessibility_needs || '',
+          facility_name: facility?.name || 'Unknown Facility'
+        };
+      })
+    ].sort((a, b) => a.first_name.localeCompare(b.first_name));
+
+    setAllClients(combinedClients);
+  }, [individualClients, managedClients, facilities]);
+
+  useEffect(() => {
+    if (formData.clientId) {
+      const client = allClients.find(c => c.id === formData.clientId);
+      setSelectedClient(client);
+    }
+  }, [formData.clientId, allClients]);
+
+  // Handle wheelchair selection changes
+  const handleWheelchairChange = useCallback((newWheelchairData) => {
+    setWheelchairData(newWheelchairData);
+    
+    // Update form data wheelchair type for database compatibility
+    let wheelchairType = 'no_wheelchair';
+    if (newWheelchairData.type !== 'none' || newWheelchairData.needsProvided) {
+      wheelchairType = newWheelchairData.type === 'none' ? 'provided' : newWheelchairData.type;
+    }
+    
+    setFormData(prev => ({
+      ...prev,
+      wheelchairType: wheelchairType
+    }));
+  }, []);
+
+  const calculatePricing = async () => {
+    if (!formData.pickupAddress || !formData.destinationAddress || !formData.pickupDate || !formData.pickupTime) {
+      setCurrentPricing(null);
+      return;
+    }
+
+    try {
+      const pickupDateTime = new Date(`${formData.pickupDate}T${formData.pickupTime}`);
+      
+      // Determine client type for discount calculation
+      const clientType = selectedClient?.client_type === 'individual' ? 'individual' : 'facility';
+      
+      const result = await getPricingEstimate({
+        pickupAddress: formData.pickupAddress,
+        destinationAddress: formData.destinationAddress,
+        isRoundTrip: formData.isRoundTrip,
+        pickupDateTime: pickupDateTime.toISOString(),
+        wheelchairType: formData.wheelchairType,
+        clientType,
+        additionalPassengers: formData.additionalPassengers || 0,
+        isEmergency: formData.isEmergency || false,
+        preCalculatedDistance: routeInfo ? {
+          miles: routeInfo.distance?.miles || 0,
+          distance: routeInfo.distance?.miles || 0,
+          text: routeInfo.distance?.text || '',
+          duration: routeInfo.duration?.text || ''
+        } : null
+      });
+
+      if (result.success) {
+        setCurrentPricing(result);
+      } else {
+        setCurrentPricing(null);
+      }
+    } catch (err) {
+      console.error('Pricing calculation error:', err);
+      setCurrentPricing(null);
+    }
+  };
+
+  // Calculate pricing when relevant form data changes
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      calculatePricing();
+    }, 500); // Debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [
+    formData.pickupAddress,
+    formData.destinationAddress,
+    formData.pickupDate,
+    formData.pickupTime,
+    formData.isRoundTrip,
+    formData.wheelchairType,
+    formData.isEmergency,
+    selectedClient?.client_type,
+    routeInfo
+  ]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess(false);
+    
+    if (!formData.clientId) {
+      setError('Please select a client');
+      return;
+    }
+    
+    if (!formData.pickupAddress || !formData.destinationAddress) {
+      setError('Please fill in both pickup and destination addresses');
+      return;
+    }
+    
+    if (!formData.pickupDate || !formData.pickupTime) {
+      setError('Please select pickup date and time');
+      return;
+    }
+
+    // Validate wheelchair selection
+    if (wheelchairData.isTransportChair) {
+      setError('We are unable to accommodate transport wheelchairs due to safety regulations. Please select a different wheelchair option or choose "None" for us to provide suitable accommodation.');
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      
+      // Combine date and time
+      const pickupDateTime = new Date(`${formData.pickupDate}T${formData.pickupTime}`);
+      let returnDateTime = null;
+      
+      if (formData.isRoundTrip && formData.returnTime) {
+        returnDateTime = new Date(`${formData.pickupDate}T${formData.returnTime}`);
+      }
+
+      // Determine if this is an individual client or managed client
+      const isIndividualClient = selectedClient?.client_type === 'individual';
+      
+      // Create trip data
+      const tripData = {
+        user_id: isIndividualClient ? selectedClient.id : null,
+        managed_client_id: !isIndividualClient ? selectedClient.id : null,
+        facility_id: !isIndividualClient ? selectedClient.facility_id : null,
+        pickup_address: formData.pickupAddress,
+        pickup_details: formData.pickupDetails,
+        destination_address: formData.destinationAddress,
+        destination_details: formData.destinationDetails,
+        pickup_time: pickupDateTime.toISOString(),
+        return_pickup_time: returnDateTime?.toISOString() || null,
+        wheelchair_type: formData.wheelchairType,
+        additional_passengers: parseInt(formData.additionalPassengers) || 0,
+        notes: formData.tripNotes,
+        is_round_trip: formData.isRoundTrip,
+        is_emergency: formData.isEmergency,
+        status: formData.driver_id ? 'assigned' : 'pending',
+        driver_id: formData.driver_id || null,
+        price: currentPricing?.summary?.totalAmount || 0,
+        created_by: user.id,
+        created_by_role: 'dispatcher'
+      };
+
+      // Insert trip
+      const { data: trip, error: tripError } = await supabase
+        .from('trips')
+        .insert([tripData])
+        .select()
+        .single();
+
+      if (tripError) throw tripError;
+
+      setSuccess(true);
+      
+      // Clear form after successful submission
+      setTimeout(() => {
+        router.push('/dashboard?success=trip_created');
+      }, 2000);
+
+    } catch (err) {
+      console.error('Submit error:', err);
+      setError(err.message || 'Failed to create trip');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRouteCalculated = (routeData) => {
+    setRouteInfo(routeData);
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="bg-white rounded-lg shadow-sm border p-8">
+          <h1 className="text-2xl font-bold text-gray-900 mb-6">Book Transportation</h1>
+          
+          {error && (
+            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex">
+                <svg className="w-5 h-5 text-red-400 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+                <p className="text-red-700">{error}</p>
+              </div>
+            </div>
+          )}
+
+          {success && (
+            <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex">
+                <svg className="w-5 h-5 text-green-400 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <p className="text-green-700">Trip created successfully! Redirecting to dashboard...</p>
+              </div>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Client Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Select Client *
+              </label>
+              <select
+                value={formData.clientId}
+                onChange={(e) => setFormData(prev => ({ ...prev, clientId: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent"
+                required
+              >
+                <option value="">Choose a client...</option>
+                {allClients.map(client => (
+                  <option key={client.id} value={client.id}>
+                    {client.display_name}
+                  </option>
+                ))}
+              </select>
+
+              {selectedClient && (
+                <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+                  <div className="text-sm">
+                    {selectedClient.medical_notes && (
+                      <p className="text-gray-700 mb-1">
+                        <strong>Medical notes:</strong> {selectedClient.medical_notes}
+                      </p>
+                    )}
+                    {selectedClient.accessibility_needs && (
+                      <p className="text-gray-700">
+                        <strong>Accessibility:</strong> {selectedClient.accessibility_needs}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Date and Time */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Pickup Date *
+                </label>
+                <input
+                  type="date"
+                  value={formData.pickupDate}
+                  onChange={(e) => setFormData(prev => ({ ...prev, pickupDate: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Pickup Time *
+                </label>
+                <input
+                  type="time"
+                  value={formData.pickupTime}
+                  onChange={(e) => setFormData(prev => ({ ...prev, pickupTime: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Addresses */}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Pickup Address *
+                </label>
+                <SimpleAutocomplete
+                  placeholder="Enter pickup address"
+                  value={formData.pickupAddress}
+                  onChange={(address) => setFormData(prev => ({ ...prev, pickupAddress: address }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent"
+                />
+                <input
+                  type="text"
+                  placeholder="Apartment, suite, building entrance, etc. (optional)"
+                  value={formData.pickupDetails}
+                  onChange={(e) => setFormData(prev => ({ ...prev, pickupDetails: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent mt-2"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Destination Address *
+                </label>
+                <SimpleAutocomplete
+                  placeholder="Enter destination address"
+                  value={formData.destinationAddress}
+                  onChange={(address) => setFormData(prev => ({ ...prev, destinationAddress: address }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent"
+                />
+                <input
+                  type="text"
+                  placeholder="Building, entrance, room number, etc. (optional)"
+                  value={formData.destinationDetails}
+                  onChange={(e) => setFormData(prev => ({ ...prev, destinationDetails: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent mt-2"
+                />
+              </div>
+            </div>
+
+            {/* Route Overview */}
+            {routeInfo && (
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="font-medium text-gray-900 mb-2">Route Overview</h3>
+                <div className="text-sm text-gray-600">
+                  <p className="font-semibold text-lg">{routeInfo.distance?.text}</p>
+                  <p>({routeInfo.distance?.miles?.toFixed(2)} miles)</p>
+                  <p className="text-blue-600">{routeInfo.duration?.text} driving time</p>
+                </div>
+              </div>
+            )}
+
+            {/* Round Trip */}
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="isRoundTrip"
+                checked={formData.isRoundTrip}
+                onChange={(e) => setFormData(prev => ({ ...prev, isRoundTrip: e.target.checked }))}
+                className="h-4 w-4 text-[#7CCFD0] focus:ring-[#7CCFD0] border-gray-300 rounded"
+              />
+              <label htmlFor="isRoundTrip" className="ml-2 text-sm font-medium text-gray-700">
+                Round trip
+              </label>
+            </div>
+
+            {formData.isRoundTrip && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Return Time
+                </label>
+                <input
+                  type="time"
+                  value={formData.returnTime}
+                  onChange={(e) => setFormData(prev => ({ ...prev, returnTime: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent"
+                />
+              </div>
+            )}
+
+            {/* Emergency Trip */}
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="isEmergency"
+                  checked={formData.isEmergency}
+                  onChange={(e) => setFormData(prev => ({ ...prev, isEmergency: e.target.checked }))}
+                  className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                />
+                <label htmlFor="isEmergency" className="ml-2 text-sm font-medium text-red-700">
+                  🚨 Emergency Trip
+                </label>
+              </div>
+              <p className="text-xs text-red-600 mt-1">
+                Check this box if this is an emergency trip requiring immediate attention. Additional $40 emergency fee applies.
+              </p>
+            </div>
+
+            {/* Wheelchair Transportation */}
+            <WheelchairSelectionFlow 
+              onSelectionChange={handleWheelchairChange}
+              selectedType={wheelchairData.type}
+              needsProvided={wheelchairData.needsProvided}
+            />
+
+            {/* Additional Passengers */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Additional Passengers
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="3"
+                value={formData.additionalPassengers}
+                onChange={(e) => setFormData(prev => ({ ...prev, additionalPassengers: parseInt(e.target.value) || 0 }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent"
+              />
+            </div>
+
+            {/* Trip Notes */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Trip Notes
+              </label>
+              <textarea
+                placeholder="Special instructions, medical equipment, etc."
+                value={formData.tripNotes}
+                onChange={(e) => setFormData(prev => ({ ...prev, tripNotes: e.target.value }))}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent"
+              />
+            </div>
+
+            {/* Pricing Display */}
+            {currentPricing && (
+              <div className="bg-gradient-to-br from-[#7CCFD0]/10 to-[#60BFC0]/5 rounded-lg border border-[#7CCFD0]/20 p-4">
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Fare Estimate</h3>
+                <div className="flex justify-between items-center p-3 bg-white/60 rounded-lg">
+                  <div>
+                    <p className="text-sm text-gray-600">
+                      {currentPricing.summary.tripType} • {currentPricing.summary.distance}
+                    </p>
+                    {currentPricing.distance?.duration && (
+                      <p className="text-xs text-gray-500">
+                        Est. travel time: {currentPricing.distance.duration}
+                      </p>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-gray-900">
+                      {currentPricing.summary.estimatedTotal}
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Price breakdown */}
+                {currentPricing.breakdown && (
+                  <div className="mt-3 space-y-1">
+                    <button
+                      type="button"
+                      className="text-sm text-[#7CCFD0] hover:text-[#60BFC0] underline"
+                      onClick={() => setShowBreakdown(!showBreakdown)}
+                    >
+                      View price breakdown
+                    </button>
+                    <p className="text-xs text-gray-500">
+                      • Additional charges apply for off-hours, weekends, or wheelchair accessibility
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      • Final fare may vary based on actual route and traffic conditions
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Map */}
+            {formData.pickupAddress && formData.destinationAddress && (
+              <div>
+                <SuperSimpleMap
+                  pickupAddress={formData.pickupAddress}
+                  destinationAddress={formData.destinationAddress}
+                  onRouteCalculated={handleRouteCalculated}
+                />
+              </div>
+            )}
+
+            {/* Submit Buttons */}
+            <div className="flex gap-4 pt-6">
+              <button
+                type="button"
+                onClick={() => router.back()}
+                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-6 py-2 bg-[#7CCFD0] text-white rounded-md hover:bg-[#60BFC0] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {loading ? 'Creating Trip...' : 'Book Trip'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Simple Wheelchair Selection Component
+function WheelchairSelectionFlow({ onSelectionChange, selectedType, needsProvided }) {
+  const [showDetails, setShowDetails] = useState(false);
+
+  const handleTypeChange = (type) => {
+    onSelectionChange({
+      type,
+      needsProvided: false,
+      hasWheelchairFee: type === 'provided',
+      fee: type === 'provided' ? 25 : 0
+    });
+  };
+
+  const handleProvidedChange = (provided) => {
+    onSelectionChange({
+      type: 'none',
+      needsProvided: provided,
+      hasWheelchairFee: provided,
+      fee: provided ? 25 : 0
+    });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex items-center mb-3">
+          <span className="text-lg mr-2">♿</span>
+          <h3 className="font-medium text-gray-900">Wheelchair Transportation</h3>
+        </div>
+        
+        <div className="space-y-3">
+          <p className="text-sm font-medium text-gray-700">What type of wheelchair do you have?</p>
+          
+          <div className="space-y-2">
+            <label className="flex items-center">
+              <input
+                type="radio"
+                name="wheelchairType"
+                value="none"
+                checked={selectedType === 'none' && !needsProvided}
+                onChange={() => handleTypeChange('none')}
+                className="h-4 w-4 text-[#7CCFD0] focus:ring-[#7CCFD0]"
+              />
+              <div className="ml-3">
+                <div className="font-medium text-gray-900">None</div>
+                <div className="text-sm text-gray-600">No wheelchair needed</div>
+              </div>
+            </label>
+
+            <label className="flex items-center">
+              <input
+                type="radio"
+                name="wheelchairType"
+                value="manual"
+                checked={selectedType === 'manual'}
+                onChange={() => handleTypeChange('manual')}
+                className="h-4 w-4 text-[#7CCFD0] focus:ring-[#7CCFD0]"
+              />
+              <div className="ml-3">
+                <div className="font-medium text-gray-900">Manual wheelchair (I have my own)</div>
+                <div className="text-sm text-gray-600">Standard manual wheelchair that you bring</div>
+                <div className="text-sm text-green-600 font-medium">No additional fee</div>
+              </div>
+            </label>
+
+            <label className="flex items-center">
+              <input
+                type="radio"
+                name="wheelchairType"
+                value="power"
+                checked={selectedType === 'power'}
+                onChange={() => handleTypeChange('power')}
+                className="h-4 w-4 text-[#7CCFD0] focus:ring-[#7CCFD0]"
+              />
+              <div className="ml-3">
+                <div className="font-medium text-gray-900">Power wheelchair (I have my own)</div>
+                <div className="text-sm text-gray-600">Electric/motorized wheelchair that you bring</div>
+                <div className="text-sm text-green-600 font-medium">No additional fee</div>
+              </div>
+            </label>
+
+            <div className="bg-red-50 border border-red-200 rounded p-3">
+              <div className="font-medium text-red-800">Transport wheelchair</div>
+              <div className="text-sm text-red-600">Not Available</div>
+              <div className="text-xs text-red-600 mt-1">Lightweight transport chair - Not permitted for safety reasons</div>
+            </div>
+          </div>
+
+          <div className="pt-3 border-t border-blue-200">
+            <p className="text-sm font-medium text-gray-700 mb-2">Do you want us to provide a wheelchair?</p>
+            
+            <div className="space-y-2">
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="wheelchairProvided"
+                  checked={needsProvided}
+                  onChange={() => handleProvidedChange(true)}
+                  className="h-4 w-4 text-[#7CCFD0] focus:ring-[#7CCFD0]"
+                />
+                <div className="ml-3">
+                  <div className="font-medium text-gray-900">Yes, please provide a wheelchair</div>
+                  <div className="text-sm text-gray-600">We will provide a suitable wheelchair for your trip</div>
+                  <div className="text-sm text-blue-600 font-medium">+$25 wheelchair rental fee</div>
+                </div>
+              </label>
+
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="wheelchairProvided"
+                  checked={!needsProvided}
+                  onChange={() => handleProvidedChange(false)}
+                  className="h-4 w-4 text-[#7CCFD0] focus:ring-[#7CCFD0]"
+                />
+                <div className="ml-3">
+                  <div className="font-medium text-gray-900">No, wheelchair not needed</div>
+                  <div className="text-sm text-gray-600">Passenger can walk or transfer independently</div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <div className="bg-blue-100 rounded p-3 mt-3">
+            <p className="text-sm text-blue-800">
+              <strong>Wheelchair Accessibility Information</strong><br />
+              All our vehicles are equipped with wheelchair accessibility features. The same fee applies to all wheelchair types to ensure fair and transparent pricing.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

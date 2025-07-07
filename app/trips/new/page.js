@@ -110,10 +110,10 @@ export default async function NewTripPage() {
 
         console.log(`📊 Client summary: ${individualClients?.length || 0} individual + ${managedClients.length} managed = ${(individualClients?.length || 0) + managedClients.length} total clients`);
 
-        // Import the NewTripForm component
-        const { NewTripForm } = require('../../components/NewTripForm');
+        // Import the enhanced trip form component
+        const { default: EnhancedTripForm } = require('../../components/EnhancedTripForm');
         
-        return <NewTripForm 
+        return <EnhancedTripForm 
             user={session.user} 
             userProfile={userProfile} 
             individualClients={individualClients || []}
