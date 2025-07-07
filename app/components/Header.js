@@ -63,7 +63,7 @@ export default function Header() {
   }, [router]);
 
   return (
-    <header className="sticky top-0 z-10 bg-brand-background border-b border-brand-border">
+    <header className="sticky top-0 z-10 bg-white border-b border-gray-200">
       <div className="w-full px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link href="/dashboard" className="flex items-center gap-3">
@@ -82,48 +82,48 @@ export default function Header() {
         <div className="flex-1 flex items-center justify-center space-x-6 mx-8">
           <Link 
             href="/dashboard" 
-            className={`text-sm font-medium hover:text-brand-accent transition-colors pb-1 ${
-              activeRoute === '/dashboard' ? 'text-brand-accent border-b-2 border-brand-accent' : ''
+            className={`text-sm font-bold text-black hover:text-[#7CCFD0] transition-colors pb-1 ${
+              activeRoute === '/dashboard' ? 'text-[#7CCFD0] border-b-2 border-[#7CCFD0]' : ''
             }`}
           >
             Dashboard
           </Link>
           <Link 
             href="/trips/new" 
-            className={`text-sm font-medium hover:text-brand-accent transition-colors pb-1 ${
-              activeRoute.includes('/trips/new') ? 'text-brand-accent border-b-2 border-brand-accent' : ''
+            className={`text-sm font-bold text-black hover:text-[#7CCFD0] transition-colors pb-1 ${
+              activeRoute.includes('/trips/new') ? 'text-[#7CCFD0] border-b-2 border-[#7CCFD0]' : ''
             }`}
           >
             New Trip
           </Link>
           <Link 
             href="/calendar" 
-            className={`text-sm font-medium hover:text-brand-accent transition-colors pb-1 ${
-              activeRoute.includes('/calendar') ? 'text-brand-accent border-b-2 border-brand-accent' : ''
+            className={`text-sm font-bold text-black hover:text-[#7CCFD0] transition-colors pb-1 ${
+              activeRoute.includes('/calendar') ? 'text-[#7CCFD0] border-b-2 border-[#7CCFD0]' : ''
             }`}
           >
             Calendar
           </Link>
           <Link 
             href="/drivers" 
-            className={`text-sm font-medium hover:text-brand-accent transition-colors pb-1 ${
-              activeRoute.includes('/drivers') ? 'text-brand-accent border-b-2 border-brand-accent' : ''
+            className={`text-sm font-bold text-black hover:text-[#7CCFD0] transition-colors pb-1 ${
+              activeRoute.includes('/drivers') ? 'text-[#7CCFD0] border-b-2 border-[#7CCFD0]' : ''
             }`}
           >
             Drivers
           </Link>
           <Link 
             href="/clients" 
-            className={`text-sm font-medium hover:text-brand-accent transition-colors pb-1 ${
-              activeRoute.includes('/clients') ? 'text-brand-accent border-b-2 border-brand-accent' : ''
+            className={`text-sm font-bold text-black hover:text-[#7CCFD0] transition-colors pb-1 ${
+              activeRoute.includes('/clients') ? 'text-[#7CCFD0] border-b-2 border-[#7CCFD0]' : ''
             }`}
           >
             Clients
           </Link>
           <Link 
             href="/map" 
-            className={`text-sm font-medium hover:text-brand-accent transition-colors pb-1 ${
-              activeRoute.includes('/map') ? 'text-brand-accent border-b-2 border-brand-accent' : ''
+            className={`text-sm font-bold text-black hover:text-[#7CCFD0] transition-colors pb-1 ${
+              activeRoute.includes('/map') ? 'text-[#7CCFD0] border-b-2 border-[#7CCFD0]' : ''
             }`}
           >
             Map
@@ -134,12 +134,12 @@ export default function Header() {
         <div className="flex items-center gap-4">
           {user && (
             <div className="flex items-center gap-4">
-              <span className="text-sm hidden md:inline-block">
+              <span className="text-sm text-black font-medium hidden md:inline-block">
                 {user.email}
               </span>
               <button
                 onClick={handleSignOut}
-                className="px-3 py-1 rounded text-sm bg-brand-accent text-brand-buttonText hover:opacity-90 transition-opacity"
+                className="px-3 py-1 rounded text-sm bg-[#7CCFD0] text-white hover:opacity-90 transition-opacity font-medium"
               >
                 Sign Out
               </button>
