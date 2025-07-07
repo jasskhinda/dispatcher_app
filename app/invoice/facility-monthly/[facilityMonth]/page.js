@@ -1683,23 +1683,12 @@ export default function FacilityMonthlyInvoicePage() {
                                                         <button
                                                             onClick={() => handleCheckVerification('check_received')}
                                                             disabled={updatingPaymentStatus}
-                                                            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center"
-                                                        >
-                                                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                                                            </svg>
-                                                            RECEIVED
-                                                        </button>
-                                                        
-                                                        <button
-                                                            onClick={() => handleCheckVerification('mark_verified')}
-                                                            disabled={updatingPaymentStatus}
                                                             className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center"
                                                         >
                                                             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                             </svg>
-                                                            RECEIVED DEPOSIT
+                                                            RECEIVED & DEPOSITED
                                                         </button>
                                                         
                                                         <button
