@@ -500,7 +500,29 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
                 <input
                   type="time"
                   value={formData.pickupTime}
-                  onChange={(e) => setFormData(prev => ({ ...prev, pickupTime: e.target.value }))}
+                  onChange={(e) => {
+                    const newPickupTime = e.target.value;
+                    setFormData(prev => ({ ...prev, pickupTime: newPickupTime }));
+                    
+                    // Validate return time if round trip and return time is set
+                    if (formData.isRoundTrip && formData.returnTime && newPickupTime) {
+                      const pickupDateTime = new Date(`${formData.pickupDate}T${newPickupTime}`);
+                      const returnDateTime = new Date(`${formData.pickupDate}T${formData.returnTime}`);
+                      
+                      // Calculate minimum return time (pickup + travel time + 30 minutes minimum)
+                      const travelTimeMinutes = routeInfo?.duration?.value ? Math.ceil(routeInfo.duration.value / 60) : 60;
+                      const minimumReturnTime = new Date(pickupDateTime.getTime() + (travelTimeMinutes + 30) * 60000);
+                      
+                      if (returnDateTime <= minimumReturnTime) {
+                        const minTimeString = minimumReturnTime.toTimeString().slice(0, 5);
+                        setError(`Return time must be at least ${Math.ceil((travelTimeMinutes + 30) / 60 * 100) / 100} hours after pickup time. Minimum return time: ${minTimeString}`);
+                      } else {
+                        if (error.includes('Return time must be')) {
+                          setError('');
+                        }
+                      }
+                    }
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent text-gray-900 bg-white"
                   required
                 />
@@ -579,14 +601,43 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
             {formData.isRoundTrip && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Return Time
+                  Return Time *
                 </label>
                 <input
                   type="time"
                   value={formData.returnTime}
-                  onChange={(e) => setFormData(prev => ({ ...prev, returnTime: e.target.value }))}
+                  onChange={(e) => {
+                    const newReturnTime = e.target.value;
+                    setFormData(prev => ({ ...prev, returnTime: newReturnTime }));
+                    
+                    // Validate return time
+                    if (formData.pickupTime && newReturnTime) {
+                      const pickupDateTime = new Date(`${formData.pickupDate}T${formData.pickupTime}`);
+                      const returnDateTime = new Date(`${formData.pickupDate}T${newReturnTime}`);
+                      
+                      // Calculate minimum return time (pickup + travel time + 30 minutes minimum)
+                      const travelTimeMinutes = routeInfo?.duration?.value ? Math.ceil(routeInfo.duration.value / 60) : 60; // Default 1 hour if no route info
+                      const minimumReturnTime = new Date(pickupDateTime.getTime() + (travelTimeMinutes + 30) * 60000); // Add travel time + 30 minutes
+                      
+                      if (returnDateTime <= minimumReturnTime) {
+                        const minTimeString = minimumReturnTime.toTimeString().slice(0, 5);
+                        setError(`Return time must be at least ${Math.ceil((travelTimeMinutes + 30) / 60 * 100) / 100} hours after pickup time. Minimum return time: ${minTimeString}`);
+                      } else {
+                        // Clear error if time is valid
+                        if (error.includes('Return time must be')) {
+                          setError('');
+                        }
+                      }
+                    }
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent text-gray-900 bg-white"
+                  required
                 />
+                {routeInfo && (
+                  <p className="text-xs text-gray-600 mt-1">
+                    Estimated travel time: {routeInfo.duration?.text || 'Calculating...'}. Please allow extra time for the appointment.
+                  </p>
+                )}
               </div>
             )}
 
