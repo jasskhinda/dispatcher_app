@@ -1521,7 +1521,7 @@ export default function FacilityMonthlyInvoicePage() {
                                         </div>
                                         <div className="mt-3 pt-2 border-t border-gray-200">
                                             <p className="text-xs text-gray-500 uppercase tracking-wide">
-                                                Facility Account ID: {facilityInfo?.id?.substring(0, 8)}...
+                                                Facility Account ID: {facilityInfo?.id}
                                             </p>
                                         </div>
                                     </div>
