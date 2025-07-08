@@ -2194,9 +2194,11 @@ export default function FacilityMonthlyInvoicePage() {
                                             const isFutureMonth = invoiceMonth > currentMonth;
                                             const actualPaymentStatus = String(paymentStatus?.payment_status || paymentStatus?.status || 'UNPAID');
                                             const isActuallyPaid = actualPaymentStatus.includes('PAID');
+                                            const hasPaymentDate = paymentStatus?.payment_date;
+                                            const hasFacilityPayment = hasPaymentDate || actualPaymentStatus.includes('CHECK') || actualPaymentStatus.includes('CARD') || actualPaymentStatus.includes('BANK');
                                             
-                                            // Always show as COMPLETED TRIPS with payment status indicator
-                                            if (isActuallyPaid) {
+                                            // Show payment status based on actual facility payment, not just dispatcher verification
+                                            if (isActuallyPaid && hasFacilityPayment) {
                                                 return '✅ COMPLETED TRIPS (Payment Verified)';
                                             } else {
                                                 return '🚗 COMPLETED TRIPS (Awaiting Payment)';
@@ -2214,15 +2216,27 @@ export default function FacilityMonthlyInvoicePage() {
                                             <div className="text-right">
                                                 <p className="text-sm font-medium text-gray-600">Total Amount</p>
                                                 <p className={`text-2xl font-bold ${
-                                                    String(paymentStatus?.payment_status || paymentStatus?.status || 'UNPAID').includes('PAID')
-                                                        ? 'text-green-700'
-                                                        : 'text-blue-700'
+                                                    (() => {
+                                                        const actualPaymentStatus = String(paymentStatus?.payment_status || paymentStatus?.status || 'UNPAID');
+                                                        const isActuallyPaid = actualPaymentStatus.includes('PAID');
+                                                        const hasPaymentDate = paymentStatus?.payment_date;
+                                                        const hasFacilityPayment = hasPaymentDate || actualPaymentStatus.includes('CHECK') || actualPaymentStatus.includes('CARD') || actualPaymentStatus.includes('BANK');
+                                                        
+                                                        return (isActuallyPaid && hasFacilityPayment) ? 'text-green-700' : 'text-blue-700';
+                                                    })()
                                                 }`}>
                                                     ${billableTrips.reduce((sum, trip) => sum + (trip.displayPrice || 0), 0).toFixed(2)}
                                                 </p>
                                             </div>
                                         </div>
-                                        {String(paymentStatus?.payment_status || paymentStatus?.status || 'UNPAID').includes('PAID') && (
+                                        {(() => {
+                                            const actualPaymentStatus = String(paymentStatus?.payment_status || paymentStatus?.status || 'UNPAID');
+                                            const isActuallyPaid = actualPaymentStatus.includes('PAID');
+                                            const hasPaymentDate = paymentStatus?.payment_date;
+                                            const hasFacilityPayment = hasPaymentDate || actualPaymentStatus.includes('CHECK') || actualPaymentStatus.includes('CARD') || actualPaymentStatus.includes('BANK');
+                                            
+                                            return isActuallyPaid && hasFacilityPayment;
+                                        })() && (
                                             <div className="mt-3 pt-3 border-t border-gray-200">
                                                 <p className="text-sm text-green-600 font-medium flex items-center">
                                                     <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
