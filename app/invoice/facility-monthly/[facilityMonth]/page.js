@@ -1558,10 +1558,12 @@ export default function FacilityMonthlyInvoicePage() {
                                                 
                                                 if (isFutureMonth) {
                                                     return 'bg-gray-100 text-gray-600 border border-gray-300';
-                                                } else if (isActuallyPaid && (totalAmount > 0 || isVerified)) {
+                                                } else if (isActuallyPaid && hasFacilityPayment && (totalAmount > 0 || isVerified)) {
                                                     return 'bg-green-100 text-green-800 border border-green-300';
-                                                } else if (isActuallyPaid && totalAmount === 0) {
+                                                } else if (isActuallyPaid && hasFacilityPayment && totalAmount === 0) {
                                                     return 'bg-green-100 text-green-800 border border-green-300';
+                                                } else if (isActuallyPaid && !hasFacilityPayment && totalAmount > 0) {
+                                                    return 'bg-red-100 text-red-800 border border-red-300';
                                                 } else if (isCurrentMonth) {
                                                     return 'bg-blue-100 text-blue-800 border border-blue-300';
                                                 } else {
@@ -1578,17 +1580,24 @@ export default function FacilityMonthlyInvoicePage() {
                                                 const isActuallyPaid = actualPaymentStatus.includes('PAID');
                                                 const isVerified = actualPaymentStatus.includes('VERIFIED');
                                                 const isPaymentFailed = actualPaymentStatus.includes('PAYMENT FAILED');
+                                                const hasPaymentDate = paymentStatus?.payment_date;
+                                                const hasFacilityPayment = hasPaymentDate || actualPaymentStatus.includes('CHECK') || actualPaymentStatus.includes('CARD') || actualPaymentStatus.includes('BANK');
                                                 
                                                 if (isFutureMonth) {
                                                     return '📅 FUTURE MONTH - NO INVOICE YET';
                                                 } else if (isPaymentFailed) {
                                                     return '📤 PAYMENT REQUEST SENT';
-                                                } else if (isActuallyPaid && isVerified) {
+                                                } else if (isActuallyPaid && isVerified && hasFacilityPayment) {
                                                     return '✅ FULLY PAID';
-                                                } else if (isActuallyPaid && !isVerified) {
+                                                } else if (isActuallyPaid && !isVerified && hasFacilityPayment) {
                                                     return totalAmount > 0 
                                                         ? '⏳ PAYMENT NEEDS VERIFICATION'
                                                         : '✅ NO TRIPS - NO PAYMENT NEEDED';
+                                                } else if (isActuallyPaid && !hasFacilityPayment) {
+                                                    // This is the case where status shows "PAID" but facility hasn't actually paid
+                                                    return totalAmount > 0 
+                                                        ? `💳 $${totalAmount.toFixed(2)} DUE - FACILITY PAYMENT REQUIRED`
+                                                        : '💰 NO BILLABLE TRIPS';
                                                 } else if (isCurrentMonth) {
                                                     return totalAmount > 0 
                                                         ? `📅 CURRENT MONTH - $${totalAmount.toFixed(2)} RUNNING TOTAL`
