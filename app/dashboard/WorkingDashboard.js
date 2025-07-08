@@ -48,6 +48,12 @@ export default function WorkingDashboard() {
     }
 
     async function getSession() {
+        // Add timeout protection - if loading takes more than 10 seconds, force complete
+        const timeoutId = setTimeout(() => {
+            console.warn('⚠️ Data fetch timeout, forcing loading to complete');
+            setLoading(false);
+        }, 10000);
+
         try {
             setLoading(true);
             
@@ -79,15 +85,20 @@ export default function WorkingDashboard() {
             // This will include trips from BookingCCT, facility_app, and any other sources
             console.log('🔍 Fetching trips from all sources...');
             
-            const { data: tripsData, error: tripsError } = await supabase
-                .from('trips')
-                .select(`
-                    *,
-                    user_profile:profiles(first_name, last_name, phone_number, email),
-                    facility:facilities(id, name, contact_email, phone_number)
-                `)
-                .order('created_at', { ascending: false })
-                .limit(200); // Increased limit to show more trips from all sources
+            const { data: tripsData, error: tripsError } = await Promise.race([
+                supabase
+                    .from('trips')
+                    .select(`
+                        *,
+                        user_profile:profiles(first_name, last_name, phone_number, email),
+                        facility:facilities(id, name, contact_email, phone_number)
+                    `)
+                    .order('created_at', { ascending: false })
+                    .limit(200), // Increased limit to show more trips from all sources
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Trips query timeout')), 8000)
+                )
+            ]);
 
             if (tripsError) {
                 console.error('❌ Trips error:', tripsError);
@@ -95,11 +106,16 @@ export default function WorkingDashboard() {
                 console.log('⚠️ Falling back to basic trip query...');
                 
                 // Fallback: Try basic query without joins - SHOW NEWEST FIRST
-                const { data: basicTrips, error: basicError } = await supabase
-                    .from('trips')
-                    .select('*')
-                    .order('created_at', { ascending: false })
-                    .limit(200);
+                const { data: basicTrips, error: basicError } = await Promise.race([
+                    supabase
+                        .from('trips')
+                        .select('*')
+                        .order('created_at', { ascending: false })
+                        .limit(200),
+                    new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Basic trips query timeout')), 5000)
+                    )
+                ]);
                 
                 if (basicError) {
                     console.error('❌ Basic trips error:', basicError);
@@ -199,6 +215,8 @@ export default function WorkingDashboard() {
             console.error('Dashboard error:', err);
             setError('Dashboard error: ' + err.message);
             setLoading(false);
+        } finally {
+            clearTimeout(timeoutId);
         }
     }
 

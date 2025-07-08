@@ -20,13 +20,57 @@ export default function LoadingProvider({ children }) {
   const [loadingMessage, setLoadingMessage] = useState('Loading...');
   const pathname = usePathname();
   
-  // Initial page load
+  // Global timeout protection - force hide loading after maximum time
+  useEffect(() => {
+    const globalTimeout = setTimeout(() => {
+      if (isLoading) {
+        console.warn('🚨 Global loading timeout reached, forcing hide');
+        setIsLoading(false);
+      }
+    }, 15000); // 15 seconds maximum loading time
+
+    return () => clearTimeout(globalTimeout);
+  }, [isLoading]);
+
+  // Handle page visibility changes to prevent stuck preloader
+  useEffect(() => {
+    let visibilityTimeout;
+    
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isLoading) {
+        // If user comes back to tab and loader is still showing, give it 3 more seconds
+        visibilityTimeout = setTimeout(() => {
+          console.warn('🚨 Visibility timeout - hiding loader');
+          setIsLoading(false);
+        }, 3000);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (visibilityTimeout) {
+        clearTimeout(visibilityTimeout);
+      }
+    };
+  }, [isLoading]);
+  
+  // Initial page load with maximum timeout
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsLoading(false);
     }, 2000); // Show loader for 2 seconds on initial load
 
-    return () => clearTimeout(timer);
+    // Failsafe: Force hide loading after 5 seconds maximum
+    const failsafeTimer = setTimeout(() => {
+      console.warn('⚠️ Loading took too long, forcing hide');
+      setIsLoading(false);
+    }, 5000);
+
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(failsafeTimer);
+    };
   }, []);
 
   // Route change loading

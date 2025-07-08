@@ -237,6 +237,13 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
       return;
     }
     
+    // Add timeout protection for form submission
+    const submitTimeout = setTimeout(() => {
+      console.warn('⚠️ Form submission timeout');
+      setError('Request timed out. Please try again.');
+      setLoading(false);
+    }, 15000); // 15 second timeout
+
     try {
       setLoading(true);
       
@@ -294,6 +301,7 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
       console.error('Submit error:', err);
       setError(err.message || 'Failed to create trip');
     } finally {
+      clearTimeout(submitTimeout);
       setLoading(false);
     }
   };
