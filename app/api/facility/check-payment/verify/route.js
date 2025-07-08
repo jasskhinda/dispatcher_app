@@ -54,6 +54,36 @@ export async function GET() {
   }
 }
 
+// Helper function to check if payment was recently reset
+async function checkRecentReset(facility_id, month, supabase) {
+  try {
+    // Check if there are any recent payment deletion records in the last 30 seconds
+    const thirtySecondsAgo = new Date(Date.now() - 30000).toISOString()
+    
+    // Since we don't have a reset log table, we check if invoice was created very recently
+    // which would indicate it was just reset and recreated
+    const { data: recentInvoices, error } = await supabase
+      .from('facility_invoices')
+      .select('created_at')
+      .eq('facility_id', facility_id)
+      .eq('month', month)
+      .gte('created_at', thirtySecondsAgo)
+      .order('created_at', { ascending: false })
+      .limit(1)
+    
+    if (error) {
+      console.log('Error checking recent reset:', error)
+      return false
+    }
+    
+    // If invoice was created very recently (within 30 seconds), it was likely just reset
+    return recentInvoices && recentInvoices.length > 0
+  } catch (error) {
+    console.log('Error in checkRecentReset:', error)
+    return false
+  }
+}
+
 export async function POST(request) {
   try {
     console.log('Check verification API called')
@@ -156,6 +186,16 @@ export async function POST(request) {
             { status: 400 }
           )
         }
+        
+        // Check if payment was recently reset before marking as verified
+        const resetTimestampVerify = await checkRecentReset(facility_id, month, supabase)
+        if (resetTimestampVerify) {
+          return Response.json(
+            { error: 'Payment was recently reset. Please wait before marking as verified.' },
+            { status: 400 }
+          )
+        }
+        
         newPaymentStatus = 'PAID WITH CHECK - VERIFIED'
         
         if (currentInvoice.payment_status === 'CHECK PAYMENT - ALREADY SENT') {
@@ -192,6 +232,15 @@ export async function POST(request) {
         break
 
       case 'check_received':
+        // Check if payment was recently reset before marking as verified
+        const resetTimestamp = await checkRecentReset(facility_id, month, supabase)
+        if (resetTimestamp) {
+          return Response.json(
+            { error: 'Payment was recently reset. Please wait before marking as verified.' },
+            { status: 400 }
+          )
+        }
+        
         newPaymentStatus = 'PAID WITH CHECK - VERIFIED'
         auditNote = `✅ FINAL VERIFICATION COMPLETE: Check payment received, deposited, and fully verified by dispatcher on ${now.toLocaleDateString('en-US', { 
           month: 'long', 
@@ -210,6 +259,15 @@ export async function POST(request) {
         break
 
       case 'confirm_payment':
+        // Check if payment was recently reset before confirming payment
+        const resetTimestampConfirm = await checkRecentReset(facility_id, month, supabase)
+        if (resetTimestampConfirm) {
+          return Response.json(
+            { error: 'Payment was recently reset. Please wait before confirming payment.' },
+            { status: 400 }
+          )
+        }
+        
         if (currentInvoice.payment_status === 'PAID WITH CARD') {
           newPaymentStatus = 'PAID WITH CARD - VERIFIED'
         } else if (currentInvoice.payment_status === 'PAID WITH BANK TRANSFER') {
