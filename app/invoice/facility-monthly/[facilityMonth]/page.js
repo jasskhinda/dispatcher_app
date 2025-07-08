@@ -1554,6 +1554,9 @@ export default function FacilityMonthlyInvoicePage() {
                                                 const isFutureMonth = invoiceMonth > currentMonth;
                                                 const actualPaymentStatus = String(paymentStatus?.payment_status || paymentStatus?.status || 'UNPAID');
                                                 const isActuallyPaid = actualPaymentStatus.includes('PAID');
+                                                const isVerified = actualPaymentStatus.includes('VERIFIED');
+                                                const hasPaymentDate = paymentStatus?.payment_date;
+                                                const hasFacilityPayment = hasPaymentDate || actualPaymentStatus.includes('CHECK') || actualPaymentStatus.includes('CARD') || actualPaymentStatus.includes('BANK');
                                                 const hasTrips = billableTrips.length > 0 || totalAmount > 0;
                                                 
                                                 if (isFutureMonth) {
