@@ -1558,7 +1558,9 @@ export default function FacilityMonthlyInvoicePage() {
                                                 
                                                 if (isFutureMonth) {
                                                     return 'bg-gray-100 text-gray-600 border border-gray-300';
-                                                } else if (isActuallyPaid) {
+                                                } else if (isActuallyPaid && (totalAmount > 0 || isVerified)) {
+                                                    return 'bg-green-100 text-green-800 border border-green-300';
+                                                } else if (isActuallyPaid && totalAmount === 0) {
                                                     return 'bg-green-100 text-green-800 border border-green-300';
                                                 } else if (isCurrentMonth) {
                                                     return 'bg-blue-100 text-blue-800 border border-blue-300';
@@ -1584,7 +1586,9 @@ export default function FacilityMonthlyInvoicePage() {
                                                 } else if (isActuallyPaid && isVerified) {
                                                     return '✅ FULLY PAID';
                                                 } else if (isActuallyPaid && !isVerified) {
-                                                    return '⏳ PAYMENT NEEDS VERIFICATION';
+                                                    return totalAmount > 0 
+                                                        ? '⏳ PAYMENT NEEDS VERIFICATION'
+                                                        : '✅ NO TRIPS - NO PAYMENT NEEDED';
                                                 } else if (isCurrentMonth) {
                                                     return totalAmount > 0 
                                                         ? `📅 CURRENT MONTH - $${totalAmount.toFixed(2)} RUNNING TOTAL`
