@@ -1155,52 +1155,91 @@ export default function WorkingDashboard() {
                                                     {formatDate(trip.pickup_time)}
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                    <div className="flex space-x-2">
-                                                        {trip.status === 'pending' && (
-                                                            <>
-                                                                <button 
-                                                                    onClick={() => handleTripAction(trip.id, 'approve')}
-                                                                    disabled={actionLoading[trip.id]}
-                                                                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
-                                                                >
-                                                                    {actionLoading[trip.id] ? 'Approving...' : 'Approve'}
-                                                                </button>
-                                                                <button 
-                                                                    onClick={() => handleTripAction(trip.id, 'reject')}
-                                                                    disabled={actionLoading[trip.id]}
-                                                                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
-                                                                >
-                                                                    {actionLoading[trip.id] ? 'Processing...' : 'Reject'}
-                                                                </button>
-                                                            </>
-                                                        )}
-                                                        {trip.status === 'upcoming' && (
-                                                            <button 
-                                                                onClick={() => handleTripAction(trip.id, 'complete')}
-                                                                disabled={actionLoading[trip.id]}
-                                                                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
-                                                            >
-                                                                {actionLoading[trip.id] ? 'Completing...' : 'Complete'}
-                                                            </button>
-                                                        )}
-                                                        {trip.status === 'completed' && (
+                                                    <div className="flex flex-col space-y-2">
+                                                        {/* Facility Management Button for facility trips */}
+                                                        {trip.facility_id && (
                                                             <a
-                                                                href={trip.facility_id ? `/invoice/facility-monthly/${trip.facility_id}-${new Date(trip.pickup_time).getFullYear()}-${String(new Date(trip.pickup_time).getMonth() + 1).padStart(2, '0')}` : `/invoice/${trip.id}`}
-                                                                className="inline-flex items-center bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 shadow-sm"
+                                                                href={`/invoice/facility-monthly/${trip.facility_id}-${new Date(trip.pickup_time).getFullYear()}-${String(new Date(trip.pickup_time).getMonth() + 1).padStart(2, '0')}`}
+                                                                className="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-md text-xs font-medium transition-colors duration-200 shadow-sm"
                                                             >
-                                                                📄 {trip.facility_id ? 'Monthly Invoice' : 'Invoice Details'}
+                                                                🏥 Manage Facility
                                                             </a>
                                                         )}
-                                                        {trip.status === 'cancelled' && (
-                                                            <div className="text-red-600 text-xs">
-                                                                <div className="font-semibold">❌ Rejected</div>
-                                                                {trip.cancellation_reason && (
-                                                                    <div className="text-gray-500 mt-1 max-w-xs">
-                                                                        {trip.cancellation_reason}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        )}
+                                                        
+                                                        {/* Trip Action Buttons */}
+                                                        <div className="flex space-x-1">
+                                                            {/* Edit Button - Always available */}
+                                                            <a
+                                                                href={`/trips/${trip.id}/edit`}
+                                                                className="inline-flex items-center bg-gray-600 hover:bg-gray-700 text-white px-2 py-1 rounded text-xs font-medium transition-colors duration-200 shadow-sm"
+                                                                title="Edit Trip"
+                                                            >
+                                                                ✏️ EDIT
+                                                            </a>
+                                                            
+                                                            {trip.status === 'pending' && (
+                                                                <>
+                                                                    <button 
+                                                                        onClick={() => handleTripAction(trip.id, 'approve')}
+                                                                        disabled={actionLoading[trip.id]}
+                                                                        className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
+                                                                        title="Approve Trip"
+                                                                    >
+                                                                        {actionLoading[trip.id] ? '...' : '✅ APPROVE'}
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={() => handleTripAction(trip.id, 'reject')}
+                                                                        disabled={actionLoading[trip.id]}
+                                                                        className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
+                                                                        title="Reject Trip"
+                                                                    >
+                                                                        {actionLoading[trip.id] ? '...' : '❌ REJECT'}
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                            
+                                                            {(trip.status === 'upcoming' || trip.status === 'approved') && (
+                                                                <>
+                                                                    <button 
+                                                                        onClick={() => handleTripAction(trip.id, 'complete')}
+                                                                        disabled={actionLoading[trip.id]}
+                                                                        className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
+                                                                        title="Complete Trip"
+                                                                    >
+                                                                        {actionLoading[trip.id] ? '...' : '✅ COMPLETE'}
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={() => handleTripAction(trip.id, 'cancel')}
+                                                                        disabled={actionLoading[trip.id]}
+                                                                        className="bg-orange-600 hover:bg-orange-700 text-white px-2 py-1 rounded text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
+                                                                        title="Cancel Trip"
+                                                                    >
+                                                                        {actionLoading[trip.id] ? '...' : '🚫 CANCEL'}
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                            
+                                                            {trip.status === 'completed' && (
+                                                                <a
+                                                                    href={trip.facility_id ? `/invoice/facility-monthly/${trip.facility_id}-${new Date(trip.pickup_time).getFullYear()}-${String(new Date(trip.pickup_time).getMonth() + 1).padStart(2, '0')}` : `/invoice/${trip.id}`}
+                                                                    className="inline-flex items-center bg-purple-600 hover:bg-purple-700 text-white px-2 py-1 rounded text-xs font-medium transition-colors duration-200 shadow-sm"
+                                                                    title="View Invoice"
+                                                                >
+                                                                    📄 INVOICE
+                                                                </a>
+                                                            )}
+                                                            
+                                                            {trip.status === 'cancelled' && (
+                                                                <div className="text-red-600 text-xs">
+                                                                    <div className="font-semibold">❌ Cancelled</div>
+                                                                    {trip.cancellation_reason && (
+                                                                        <div className="text-gray-500 mt-1 max-w-xs">
+                                                                            {trip.cancellation_reason}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </td>
                                             </tr>
