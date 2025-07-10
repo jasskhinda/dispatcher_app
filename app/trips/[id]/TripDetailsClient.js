@@ -210,30 +210,43 @@ export default function TripDetailsClient({ trip, user }) {
                         managed_client_id: currentTrip.managed_client_id,
                         has_user_profile: !!currentTrip.user_profile,
                         has_managed_client: !!currentTrip.managed_client,
+                        managed_client_data: currentTrip.managed_client,
                         client_name: currentTrip.client_name,
                         client_first_name: currentTrip.client_first_name,
                         passenger_name: currentTrip.passenger_name
                       });
                       
-                      // Try to get client name from various sources with enhanced fallbacks
-                      let clientName = currentTrip.client_name || 
-                                       currentTrip.client_first_name || 
-                                       (currentTrip.user_profile ? 
-                                         `${currentTrip.user_profile.first_name || ''} ${currentTrip.user_profile.last_name || ''}`.trim() : 
-                                         null) ||
-                                       (currentTrip.managed_client ? 
-                                         `${currentTrip.managed_client.first_name || ''} ${currentTrip.managed_client.last_name || ''}`.trim() : 
-                                         null) ||
-                                       currentTrip.passenger_name ||
-                                       currentTrip.name;
-                      
-                      // If still no name but we have IDs, create descriptive fallbacks
-                      if (!clientName) {
-                        if (currentTrip.managed_client_id) {
-                          clientName = `Managed Client ${currentTrip.managed_client_id.slice(0, 8)}`;
-                        } else if (currentTrip.user_id) {
-                          clientName = `Client ${currentTrip.user_id.slice(0, 8)}`;
-                        }
+                      // Priority 1: Get client name from managed_client data if available
+                      let clientName = null;
+                      if (currentTrip.managed_client?.first_name) {
+                        clientName = `${currentTrip.managed_client.first_name} ${currentTrip.managed_client.last_name || ''}`.trim();
+                        console.log('✅ Using managed client name:', clientName);
+                      }
+                      // Priority 2: Get client name from user_profile data if available
+                      else if (currentTrip.user_profile?.first_name) {
+                        clientName = `${currentTrip.user_profile.first_name} ${currentTrip.user_profile.last_name || ''}`.trim();
+                        console.log('✅ Using user profile name:', clientName);
+                      }
+                      // Priority 3: Use existing client_name fields
+                      else if (currentTrip.client_name) {
+                        clientName = currentTrip.client_name;
+                        console.log('✅ Using existing client_name field:', clientName);
+                      }
+                      else if (currentTrip.client_first_name) {
+                        clientName = currentTrip.client_first_name;
+                        console.log('✅ Using client_first_name field:', clientName);
+                      }
+                      else if (currentTrip.passenger_name) {
+                        clientName = currentTrip.passenger_name;
+                        console.log('✅ Using passenger_name field:', clientName);
+                      }
+                      // Priority 4: Create descriptive fallbacks only as last resort
+                      else if (currentTrip.managed_client_id) {
+                        clientName = `Managed Client ${currentTrip.managed_client_id.slice(0, 8)}`;
+                        console.log('⚠️ Using managed client ID fallback:', clientName);
+                      } else if (currentTrip.user_id) {
+                        clientName = `Client ${currentTrip.user_id.slice(0, 8)}`;
+                        console.log('⚠️ Using user ID fallback:', clientName);
                       }
                       
                       const clientPhone = currentTrip.phone_number || 
@@ -273,10 +286,28 @@ export default function TripDetailsClient({ trip, user }) {
                               <dd className="mt-1 text-sm text-gray-900">{clientPhone}</dd>
                             </div>
                           )}
-                          {currentTrip.managed_client?.date_of_birth && (
+                          {currentTrip.managed_client?.address && (
                             <div>
-                              <dt className="text-sm font-medium text-gray-600">Date of Birth</dt>
-                              <dd className="mt-1 text-sm text-gray-900">{new Date(currentTrip.managed_client.date_of_birth).toLocaleDateString()}</dd>
+                              <dt className="text-sm font-medium text-gray-600">Address</dt>
+                              <dd className="mt-1 text-sm text-gray-900">{currentTrip.managed_client.address}</dd>
+                            </div>
+                          )}
+                          {currentTrip.managed_client?.accessibility_needs && (
+                            <div>
+                              <dt className="text-sm font-medium text-gray-600">Accessibility Needs</dt>
+                              <dd className="mt-1 text-sm text-gray-900">{currentTrip.managed_client.accessibility_needs}</dd>
+                            </div>
+                          )}
+                          {currentTrip.managed_client?.medical_requirements && (
+                            <div>
+                              <dt className="text-sm font-medium text-gray-600">Medical Requirements</dt>
+                              <dd className="mt-1 text-sm text-gray-900">{currentTrip.managed_client.medical_requirements}</dd>
+                            </div>
+                          )}
+                          {currentTrip.managed_client?.emergency_contact && (
+                            <div>
+                              <dt className="text-sm font-medium text-gray-600">Emergency Contact</dt>
+                              <dd className="mt-1 text-sm text-gray-900">{currentTrip.managed_client.emergency_contact}</dd>
                             </div>
                           )}
                         </dl>

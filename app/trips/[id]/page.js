@@ -62,37 +62,35 @@ export default async function TripDetailsPage({ params }) {
     if (trip.managed_client_id) {
       console.log('🔍 Fetching managed client data for ID:', trip.managed_client_id);
       
-      // Try facility_managed_clients first
-      let { data: managedClient, error: managedClientError } = await supabase
+      // Query facility_managed_clients table (this is the correct table based on schema)
+      const { data: managedClient, error: managedClientError } = await supabase
         .from('facility_managed_clients')
-        .select('first_name, last_name, phone_number, email, date_of_birth')
+        .select('first_name, last_name, phone_number, email, address, accessibility_needs, medical_requirements, emergency_contact')
         .eq('id', trip.managed_client_id)
         .single();
       
       if (managedClientError) {
-        console.log('⚠️ facility_managed_clients query failed, trying managed_clients table:', managedClientError.message);
-        
-        // Fallback to managed_clients table
-        const fallbackResult = await supabase
-          .from('managed_clients')
-          .select('first_name, last_name, phone_number, email, date_of_birth')
-          .eq('id', trip.managed_client_id)
-          .single();
-        
-        managedClient = fallbackResult.data;
-        if (fallbackResult.error) {
-          console.log('❌ Both managed client tables failed:', fallbackResult.error.message);
-        }
-      }
-      
-      if (managedClient) {
-        console.log('✅ Managed client found:', { 
-          name: `${managedClient.first_name} ${managedClient.last_name}`,
-          phone: managedClient.phone_number 
+        console.error('❌ Failed to fetch managed client data:', {
+          error: managedClientError,
+          managed_client_id: trip.managed_client_id,
+          error_code: managedClientError.code,
+          error_message: managedClientError.message
+        });
+      } else if (managedClient) {
+        console.log('✅ Managed client found successfully:', { 
+          id: trip.managed_client_id,
+          name: `${managedClient.first_name || ''} ${managedClient.last_name || ''}`.trim(),
+          phone: managedClient.phone_number,
+          email: managedClient.email
         });
         trip.managed_client = managedClient;
+        
+        // Also set client_name field if not already set
+        if (!trip.client_name && managedClient.first_name) {
+          trip.client_name = `${managedClient.first_name} ${managedClient.last_name || ''}`.trim();
+        }
       } else {
-        console.log('❌ No managed client found in any table for ID:', trip.managed_client_id);
+        console.log('⚠️ Managed client query returned null for ID:', trip.managed_client_id);
       }
     }
 
