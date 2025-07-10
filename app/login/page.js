@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -67,8 +66,8 @@ export default function Login() {
       <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-xl shadow-lg border border-gray-200">
         <div className="text-center space-y-4">
           <div className="flex justify-center mb-4">
-            <Image 
-              src="/LOGO2.webp" 
+            <img 
+              src="/LOGO2.png" 
               alt="Compassionate Care Transportation Logo" 
               width={120} 
               height={120}
