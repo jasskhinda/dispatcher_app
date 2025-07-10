@@ -60,14 +60,39 @@ export default async function TripDetailsPage({ params }) {
 
     // Also fetch managed client info if managed_client_id exists
     if (trip.managed_client_id) {
-      const { data: managedClient } = await supabase
+      console.log('🔍 Fetching managed client data for ID:', trip.managed_client_id);
+      
+      // Try facility_managed_clients first
+      let { data: managedClient, error: managedClientError } = await supabase
         .from('facility_managed_clients')
         .select('first_name, last_name, phone_number, email, date_of_birth')
         .eq('id', trip.managed_client_id)
         .single();
       
+      if (managedClientError) {
+        console.log('⚠️ facility_managed_clients query failed, trying managed_clients table:', managedClientError.message);
+        
+        // Fallback to managed_clients table
+        const fallbackResult = await supabase
+          .from('managed_clients')
+          .select('first_name, last_name, phone_number, email, date_of_birth')
+          .eq('id', trip.managed_client_id)
+          .single();
+        
+        managedClient = fallbackResult.data;
+        if (fallbackResult.error) {
+          console.log('❌ Both managed client tables failed:', fallbackResult.error.message);
+        }
+      }
+      
       if (managedClient) {
+        console.log('✅ Managed client found:', { 
+          name: `${managedClient.first_name} ${managedClient.last_name}`,
+          phone: managedClient.phone_number 
+        });
         trip.managed_client = managedClient;
+      } else {
+        console.log('❌ No managed client found in any table for ID:', trip.managed_client_id);
       }
     }
 

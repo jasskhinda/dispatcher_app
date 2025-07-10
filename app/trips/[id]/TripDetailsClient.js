@@ -203,8 +203,20 @@ export default function TripDetailsClient({ trip, user }) {
                       👤 Client
                     </h4>
                     {(() => {
-                      // Try to get client name from various sources
-                      const clientName = currentTrip.client_name || 
+                      // Enhanced client name resolution with debugging
+                      console.log('🔍 Client resolution debug:', {
+                        trip_id: currentTrip.id,
+                        user_id: currentTrip.user_id,
+                        managed_client_id: currentTrip.managed_client_id,
+                        has_user_profile: !!currentTrip.user_profile,
+                        has_managed_client: !!currentTrip.managed_client,
+                        client_name: currentTrip.client_name,
+                        client_first_name: currentTrip.client_first_name,
+                        passenger_name: currentTrip.passenger_name
+                      });
+                      
+                      // Try to get client name from various sources with enhanced fallbacks
+                      let clientName = currentTrip.client_name || 
                                        currentTrip.client_first_name || 
                                        (currentTrip.user_profile ? 
                                          `${currentTrip.user_profile.first_name || ''} ${currentTrip.user_profile.last_name || ''}`.trim() : 
@@ -214,6 +226,15 @@ export default function TripDetailsClient({ trip, user }) {
                                          null) ||
                                        currentTrip.passenger_name ||
                                        currentTrip.name;
+                      
+                      // If still no name but we have IDs, create descriptive fallbacks
+                      if (!clientName) {
+                        if (currentTrip.managed_client_id) {
+                          clientName = `Managed Client ${currentTrip.managed_client_id.slice(0, 8)}`;
+                        } else if (currentTrip.user_id) {
+                          clientName = `Client ${currentTrip.user_id.slice(0, 8)}`;
+                        }
+                      }
                       
                       const clientPhone = currentTrip.phone_number || 
                                         currentTrip.client_phone || 
@@ -269,6 +290,13 @@ export default function TripDetailsClient({ trip, user }) {
                               {currentTrip.managed_client_id && <div>Managed Client ID: {currentTrip.managed_client_id.slice(0, 8)}...</div>}
                               {currentTrip.facility_id && <div>Facility ID: {currentTrip.facility_id.slice(0, 8)}...</div>}
                               {!currentTrip.user_id && !currentTrip.managed_client_id && <div>No client identifiers found</div>}
+                              <div className="mt-2 pt-2 border-t border-yellow-200">
+                                <div className="font-medium">Available Data:</div>
+                                <div>Has user_profile: {currentTrip.user_profile ? 'Yes' : 'No'}</div>
+                                <div>Has managed_client: {currentTrip.managed_client ? 'Yes' : 'No'}</div>
+                                <div>Client name field: {currentTrip.client_name || 'Not set'}</div>
+                                <div>Passenger name field: {currentTrip.passenger_name || 'Not set'}</div>
+                              </div>
                             </div>
                           </div>
                         </div>
