@@ -41,12 +41,14 @@ export default function TripDetailsClient({ trip, user }) {
             <p className="text-sm text-gray-600 mt-1">Trip ID: {currentTrip.id.slice(0, 8)}...</p>
           </div>
           <div className="flex items-center space-x-3">
-            <button
-              onClick={() => setShowEditForm(true)}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-colors"
-            >
-              ✏️ Edit Trip
-            </button>
+{(currentTrip.status === 'pending' || currentTrip.status === 'upcoming' || currentTrip.status === 'approved') && (
+              <button
+                onClick={() => setShowEditForm(true)}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-colors"
+              >
+                ✏️ Edit Trip
+              </button>
+            )}
             <button
               onClick={() => router.push('/dashboard')}
               className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 shadow-sm transition-colors"
