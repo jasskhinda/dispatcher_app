@@ -1170,9 +1170,9 @@ export default function WorkingDashboard() {
                                                         <div className="flex space-x-1">
                                                             {/* Edit Button - Always available */}
                                                             <a
-                                                                href={`/trips/${trip.id}/edit`}
+                                                                href={`/trips/${trip.id}`}
                                                                 className="inline-flex items-center bg-gray-600 hover:bg-gray-700 text-white px-2 py-1 rounded text-xs font-medium transition-colors duration-200 shadow-sm"
-                                                                title="Edit Trip"
+                                                                title="View & Edit Trip"
                                                             >
                                                                 ✏️ EDIT
                                                             </a>
