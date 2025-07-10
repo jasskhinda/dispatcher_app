@@ -493,13 +493,27 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Pickup Date *
                 </label>
-                <input
-                  type="date"
-                  value={formData.pickupDate}
-                  onChange={(e) => setFormData(prev => ({ ...prev, pickupDate: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent text-gray-900 bg-white"
-                  required
-                />
+                <div className="relative">
+                  <input
+                    type="date"
+                    value={formData.pickupDate}
+                    onChange={(e) => setFormData(prev => ({ ...prev, pickupDate: e.target.value }))}
+                    min={new Date().toISOString().split('T')[0]}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#7CCFD0] focus:border-transparent bg-white opacity-0 absolute top-0 left-0 cursor-pointer"
+                    required
+                  />
+                  <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 pointer-events-none flex items-center justify-between">
+                    <span>
+                      {formData.pickupDate 
+                        ? new Date(formData.pickupDate + 'T00:00:00').toLocaleDateString('en-US')
+                        : 'mm/dd/yyyy'
+                      }
+                    </span>
+                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
