@@ -341,22 +341,22 @@ export default function IndividualTripsPage() {
                     <div className="p-6">
                         {filteredTrips.length > 0 ? (
                             <div className="overflow-x-auto">
-                                <table className="min-w-full divide-y divide-gray-200">
-                                    <thead className="bg-gray-50">
+                                <table className="w-full">
+                                    <thead className="bg-gray-50 border-b border-gray-200">
                                         <tr>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                Trip Details
+                                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Trip Info
                                             </th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                Client Information
+                                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Client
                                             </th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                 Status
                                             </th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                Pickup Time
+                                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Pickup
                                             </th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                 Actions
                                             </th>
                                         </tr>
@@ -364,59 +364,50 @@ export default function IndividualTripsPage() {
                                     <tbody className="bg-white divide-y divide-gray-200">
                                         {filteredTrips.map((trip) => (
                                             <tr key={trip.id} className="hover:bg-gray-50">
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <div className="text-sm font-medium text-gray-900">
-                                                        {trip.id.slice(0, 8)}...
-                                                    </div>
-                                                    <div className="text-sm text-gray-500">
-                                                        {trip.pickup_location || trip.pickup_address || 'Pickup location'} 
-                                                        <br />→ {trip.dropoff_location || trip.destination_address || 'Destination'}
-                                                    </div>
-                                                    {trip.price && (
-                                                        <div className="text-xs text-green-600 font-medium mt-1">
-                                                            ${parseFloat(trip.price).toFixed(2)}
+                                                <td className="px-3 py-3">
+                                                    <div className="text-sm">
+                                                        <div className="font-medium text-gray-900">#{trip.id.slice(0, 6)}</div>
+                                                        <div className="text-xs text-gray-500 mt-1">
+                                                            <div className="truncate max-w-xs" title={trip.pickup_location || trip.pickup_address}>
+                                                                📍 {(trip.pickup_location || trip.pickup_address || 'Pickup').substring(0, 30)}...
+                                                            </div>
+                                                            <div className="truncate max-w-xs" title={trip.dropoff_location || trip.destination_address}>
+                                                                → {(trip.dropoff_location || trip.destination_address || 'Destination').substring(0, 30)}...
+                                                            </div>
                                                         </div>
-                                                    )}
+                                                        {trip.price && (
+                                                            <div className="text-sm font-semibold text-green-600 mt-1">
+                                                                ${parseFloat(trip.price).toFixed(2)}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                                                        <div className="text-sm font-medium text-gray-900 mb-2">
-                                                            👤 {getClientDisplayName(trip)}
+                                                <td className="px-3 py-3">
+                                                    <div className="text-sm">
+                                                        <div className="font-medium text-gray-900">
+                                                            {getClientDisplayName(trip)}
                                                         </div>
                                                         {trip.user_profile && (
-                                                            <div className="space-y-1">
+                                                            <div className="mt-1 space-y-0.5">
                                                                 {trip.user_profile.email && (
-                                                                    <div className="text-xs text-gray-600 flex items-center">
-                                                                        <span className="text-blue-600 mr-1">📧</span>
+                                                                    <div className="text-xs text-gray-500 truncate max-w-[200px]" title={trip.user_profile.email}>
                                                                         {trip.user_profile.email}
                                                                     </div>
                                                                 )}
                                                                 {trip.user_profile.phone_number && (
-                                                                    <div className="text-xs text-gray-600 flex items-center">
-                                                                        <span className="text-green-600 mr-1">📞</span>
+                                                                    <div className="text-xs text-gray-500">
                                                                         {trip.user_profile.phone_number}
-                                                                    </div>
-                                                                )}
-                                                                {trip.user_profile.address && (
-                                                                    <div className="text-xs text-gray-600 flex items-center">
-                                                                        <span className="text-purple-600 mr-1">📍</span>
-                                                                        <span className="truncate" title={trip.user_profile.address}>
-                                                                            {trip.user_profile.address.length > 30 ? 
-                                                                                `${trip.user_profile.address.substring(0, 30)}...` : 
-                                                                                trip.user_profile.address
-                                                                            }
-                                                                        </span>
                                                                     </div>
                                                                 )}
                                                             </div>
                                                         )}
-                                                        <div className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded mt-2 inline-block">
-                                                            📱 Individual Booking
-                                                        </div>
+                                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 mt-1">
+                                                            Individual
+                                                        </span>
                                                     </div>
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                                <td className="px-3 py-3">
+                                                    <span className={`px-2 py-1 inline-flex text-xs font-semibold rounded-full ${
                                                         trip.status === 'completed' ? 'bg-green-100 text-green-800' :
                                                         trip.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                                                         trip.status === 'approved_pending_payment' ? 'bg-blue-100 text-blue-800' :
@@ -427,27 +418,40 @@ export default function IndividualTripsPage() {
                                                         trip.status === 'cancelled' ? 'bg-red-100 text-red-800' :
                                                         'bg-gray-100 text-gray-800'
                                                     }`}>
-                                                        {trip.status === 'pending' ? 'Waiting for Approval' : 
-                                                         trip.status === 'approved_pending_payment' ? 'Approved - Processing Payment' :
-                                                         trip.status === 'paid_in_progress' ? 'Paid & In Progress' :
-                                                         trip.status === 'payment_failed' ? 'Payment Failed - Retry Required' :
+                                                        {trip.status === 'pending' ? 'Pending' : 
+                                                         trip.status === 'approved_pending_payment' ? 'Processing' :
+                                                         trip.status === 'paid_in_progress' ? 'Paid' :
+                                                         trip.status === 'payment_failed' ? 'Failed' :
                                                          trip.status === 'completed' ? 'Completed' :
                                                          trip.status === 'cancelled' ? 'Cancelled' :
-                                                         trip.status === 'upcoming' ? 'Approved - Ready to Start' :
+                                                         trip.status === 'upcoming' ? 'Upcoming' :
                                                          trip.status === 'in_process' ? 'In Process' :
                                                          trip.status}
                                                     </span>
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                    {formatDate(trip.pickup_time)}
+                                                <td className="px-3 py-3 text-sm text-gray-900">
+                                                    <div className="text-xs">
+                                                        {new Date(trip.pickup_time).toLocaleDateString('en-US', {
+                                                            month: 'short',
+                                                            day: 'numeric',
+                                                            year: 'numeric'
+                                                        })}
+                                                    </div>
+                                                    <div className="text-xs text-gray-500">
+                                                        {new Date(trip.pickup_time).toLocaleTimeString('en-US', {
+                                                            hour: 'numeric',
+                                                            minute: '2-digit',
+                                                            hour12: true
+                                                        })}
+                                                    </div>
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                    <div className="flex space-x-2">
+                                                <td className="px-3 py-3 text-right text-sm font-medium">
+                                                    <div className="flex justify-end space-x-1">
                                                         {/* Edit Button - Only for non-completed trips */}
                                                         {trip.status !== 'completed' && trip.status !== 'cancelled' && (
                                                             <button
                                                                 onClick={() => router.push(`/trips/${trip.id}`)}
-                                                                className="inline-flex items-center bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 shadow-sm"
+                                                                className="inline-flex items-center bg-gray-600 hover:bg-gray-700 text-white px-2 py-1 rounded text-xs font-medium transition-colors duration-200"
                                                                 title="View & Edit Trip"
                                                             >
                                                                 ✏️ EDIT
@@ -459,14 +463,14 @@ export default function IndividualTripsPage() {
                                                                 <button 
                                                                     onClick={() => handleTripAction(trip.id, 'approve')}
                                                                     disabled={actionLoading[trip.id]}
-                                                                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
+                                                                    className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
                                                                 >
                                                                     {actionLoading[trip.id] ? '...' : '✅ APPROVE'}
                                                                 </button>
                                                                 <button 
                                                                     onClick={() => handleTripAction(trip.id, 'reject')}
                                                                     disabled={actionLoading[trip.id]}
-                                                                    className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
+                                                                    className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
                                                                 >
                                                                     {actionLoading[trip.id] ? '...' : '❌ REJECT'}
                                                                 </button>
@@ -474,16 +478,16 @@ export default function IndividualTripsPage() {
                                                         )}
                                                         
                                                         {trip.status === 'approved_pending_payment' && (
-                                                            <div className="text-blue-600 text-sm bg-blue-100 px-3 py-2 rounded-md flex items-center">
-                                                                💳 Processing payment...
-                                                            </div>
+                                                            <span className="text-blue-600 text-xs bg-blue-100 px-2 py-1 rounded">
+                                                                💳 Processing...
+                                                            </span>
                                                         )}
                                                         
                                                         {trip.status === 'paid_in_progress' && (
                                                             <button 
                                                                 onClick={() => handleTripAction(trip.id, 'complete')}
                                                                 disabled={actionLoading[trip.id]}
-                                                                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
+                                                                className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
                                                             >
                                                                 {actionLoading[trip.id] ? '...' : '✅ COMPLETE'}
                                                             </button>
@@ -493,46 +497,42 @@ export default function IndividualTripsPage() {
                                                             <button 
                                                                 onClick={() => handleSendReminder(trip.id)}
                                                                 disabled={actionLoading[trip.id]}
-                                                                className="bg-orange-600 hover:bg-orange-700 text-white px-3 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
+                                                                className="bg-orange-600 hover:bg-orange-700 text-white px-2 py-1 rounded text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
                                                             >
-                                                                {actionLoading[trip.id] ? '...' : '📧 SEND REMINDER'}
+                                                                {actionLoading[trip.id] ? '...' : '📧 REMIND'}
                                                             </button>
                                                         )}
                                                         
                                                         {trip.status === 'upcoming' && (
-                                                            <>
-                                                                <button 
-                                                                    onClick={() => handleTripAction(trip.id, 'complete')}
-                                                                    disabled={actionLoading[trip.id]}
-                                                                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
-                                                                >
-                                                                    {actionLoading[trip.id] ? '...' : '✅ COMPLETE'}
-                                                                </button>
-                                                            </>
+                                                            <button 
+                                                                onClick={() => handleTripAction(trip.id, 'complete')}
+                                                                disabled={actionLoading[trip.id]}
+                                                                className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                                                            >
+                                                                {actionLoading[trip.id] ? '...' : '✅ COMPLETE'}
+                                                            </button>
                                                         )}
                                                         
                                                         {trip.status === 'in_process' && (
-                                                            <>
-                                                                <button 
-                                                                    onClick={() => handleTripAction(trip.id, 'complete')}
-                                                                    disabled={actionLoading[trip.id]}
-                                                                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
-                                                                >
-                                                                    {actionLoading[trip.id] ? '...' : '✅ COMPLETE'}
-                                                                </button>
-                                                            </>
+                                                            <button 
+                                                                onClick={() => handleTripAction(trip.id, 'complete')}
+                                                                disabled={actionLoading[trip.id]}
+                                                                className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                                                            >
+                                                                {actionLoading[trip.id] ? '...' : '✅ COMPLETE'}
+                                                            </button>
                                                         )}
                                                         
                                                         {trip.status === 'completed' && (
-                                                            <div className="text-green-600 text-sm bg-green-100 px-3 py-2 rounded-md flex items-center">
-                                                                ✅ Trip Completed
-                                                            </div>
+                                                            <span className="text-green-600 text-xs">
+                                                                ✅ Completed
+                                                            </span>
                                                         )}
                                                         
                                                         {trip.status === 'cancelled' && (
-                                                            <div className="text-red-600 text-sm bg-red-100 px-3 py-2 rounded-md flex items-center">
-                                                                ❌ Trip Cancelled
-                                                            </div>
+                                                            <span className="text-red-600 text-xs">
+                                                                ❌ Cancelled
+                                                            </span>
                                                         )}
                                                     </div>
                                                 </td>
