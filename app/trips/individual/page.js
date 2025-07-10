@@ -443,73 +443,60 @@ export default function IndividualTripsPage() {
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                                     <div className="flex space-x-2">
+                                                        {/* Edit Button - Only for non-completed trips */}
+                                                        {trip.status !== 'completed' && trip.status !== 'cancelled' && (
+                                                            <button
+                                                                onClick={() => router.push(`/trips/${trip.id}`)}
+                                                                className="inline-flex items-center bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 shadow-sm"
+                                                                title="View & Edit Trip"
+                                                            >
+                                                                ✏️ EDIT
+                                                            </button>
+                                                        )}
+                                                        
                                                         {trip.status === 'pending' && (
                                                             <>
                                                                 <button 
                                                                     onClick={() => handleTripAction(trip.id, 'approve')}
                                                                     disabled={actionLoading[trip.id]}
-                                                                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
+                                                                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
                                                                 >
-                                                                    {actionLoading[trip.id] ? 'Approving...' : 'APPROVE'}
+                                                                    {actionLoading[trip.id] ? '...' : '✅ APPROVE'}
                                                                 </button>
                                                                 <button 
                                                                     onClick={() => handleTripAction(trip.id, 'reject')}
                                                                     disabled={actionLoading[trip.id]}
-                                                                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
+                                                                    className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
                                                                 >
-                                                                    {actionLoading[trip.id] ? 'Processing...' : 'REJECT'}
+                                                                    {actionLoading[trip.id] ? '...' : '❌ REJECT'}
                                                                 </button>
                                                             </>
                                                         )}
                                                         
                                                         {trip.status === 'approved_pending_payment' && (
-                                                            <>
-                                                                <div className="text-blue-600 text-sm bg-blue-100 px-3 py-2 rounded-md flex items-center">
-                                                                    💳 Processing payment...
-                                                                </div>
-                                                                <button
-                                                                    onClick={() => router.push(`/billing/individual-invoice?trip_id=${trip.id}`)}
-                                                                    className="inline-flex items-center bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 shadow-sm"
-                                                                >
-                                                                    📄 INVOICE DETAILS
-                                                                </button>
-                                                            </>
+                                                            <div className="text-blue-600 text-sm bg-blue-100 px-3 py-2 rounded-md flex items-center">
+                                                                💳 Processing payment...
+                                                            </div>
                                                         )}
                                                         
                                                         {trip.status === 'paid_in_progress' && (
-                                                            <>
-                                                                <button 
-                                                                    onClick={() => handleTripAction(trip.id, 'complete')}
-                                                                    disabled={actionLoading[trip.id]}
-                                                                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
-                                                                >
-                                                                    {actionLoading[trip.id] ? 'Completing...' : 'COMPLETE'}
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => router.push(`/billing/individual-invoice?trip_id=${trip.id}`)}
-                                                                    className="inline-flex items-center bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 shadow-sm"
-                                                                >
-                                                                    💳 INVOICE DETAILS
-                                                                </button>
-                                                            </>
+                                                            <button 
+                                                                onClick={() => handleTripAction(trip.id, 'complete')}
+                                                                disabled={actionLoading[trip.id]}
+                                                                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
+                                                            >
+                                                                {actionLoading[trip.id] ? '...' : '✅ COMPLETE'}
+                                                            </button>
                                                         )}
                                                         
                                                         {trip.status === 'payment_failed' && (
-                                                            <>
-                                                                <button 
-                                                                    onClick={() => handleSendReminder(trip.id)}
-                                                                    disabled={actionLoading[trip.id]}
-                                                                    className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
-                                                                >
-                                                                    {actionLoading[trip.id] ? 'Sending...' : '📧 SEND PAYMENT REMINDER'}
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => router.push(`/billing/individual-invoice?trip_id=${trip.id}`)}
-                                                                    className="inline-flex items-center bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 shadow-sm"
-                                                                >
-                                                                    📄 INVOICE DETAILS
-                                                                </button>
-                                                            </>
+                                                            <button 
+                                                                onClick={() => handleSendReminder(trip.id)}
+                                                                disabled={actionLoading[trip.id]}
+                                                                className="bg-orange-600 hover:bg-orange-700 text-white px-3 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
+                                                            >
+                                                                {actionLoading[trip.id] ? '...' : '📧 SEND REMINDER'}
+                                                            </button>
                                                         )}
                                                         
                                                         {trip.status === 'upcoming' && (
@@ -517,15 +504,9 @@ export default function IndividualTripsPage() {
                                                                 <button 
                                                                     onClick={() => handleTripAction(trip.id, 'complete')}
                                                                     disabled={actionLoading[trip.id]}
-                                                                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
+                                                                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
                                                                 >
-                                                                    {actionLoading[trip.id] ? 'Completing...' : 'COMPLETE'}
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => router.push(`/billing/individual-invoice?trip_id=${trip.id}`)}
-                                                                    className="inline-flex items-center bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 shadow-sm"
-                                                                >
-                                                                    📄 INVOICE DETAILS
+                                                                    {actionLoading[trip.id] ? '...' : '✅ COMPLETE'}
                                                                 </button>
                                                             </>
                                                         )}
@@ -535,15 +516,9 @@ export default function IndividualTripsPage() {
                                                                 <button 
                                                                     onClick={() => handleTripAction(trip.id, 'complete')}
                                                                     disabled={actionLoading[trip.id]}
-                                                                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
+                                                                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
                                                                 >
-                                                                    {actionLoading[trip.id] ? 'Completing...' : 'COMPLETE'}
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => router.push(`/billing/individual-invoice?trip_id=${trip.id}`)}
-                                                                    className="inline-flex items-center bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 shadow-sm"
-                                                                >
-                                                                    📄 INVOICE DETAILS
+                                                                    {actionLoading[trip.id] ? '...' : '✅ COMPLETE'}
                                                                 </button>
                                                             </>
                                                         )}
