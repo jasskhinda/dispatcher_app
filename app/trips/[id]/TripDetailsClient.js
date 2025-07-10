@@ -24,11 +24,18 @@ export default function TripDetailsClient({ trip, user }) {
     setShowEditForm(false);
   };
 
-  // Format time for display
+  // Format time for display with US date format
   const formatTime = (timeStr) => {
     if (!timeStr) return 'N/A';
     const date = new Date(timeStr);
-    return date.toLocaleString();
+    return date.toLocaleString('en-US', {
+      month: '2-digit',
+      day: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
   };
 
   return (
