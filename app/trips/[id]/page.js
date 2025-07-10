@@ -33,20 +33,42 @@ export default async function TripDetailsPage({ params }) {
       redirect('/login?error=Access denied. This application is only for dispatchers.');
     }
 
-    // Fetch trip details with user profile and facility information
+    // Fetch trip details first
     const { data: trip, error: tripError } = await supabase
       .from('trips')
-      .select(`
-        *,
-        user_profile:profiles(first_name, last_name, phone_number, email),
-        facility:facilities(id, name, contact_email, phone_number)
-      `)
+      .select('*')
       .eq('id', tripId)
       .single();
-
+      
     if (tripError || !trip) {
       console.error('Error fetching trip:', tripError);
       redirect('/dashboard?error=Trip not found');
+    }
+
+    // Then fetch related user profile if user_id exists
+    if (trip.user_id) {
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, phone_number, email')
+        .eq('id', trip.user_id)
+        .single();
+      
+      if (userProfile) {
+        trip.user_profile = userProfile;
+      }
+    }
+
+    // Then fetch related facility if facility_id exists
+    if (trip.facility_id) {
+      const { data: facility } = await supabase
+        .from('facilities')
+        .select('id, name, contact_email, phone_number')
+        .eq('id', trip.facility_id)
+        .single();
+      
+      if (facility) {
+        trip.facility = facility;
+      }
     }
 
     // Set client name from joined user_profile data if not already set
