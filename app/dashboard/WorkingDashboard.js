@@ -1221,15 +1221,6 @@ export default function WorkingDashboard() {
                                                                 </>
                                                             )}
                                                             
-                                                            {trip.status === 'completed' && (
-                                                                <a
-                                                                    href={trip.facility_id ? `/invoice/facility-monthly/${trip.facility_id}-${new Date(trip.pickup_time).getFullYear()}-${String(new Date(trip.pickup_time).getMonth() + 1).padStart(2, '0')}` : `/invoice/${trip.id}`}
-                                                                    className="inline-flex items-center bg-purple-600 hover:bg-purple-700 text-white px-2 py-1 rounded text-xs font-medium transition-colors duration-200 shadow-sm"
-                                                                    title="View Invoice"
-                                                                >
-                                                                    📄 INVOICE
-                                                                </a>
-                                                            )}
                                                             
                                                             {trip.status === 'cancelled' && (
                                                                 <div className="text-red-600 text-xs">

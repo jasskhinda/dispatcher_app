@@ -570,22 +570,6 @@ export default function DashboardClientView({ user, userProfile, trips: initialT
                         {trip.status === 'completed' && (
                           <div className="text-green-600 text-xs">✅ Completed</div>
                         )}
-                        {trip.status === 'completed' && !trip.has_invoice && (
-                          <button
-                            onClick={() => router.push(`/invoices/new?trip_id=${trip.id}`)}
-                            className="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded bg-brand-accent text-brand-buttonText hover:opacity-90 transition-opacity focus:outline-none focus:ring-1 focus:ring-brand-accent"
-                          >
-                            Create Invoice
-                          </button>
-                        )}
-                        {trip.has_invoice && (
-                          <button
-                            onClick={() => router.push(`/invoices/${trip.invoice_id}`)}
-                            className="inline-flex items-center px-2 py-1 border border-brand-border text-xs font-medium rounded bg-brand-card hover:bg-brand-border/20 transition-colors focus:outline-none focus:ring-1 focus:ring-brand-accent"
-                          >
-                            View Invoice
-                          </button>
-                        )}
                       </td>
                     </tr>
                   ))}
