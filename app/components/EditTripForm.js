@@ -266,7 +266,7 @@ export default function EditTripForm({ trip, onSave, onCancel }) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Pickup Date *
+                  Pickup Date * <span className="text-xs text-gray-500">(mm/dd/yyyy)</span>
                 </label>
                 <input
                   type="date"
@@ -276,7 +276,17 @@ export default function EditTripForm({ trip, onSave, onCancel }) {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                   disabled={loading}
+                  placeholder="mm/dd/yyyy"
                 />
+                {formData.pickupDate && (
+                  <p className="mt-1 text-xs text-gray-600">
+                    Selected: {new Date(formData.pickupDate + 'T00:00:00').toLocaleDateString('en-US', {
+                      month: '2-digit',
+                      day: '2-digit',
+                      year: 'numeric'
+                    })}
+                  </p>
+                )}
               </div>
               
               <div>
