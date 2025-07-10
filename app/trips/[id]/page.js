@@ -61,7 +61,7 @@ export default async function TripDetailsPage({ params }) {
     // Also fetch managed client info if managed_client_id exists
     if (trip.managed_client_id) {
       const { data: managedClient } = await supabase
-        .from('managed_clients')
+        .from('facility_managed_clients')
         .select('first_name, last_name, phone_number, email, date_of_birth')
         .eq('id', trip.managed_client_id)
         .single();
