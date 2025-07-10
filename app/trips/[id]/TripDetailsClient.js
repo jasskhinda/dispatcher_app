@@ -102,31 +102,28 @@ export default function TripDetailsClient({ trip, user }) {
   };
 
   return (
-    <div className="min-h-screen bg-brand-background">
+    <div className="min-h-screen bg-white">
       {/* Header */}
-      <header className="bg-brand-card shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Trip Details</h1>
-          <div className="flex items-center space-x-4">
+      <header className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Trip Details</h1>
+            <p className="text-sm text-gray-600 mt-1">Trip ID: {currentTrip.id.slice(0, 8)}...</p>
+          </div>
+          <div className="flex items-center space-x-3">
             {currentTrip.status === 'pending' && (
               <button
                 onClick={() => setShowEditForm(true)}
-                className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-colors"
               >
-                Edit Trip
+                ✏️ Edit Trip
               </button>
             )}
             <button
-              onClick={() => router.push('/calendar')}
-              className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-brand-accent hover:opacity-90"
-            >
-              Calendar View
-            </button>
-            <button
               onClick={() => router.push('/dashboard')}
-              className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md bg-brand-border/20 hover:bg-brand-border/30"
+              className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 shadow-sm transition-colors"
             >
-              Back to Dashboard
+              ← Back to Dashboard
             </button>
           </div>
         </div>
@@ -135,78 +132,78 @@ export default function TripDetailsClient({ trip, user }) {
       {/* Main content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {error ? (
-          <div className="bg-brand-card shadow rounded-lg p-6 border border-brand-border">
-            <div className="bg-brand-cancelled/10 border-l-4 border-brand-cancelled p-4 mb-4">
-              <p className="text-sm text-brand-cancelled">{error}</p>
+          <div className="bg-white shadow-sm rounded-xl p-6 border border-gray-200">
+            <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
+              <p className="text-sm text-red-700">{error}</p>
             </div>
             <div className="flex justify-center">
               <button
-                onClick={() => router.push('/calendar')}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-brand-accent hover:opacity-90"
+                onClick={() => router.push('/dashboard')}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-colors"
               >
-                Return to Calendar
+                Return to Dashboard
               </button>
             </div>
           </div>
         ) : currentTrip && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Trip information - left column */}
-            <div className="md:col-span-2">
-              <div className="bg-brand-card shadow rounded-lg overflow-hidden border border-brand-border">
-                <div className="px-6 py-5 border-b border-brand-border flex justify-between items-center">
-                  <h3 className="text-lg font-medium">Trip Information</h3>
-                  <span className={`px-2 py-1 text-xs rounded-full font-medium
-                    ${currentTrip.status === 'completed' ? 'bg-brand-completed/20 text-brand-completed' : 
-                      currentTrip.status === 'in_progress' ? 'bg-brand-inProgress/20 text-brand-inProgress' : 
-                      currentTrip.status === 'cancelled' ? 'bg-brand-cancelled/20 text-brand-cancelled' : 
-                      currentTrip.status === 'upcoming' ? 'bg-brand-upcoming/20 text-brand-upcoming' : 
-                      'bg-brand-pending/20 text-brand-pending'}`}>
+            <div className="lg:col-span-2">
+              <div className="bg-white shadow-sm rounded-xl overflow-hidden border border-gray-200">
+                <div className="px-6 py-5 border-b border-gray-200 flex justify-between items-center">
+                  <h3 className="text-xl font-semibold text-gray-900">Trip Information</h3>
+                  <span className={`px-3 py-1 text-sm rounded-full font-medium
+                    ${currentTrip.status === 'completed' ? 'bg-green-100 text-green-800' : 
+                      currentTrip.status === 'in_progress' ? 'bg-blue-100 text-blue-800' : 
+                      currentTrip.status === 'cancelled' ? 'bg-red-100 text-red-800' : 
+                      currentTrip.status === 'upcoming' ? 'bg-indigo-100 text-indigo-800' : 
+                      'bg-yellow-100 text-yellow-800'}`}>
                     {currentTrip.status?.replace('_', ' ') || 'pending'}
                   </span>
                 </div>
                 <div className="p-6">
                   <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-6">
                     <div className="col-span-2">
-                      <dt className="text-sm font-medium opacity-70">Pickup Time</dt>
-                      <dd className="mt-1 text-sm">{formatTime(currentTrip.pickup_time)}</dd>
+                      <dt className="text-sm font-medium text-gray-600">Pickup Time</dt>
+                      <dd className="mt-1 text-sm text-gray-900">{formatTime(currentTrip.pickup_time)}</dd>
                     </div>
                     
                     {currentTrip.return_pickup_time && (
                       <div className="col-span-2">
-                        <dt className="text-sm font-medium opacity-70">Return Pickup Time</dt>
-                        <dd className="mt-1 text-sm">{formatTime(currentTrip.return_pickup_time)}</dd>
+                        <dt className="text-sm font-medium text-gray-600">Return Pickup Time</dt>
+                        <dd className="mt-1 text-sm text-gray-900">{formatTime(currentTrip.return_pickup_time)}</dd>
                       </div>
                     )}
                     
                     <div className="col-span-2">
-                      <dt className="text-sm font-medium opacity-70">Route</dt>
-                      <dd className="mt-1 text-sm">
+                      <dt className="text-sm font-medium text-gray-600">Route</dt>
+                      <dd className="mt-1 text-sm text-gray-900">
                         <div className="flex items-center mb-2">
-                          <span className="h-2 w-2 rounded-full bg-brand-completed inline-block mr-2 flex-shrink-0"></span>
+                          <span className="h-2 w-2 rounded-full bg-green-500 inline-block mr-2 flex-shrink-0"></span>
                           <span>{currentTrip.pickup_address || currentTrip.pickup_location}</span>
                         </div>
                         <div className="flex items-center">
-                          <span className="h-2 w-2 rounded-full bg-brand-cancelled inline-block mr-2 flex-shrink-0"></span>
+                          <span className="h-2 w-2 rounded-full bg-red-500 inline-block mr-2 flex-shrink-0"></span>
                           <span>{currentTrip.destination_address || currentTrip.dropoff_location}</span>
                         </div>
                       </dd>
                     </div>
                     
                     <div>
-                      <dt className="text-sm font-medium opacity-70">Estimated Duration</dt>
-                      <dd className="mt-1 text-sm">{currentTrip.estimated_duration || 30} minutes</dd>
+                      <dt className="text-sm font-medium text-gray-600">Estimated Duration</dt>
+                      <dd className="mt-1 text-sm text-gray-900">{currentTrip.estimated_duration || 30} minutes</dd>
                     </div>
                     
                     <div>
-                      <dt className="text-sm font-medium opacity-70">Created At</dt>
-                      <dd className="mt-1 text-sm">{formatTime(currentTrip.created_at)}</dd>
+                      <dt className="text-sm font-medium text-gray-600">Created At</dt>
+                      <dd className="mt-1 text-sm text-gray-900">{formatTime(currentTrip.created_at)}</dd>
                     </div>
                     
                     {/* Edit Tracking Information */}
                     {currentTrip.last_edited_by && (
                       <div className="col-span-2">
-                        <dt className="text-sm font-medium opacity-70">Last Edited</dt>
-                        <dd className="mt-1 text-sm">
+                        <dt className="text-sm font-medium text-gray-600">Last Edited</dt>
+                        <dd className="mt-1 text-sm text-gray-900">
                           {formatTime(currentTrip.last_edited_at || currentTrip.updated_at)}
                           <span className="ml-2 text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded">
                             ✏️ EDITED BY {currentTrip.edited_by_role?.toUpperCase() || 'UNKNOWN'}
@@ -217,15 +214,15 @@ export default function TripDetailsClient({ trip, user }) {
                     
                     {currentTrip.special_requirements && (
                       <div className="col-span-2">
-                        <dt className="text-sm font-medium opacity-70">Special Requirements</dt>
-                        <dd className="mt-1 text-sm">{currentTrip.special_requirements}</dd>
+                        <dt className="text-sm font-medium text-gray-600">Special Requirements</dt>
+                        <dd className="mt-1 text-sm text-gray-900">{currentTrip.special_requirements}</dd>
                       </div>
                     )}
                     
                     {currentTrip.notes && (
                       <div className="col-span-2">
-                        <dt className="text-sm font-medium opacity-70">Notes</dt>
-                        <dd className="mt-1 text-sm">{currentTrip.notes}</dd>
+                        <dt className="text-sm font-medium text-gray-600">Notes</dt>
+                        <dd className="mt-1 text-sm text-gray-900">{currentTrip.notes}</dd>
                       </div>
                     )}
                   </dl>
@@ -236,56 +233,56 @@ export default function TripDetailsClient({ trip, user }) {
             {/* Client and driver information - right column */}
             <div>
               {/* Client information */}
-              <div className="bg-brand-card shadow rounded-lg overflow-hidden mb-6 border border-brand-border">
-                <div className="px-6 py-5 border-b border-brand-border">
-                  <h3 className="text-lg font-medium">Client Information</h3>
+              <div className="bg-white shadow-sm rounded-xl overflow-hidden mb-6 border border-gray-200">
+                <div className="px-6 py-5 border-b border-gray-200">
+                  <h3 className="text-lg font-semibold text-gray-900">Client Information</h3>
                 </div>
                 <div className="p-6">
                   {currentTrip.client_name ? (
                     <dl className="space-y-3">
                       <div>
-                        <dt className="text-sm font-medium opacity-70">Name</dt>
-                        <dd className="mt-1 text-sm">
+                        <dt className="text-sm font-medium text-gray-600">Name</dt>
+                        <dd className="mt-1 text-sm text-gray-900">
                           {currentTrip.client_name}
                         </dd>
                       </div>
                       {currentTrip.phone_number && (
                         <div>
-                          <dt className="text-sm font-medium opacity-70">Phone</dt>
-                          <dd className="mt-1 text-sm">{currentTrip.phone_number}</dd>
+                          <dt className="text-sm font-medium text-gray-600">Phone</dt>
+                          <dd className="mt-1 text-sm text-gray-900">{currentTrip.phone_number}</dd>
                         </div>
                       )}
                     </dl>
                   ) : (
-                    <p className="text-sm opacity-70">Client information not available</p>
+                    <p className="text-sm text-gray-500">Client information not available</p>
                   )}
                 </div>
               </div>
               
               {/* Driver information */}
-              <div className="bg-brand-card shadow rounded-lg overflow-hidden border border-brand-border">
-                <div className="px-6 py-5 border-b border-brand-border">
-                  <h3 className="text-lg font-medium">Driver Information</h3>
+              <div className="bg-white shadow-sm rounded-xl overflow-hidden border border-gray-200">
+                <div className="px-6 py-5 border-b border-gray-200">
+                  <h3 className="text-lg font-semibold text-gray-900">Driver Information</h3>
                 </div>
                 <div className="p-6">
                   {currentTrip.driver_name ? (
                     <dl className="space-y-3">
                       <div>
-                        <dt className="text-sm font-medium opacity-70">Name</dt>
-                        <dd className="mt-1 text-sm">
+                        <dt className="text-sm font-medium text-gray-600">Name</dt>
+                        <dd className="mt-1 text-sm text-gray-900">
                           {currentTrip.driver_name}
                         </dd>
                       </div>
                       {currentTrip.driver_phone && (
                         <div>
-                          <dt className="text-sm font-medium opacity-70">Phone</dt>
-                          <dd className="mt-1 text-sm">{currentTrip.driver_phone}</dd>
+                          <dt className="text-sm font-medium text-gray-600">Phone</dt>
+                          <dd className="mt-1 text-sm text-gray-900">{currentTrip.driver_phone}</dd>
                         </div>
                       )}
                       <div className="mt-4">
                         <button
                           onClick={() => setShowDriverSelect(!showDriverSelect)}
-                          className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md bg-brand-border/20 hover:bg-brand-border/30"
+                          className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 shadow-sm transition-colors"
                         >
                           Change Driver
                         </button>
@@ -293,19 +290,13 @@ export default function TripDetailsClient({ trip, user }) {
                     </dl>
                   ) : (
                     <div>
-                      <p className="text-sm opacity-70 mb-4">No driver assigned to this trip</p>
+                      <p className="text-sm text-gray-500 mb-4">No driver assigned to this trip</p>
                       <div className="space-y-2">
                         <button
                           onClick={() => setShowDriverSelect(!showDriverSelect)}
-                          className="w-full inline-flex items-center justify-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-brand-accent hover:opacity-90"
+                          className="w-full inline-flex items-center justify-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-colors"
                         >
                           Assign Driver
-                        </button>
-                        <button
-                          onClick={() => router.push('/optimize')}
-                          className="w-full inline-flex items-center justify-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md bg-brand-border/20 hover:bg-brand-border/30"
-                        >
-                          Bulk Optimize
                         </button>
                       </div>
                     </div>
@@ -313,16 +304,16 @@ export default function TripDetailsClient({ trip, user }) {
                   
                   {/* Driver selection UI */}
                   {showDriverSelect && (
-                    <div className="mt-4 p-4 bg-brand-background rounded-md border border-brand-border">
+                    <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
                       {error && (
-                        <div className="mb-3 p-2 bg-brand-cancelled/10 border border-brand-cancelled/20 rounded text-sm text-brand-cancelled">
+                        <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
                           {error}
                         </div>
                       )}
                       <select
                         value={selectedDriverId}
                         onChange={(e) => setSelectedDriverId(e.target.value)}
-                        className="w-full p-2 mb-3 border border-brand-border rounded-md bg-brand-background text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                        className="w-full p-3 mb-3 border border-gray-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         disabled={updating}
                       >
                         <option value="">
@@ -338,7 +329,7 @@ export default function TripDetailsClient({ trip, user }) {
                         <button
                           onClick={handleAssignDriver}
                           disabled={updating || (selectedDriverId === '' && !currentTrip.driver_id)}
-                          className="flex-1 px-3 py-1.5 text-xs font-medium rounded-md text-white bg-brand-accent hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="flex-1 px-3 py-2 text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
                         >
                           {updating ? 'Updating...' : 'Confirm'}
                         </button>
@@ -348,7 +339,7 @@ export default function TripDetailsClient({ trip, user }) {
                             setSelectedDriverId(currentTrip.driver_id || '');
                           }}
                           disabled={updating}
-                          className="flex-1 px-3 py-1.5 text-xs font-medium rounded-md bg-brand-border/20 hover:bg-brand-border/30"
+                          className="flex-1 px-3 py-2 text-sm font-medium rounded-lg text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 shadow-sm transition-colors"
                         >
                           Cancel
                         </button>
