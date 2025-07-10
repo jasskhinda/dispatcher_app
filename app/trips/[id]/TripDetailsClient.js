@@ -158,77 +158,115 @@ export default function TripDetailsClient({ trip, user }) {
               </div>
             </div>
             
-            {/* Client and driver information - right column */}
+            {/* Client & Facility Information - right column */}
             <div>
-              {/* Client information */}
+              {/* Client & Facility Information */}
               <div className="bg-white shadow-sm rounded-xl overflow-hidden mb-6 border border-gray-200">
                 <div className="px-6 py-5 border-b border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-900">Client Information</h3>
+                  <h3 className="text-lg font-semibold text-gray-900">Client & Facility Information</h3>
                 </div>
-                <div className="p-6">
-{(() => {
-                    // Try to get client name from various sources
-                    const clientName = currentTrip.client_name || 
-                                     currentTrip.client_first_name || 
-                                     (currentTrip.user_profile ? 
-                                       `${currentTrip.user_profile.first_name || ''} ${currentTrip.user_profile.last_name || ''}`.trim() : 
-                                       null) ||
-                                     (currentTrip.managed_client ? 
-                                       `${currentTrip.managed_client.first_name || ''} ${currentTrip.managed_client.last_name || ''}`.trim() : 
-                                       null) ||
-                                     currentTrip.passenger_name ||
-                                     currentTrip.name ||
-                                     (currentTrip.user_id ? `Client ${currentTrip.user_id.substring(0, 8)}` : null) ||
-                                     (currentTrip.managed_client_id ? `Managed Client ${currentTrip.managed_client_id.substring(0, 8)}` : null);
-                    
-                    const clientPhone = currentTrip.phone_number || 
-                                      currentTrip.client_phone || 
-                                      (currentTrip.user_profile ? currentTrip.user_profile.phone_number : null) ||
-                                      (currentTrip.managed_client ? currentTrip.managed_client.phone_number : null);
-                    
-                    const clientEmail = currentTrip.user_profile?.email || currentTrip.managed_client?.email;
-                    
-                    return clientName ? (
-                      <dl className="space-y-3">
+                <div className="p-6 space-y-6">
+                  {/* Facility Information */}
+                  {currentTrip.facility && (
+                    <div>
+                      <h4 className="text-md font-medium text-gray-800 mb-3 flex items-center">
+                        🏥 Facility
+                      </h4>
+                      <dl className="space-y-3 pl-4 border-l-2 border-blue-200">
                         <div>
-                          <dt className="text-sm font-medium text-gray-600">Name</dt>
-                          <dd className="mt-1 text-sm text-gray-900">
-                            {clientName}
+                          <dt className="text-sm font-medium text-gray-600">Facility Name</dt>
+                          <dd className="mt-1 text-sm text-gray-900 font-medium">
+                            {currentTrip.facility.name}
                           </dd>
                         </div>
-                        {clientPhone && (
+                        {currentTrip.facility.contact_email && (
                           <div>
-                            <dt className="text-sm font-medium text-gray-600">Phone</dt>
-                            <dd className="mt-1 text-sm text-gray-900">{clientPhone}</dd>
+                            <dt className="text-sm font-medium text-gray-600">Contact Email</dt>
+                            <dd className="mt-1 text-sm text-gray-900">{currentTrip.facility.contact_email}</dd>
                           </div>
                         )}
-                        {clientEmail && (
+                        {currentTrip.facility.phone_number && (
                           <div>
-                            <dt className="text-sm font-medium text-gray-600">Email</dt>
-                            <dd className="mt-1 text-sm text-gray-900">{clientEmail}</dd>
-                          </div>
-                        )}
-                        {currentTrip.managed_client?.date_of_birth && (
-                          <div>
-                            <dt className="text-sm font-medium text-gray-600">Date of Birth</dt>
-                            <dd className="mt-1 text-sm text-gray-900">{new Date(currentTrip.managed_client.date_of_birth).toLocaleDateString()}</dd>
+                            <dt className="text-sm font-medium text-gray-600">Contact Phone</dt>
+                            <dd className="mt-1 text-sm text-gray-900">{currentTrip.facility.phone_number}</dd>
                           </div>
                         )}
                       </dl>
-                    ) : (
-                      <div>
-                        <p className="text-sm text-gray-500 mb-2">Client information not available</p>
-                        <div className="text-xs text-gray-400 bg-gray-50 p-2 rounded">
-                          <strong>Debug:</strong><br/>
-                          user_id: {currentTrip.user_id || 'none'}<br/>
-                          managed_client_id: {currentTrip.managed_client_id || 'none'}<br/>
-                          client_name: {currentTrip.client_name || 'none'}<br/>
-                          user_profile: {currentTrip.user_profile ? 'present' : 'none'}<br/>
-                          managed_client: {currentTrip.managed_client ? 'present' : 'none'}
+                    </div>
+                  )}
+
+                  {/* Client Information */}
+                  <div>
+                    <h4 className="text-md font-medium text-gray-800 mb-3 flex items-center">
+                      👤 Client
+                    </h4>
+                    {(() => {
+                      // Try to get client name from various sources
+                      const clientName = currentTrip.client_name || 
+                                       currentTrip.client_first_name || 
+                                       (currentTrip.user_profile ? 
+                                         `${currentTrip.user_profile.first_name || ''} ${currentTrip.user_profile.last_name || ''}`.trim() : 
+                                         null) ||
+                                       (currentTrip.managed_client ? 
+                                         `${currentTrip.managed_client.first_name || ''} ${currentTrip.managed_client.last_name || ''}`.trim() : 
+                                         null) ||
+                                       currentTrip.passenger_name ||
+                                       currentTrip.name;
+                      
+                      const clientPhone = currentTrip.phone_number || 
+                                        currentTrip.client_phone || 
+                                        (currentTrip.user_profile ? currentTrip.user_profile.phone_number : null) ||
+                                        (currentTrip.managed_client ? currentTrip.managed_client.phone_number : null);
+                      
+                      const clientEmail = currentTrip.user_profile?.email || currentTrip.managed_client?.email;
+                      
+                      return clientName ? (
+                        <dl className="space-y-3 pl-4 border-l-2 border-green-200">
+                          <div>
+                            <dt className="text-sm font-medium text-gray-600">Client Name</dt>
+                            <dd className="mt-1 text-sm text-gray-900 font-medium">
+                              {clientName}
+                              {currentTrip.managed_client_id && (
+                                <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                                  Facility Managed
+                                </span>
+                              )}
+                              {currentTrip.user_id && (
+                                <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                                  Direct Client
+                                </span>
+                              )}
+                            </dd>
+                          </div>
+                          {clientEmail && (
+                            <div>
+                              <dt className="text-sm font-medium text-gray-600">Email</dt>
+                              <dd className="mt-1 text-sm text-gray-900">{clientEmail}</dd>
+                            </div>
+                          )}
+                          {clientPhone && (
+                            <div>
+                              <dt className="text-sm font-medium text-gray-600">Phone</dt>
+                              <dd className="mt-1 text-sm text-gray-900">{clientPhone}</dd>
+                            </div>
+                          )}
+                          {currentTrip.managed_client?.date_of_birth && (
+                            <div>
+                              <dt className="text-sm font-medium text-gray-600">Date of Birth</dt>
+                              <dd className="mt-1 text-sm text-gray-900">{new Date(currentTrip.managed_client.date_of_birth).toLocaleDateString()}</dd>
+                            </div>
+                          )}
+                        </dl>
+                      ) : (
+                        <div className="pl-4 border-l-2 border-red-200">
+                          <p className="text-sm text-gray-500 mb-2">Client information not available</p>
+                          {!currentTrip.facility && (
+                            <p className="text-xs text-gray-400">No facility information available either</p>
+                          )}
                         </div>
-                      </div>
-                    );
-                  })()}
+                      );
+                    })()}
+                  </div>
                 </div>
               </div>
             </div>
