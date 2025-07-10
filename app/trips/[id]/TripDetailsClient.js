@@ -41,7 +41,7 @@ export default function TripDetailsClient({ trip, user }) {
             <p className="text-sm text-gray-600 mt-1">Trip ID: {currentTrip.id.slice(0, 8)}...</p>
           </div>
           <div className="flex items-center space-x-3">
-{(currentTrip.status === 'pending' || currentTrip.status === 'upcoming' || currentTrip.status === 'approved') && (
+{(currentTrip.status === 'pending' || currentTrip.status === 'upcoming' || currentTrip.status === 'approved') && currentTrip.status !== 'completed' && (
               <button
                 onClick={() => setShowEditForm(true)}
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-colors"
@@ -260,11 +260,17 @@ export default function TripDetailsClient({ trip, user }) {
                           )}
                         </dl>
                       ) : (
-                        <div className="pl-4 border-l-2 border-red-200">
-                          <p className="text-sm text-gray-500 mb-2">Client information not available</p>
-                          {!currentTrip.facility && (
-                            <p className="text-xs text-gray-400">No facility information available either</p>
-                          )}
+                        <div className="pl-4 border-l-2 border-yellow-200">
+                          <div className="bg-yellow-50 p-3 rounded-md">
+                            <p className="text-sm text-gray-700 mb-2">⚠️ Client information not fully available</p>
+                            <div className="text-xs text-gray-600 space-y-1">
+                              <div>Trip ID: {currentTrip.id}</div>
+                              {currentTrip.user_id && <div>User ID: {currentTrip.user_id.slice(0, 8)}...</div>}
+                              {currentTrip.managed_client_id && <div>Managed Client ID: {currentTrip.managed_client_id.slice(0, 8)}...</div>}
+                              {currentTrip.facility_id && <div>Facility ID: {currentTrip.facility_id.slice(0, 8)}...</div>}
+                              {!currentTrip.user_id && !currentTrip.managed_client_id && <div>No client identifiers found</div>}
+                            </div>
+                          </div>
                         </div>
                       );
                     })()}

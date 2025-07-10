@@ -1168,14 +1168,16 @@ export default function WorkingDashboard() {
                                                         
                                                         {/* Trip Action Buttons */}
                                                         <div className="flex space-x-1">
-                                                            {/* Edit Button - Always available */}
-                                                            <a
-                                                                href={`/trips/${trip.id}`}
-                                                                className="inline-flex items-center bg-gray-600 hover:bg-gray-700 text-white px-2 py-1 rounded text-xs font-medium transition-colors duration-200 shadow-sm"
-                                                                title="View & Edit Trip"
-                                                            >
-                                                                ✏️ EDIT
-                                                            </a>
+                                                            {/* Edit Button - Only available for non-completed trips */}
+                                                            {trip.status !== 'completed' && (
+                                                                <a
+                                                                    href={`/trips/${trip.id}`}
+                                                                    className="inline-flex items-center bg-gray-600 hover:bg-gray-700 text-white px-2 py-1 rounded text-xs font-medium transition-colors duration-200 shadow-sm"
+                                                                    title="View & Edit Trip"
+                                                                >
+                                                                    ✏️ EDIT
+                                                                </a>
+                                                            )}
                                                             
                                                             {trip.status === 'pending' && (
                                                                 <>
