@@ -33,10 +33,14 @@ export default async function TripDetailsPage({ params }) {
       redirect('/login?error=Access denied. This application is only for dispatchers.');
     }
 
-    // Fetch trip details
+    // Fetch trip details with user profile and facility information
     const { data: trip, error: tripError } = await supabase
       .from('trips')
-      .select('*')
+      .select(`
+        *,
+        user_profile:profiles(first_name, last_name, phone_number, email),
+        facility:facilities(id, name, contact_email, phone_number)
+      `)
       .eq('id', tripId)
       .single();
 
@@ -45,18 +49,15 @@ export default async function TripDetailsPage({ params }) {
       redirect('/dashboard?error=Trip not found');
     }
 
-    // Try to get client name if not already set
-    if (!trip.client_name && trip.user_id) {
-      const { data: clientProfile } = await supabase
-        .from('profiles')
-        .select('first_name, last_name')
-        .eq('id', trip.user_id)
-        .single();
-        
-      if (clientProfile) {
-        trip.client_name = `${clientProfile.first_name || ''} ${clientProfile.last_name || ''}`.trim() || 
-                          `Client ${trip.user_id.substring(0, 4)}`;
-      }
+    // Set client name from joined user_profile data if not already set
+    if (!trip.client_name && trip.user_profile) {
+      trip.client_name = `${trip.user_profile.first_name || ''} ${trip.user_profile.last_name || ''}`.trim() || 
+                        `Client ${trip.user_id?.substring(0, 4) || 'Unknown'}`;
+    }
+    
+    // Set phone number from joined user_profile data if not already set
+    if (!trip.phone_number && trip.user_profile?.phone_number) {
+      trip.phone_number = trip.user_profile.phone_number;
     }
 
     // If trip has a last_edited_by, fetch editor information
