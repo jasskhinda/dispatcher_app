@@ -9,79 +9,9 @@ export default function TripDetailsClient({ trip, user }) {
   const router = useRouter();
   const supabase = createClientComponentClient();
   const [error, setError] = useState('');
-  const [showDriverSelect, setShowDriverSelect] = useState(false);
-  const [selectedDriverId, setSelectedDriverId] = useState(trip.driver_id || '');
-  const [drivers, setDrivers] = useState([]);
-  const [updating, setUpdating] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
   const [currentTrip, setCurrentTrip] = useState(trip);
 
-  // Fetch available drivers on mount
-  useEffect(() => {
-    const fetchDrivers = async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name')
-        .eq('role', 'driver')
-        .order('first_name');
-      
-      if (!error && data) {
-        setDrivers(data);
-      }
-    };
-    
-    fetchDrivers();
-  }, [supabase]);
-
-  // Handle driver assignment
-  const handleAssignDriver = async () => {
-    setUpdating(true);
-    setError('');
-    
-    try {
-      let updateData = {};
-      
-      if (selectedDriverId) {
-        // Get driver's name
-        const selectedDriver = drivers.find(d => d.id === selectedDriverId);
-        const driverName = selectedDriver 
-          ? `${selectedDriver.first_name || ''} ${selectedDriver.last_name || ''}`.trim() 
-          : '';
-        
-        updateData = {
-          driver_id: selectedDriverId,
-          driver_name: driverName,
-          status: currentTrip.status === 'pending' ? 'upcoming' : currentTrip.status
-        };
-      } else {
-        // Remove driver assignment
-        updateData = {
-          driver_id: null,
-          driver_name: null,
-          status: currentTrip.status === 'upcoming' ? 'pending' : currentTrip.status
-        };
-      }
-      
-      // Update trip
-      const { error: updateError } = await supabase
-        .from('trips')
-        .update(updateData)
-        .eq('id', currentTrip.id);
-      
-      if (updateError) {
-        throw updateError;
-      }
-      
-      // Refresh the page to show updated data
-      router.refresh();
-      setShowDriverSelect(false);
-    } catch (err) {
-      console.error('Error updating driver assignment:', err);
-      setError('Failed to update driver assignment. Please try again.');
-    } finally {
-      setUpdating(false);
-    }
-  };
 
   // Handle trip edit save
   const handleTripSave = (updatedTrip) => {
@@ -111,14 +41,12 @@ export default function TripDetailsClient({ trip, user }) {
             <p className="text-sm text-gray-600 mt-1">Trip ID: {currentTrip.id.slice(0, 8)}...</p>
           </div>
           <div className="flex items-center space-x-3">
-            {currentTrip.status === 'pending' && (
-              <button
-                onClick={() => setShowEditForm(true)}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-colors"
-              >
-                ✏️ Edit Trip
-              </button>
-            )}
+            <button
+              onClick={() => setShowEditForm(true)}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-colors"
+            >
+              ✏️ Edit Trip
+            </button>
             <button
               onClick={() => router.push('/dashboard')}
               className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 shadow-sm transition-colors"
@@ -146,9 +74,9 @@ export default function TripDetailsClient({ trip, user }) {
             </div>
           </div>
         ) : currentTrip && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Trip information - left column */}
-            <div className="lg:col-span-2">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            {/* Trip information - main column */}
+            <div className="lg:col-span-3">
               <div className="bg-white shadow-sm rounded-xl overflow-hidden border border-gray-200">
                 <div className="px-6 py-5 border-b border-gray-200 flex justify-between items-center">
                   <h3 className="text-xl font-semibold text-gray-900">Trip Information</h3>
@@ -238,114 +166,54 @@ export default function TripDetailsClient({ trip, user }) {
                   <h3 className="text-lg font-semibold text-gray-900">Client Information</h3>
                 </div>
                 <div className="p-6">
-                  {currentTrip.client_name ? (
-                    <dl className="space-y-3">
-                      <div>
-                        <dt className="text-sm font-medium text-gray-600">Name</dt>
-                        <dd className="mt-1 text-sm text-gray-900">
-                          {currentTrip.client_name}
-                        </dd>
-                      </div>
-                      {currentTrip.phone_number && (
+{(() => {
+                    // Try to get client name from various sources
+                    const clientName = currentTrip.client_name || 
+                                     currentTrip.client_first_name || 
+                                     (currentTrip.user_profile ? 
+                                       `${currentTrip.user_profile.first_name || ''} ${currentTrip.user_profile.last_name || ''}`.trim() : 
+                                       null) ||
+                                     currentTrip.passenger_name ||
+                                     currentTrip.name ||
+                                     (currentTrip.user_id ? `Client ${currentTrip.user_id.substring(0, 8)}` : null);
+                    
+                    const clientPhone = currentTrip.phone_number || 
+                                      currentTrip.client_phone || 
+                                      (currentTrip.user_profile ? currentTrip.user_profile.phone_number : null);
+                    
+                    return clientName ? (
+                      <dl className="space-y-3">
                         <div>
-                          <dt className="text-sm font-medium text-gray-600">Phone</dt>
-                          <dd className="mt-1 text-sm text-gray-900">{currentTrip.phone_number}</dd>
+                          <dt className="text-sm font-medium text-gray-600">Name</dt>
+                          <dd className="mt-1 text-sm text-gray-900">
+                            {clientName}
+                          </dd>
                         </div>
-                      )}
-                    </dl>
-                  ) : (
-                    <p className="text-sm text-gray-500">Client information not available</p>
-                  )}
-                </div>
-              </div>
-              
-              {/* Driver information */}
-              <div className="bg-white shadow-sm rounded-xl overflow-hidden border border-gray-200">
-                <div className="px-6 py-5 border-b border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-900">Driver Information</h3>
-                </div>
-                <div className="p-6">
-                  {currentTrip.driver_name ? (
-                    <dl className="space-y-3">
+                        {clientPhone && (
+                          <div>
+                            <dt className="text-sm font-medium text-gray-600">Phone</dt>
+                            <dd className="mt-1 text-sm text-gray-900">{clientPhone}</dd>
+                          </div>
+                        )}
+                        {currentTrip.user_profile?.email && (
+                          <div>
+                            <dt className="text-sm font-medium text-gray-600">Email</dt>
+                            <dd className="mt-1 text-sm text-gray-900">{currentTrip.user_profile.email}</dd>
+                          </div>
+                        )}
+                      </dl>
+                    ) : (
                       <div>
-                        <dt className="text-sm font-medium text-gray-600">Name</dt>
-                        <dd className="mt-1 text-sm text-gray-900">
-                          {currentTrip.driver_name}
-                        </dd>
-                      </div>
-                      {currentTrip.driver_phone && (
-                        <div>
-                          <dt className="text-sm font-medium text-gray-600">Phone</dt>
-                          <dd className="mt-1 text-sm text-gray-900">{currentTrip.driver_phone}</dd>
+                        <p className="text-sm text-gray-500 mb-2">Client information not available</p>
+                        <div className="text-xs text-gray-400 bg-gray-50 p-2 rounded">
+                          <strong>Debug:</strong><br/>
+                          user_id: {currentTrip.user_id || 'none'}<br/>
+                          client_name: {currentTrip.client_name || 'none'}<br/>
+                          user_profile: {currentTrip.user_profile ? 'present' : 'none'}
                         </div>
-                      )}
-                      <div className="mt-4">
-                        <button
-                          onClick={() => setShowDriverSelect(!showDriverSelect)}
-                          className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 shadow-sm transition-colors"
-                        >
-                          Change Driver
-                        </button>
                       </div>
-                    </dl>
-                  ) : (
-                    <div>
-                      <p className="text-sm text-gray-500 mb-4">No driver assigned to this trip</p>
-                      <div className="space-y-2">
-                        <button
-                          onClick={() => setShowDriverSelect(!showDriverSelect)}
-                          className="w-full inline-flex items-center justify-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-colors"
-                        >
-                          Assign Driver
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Driver selection UI */}
-                  {showDriverSelect && (
-                    <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                      {error && (
-                        <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                          {error}
-                        </div>
-                      )}
-                      <select
-                        value={selectedDriverId}
-                        onChange={(e) => setSelectedDriverId(e.target.value)}
-                        className="w-full p-3 mb-3 border border-gray-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        disabled={updating}
-                      >
-                        <option value="">
-                          {currentTrip.driver_id ? 'Remove driver assignment' : 'Select a driver'}
-                        </option>
-                        {drivers.map(driver => (
-                          <option key={driver.id} value={driver.id}>
-                            {driver.first_name} {driver.last_name}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={handleAssignDriver}
-                          disabled={updating || (selectedDriverId === '' && !currentTrip.driver_id)}
-                          className="flex-1 px-3 py-2 text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
-                        >
-                          {updating ? 'Updating...' : 'Confirm'}
-                        </button>
-                        <button
-                          onClick={() => {
-                            setShowDriverSelect(false);
-                            setSelectedDriverId(currentTrip.driver_id || '');
-                          }}
-                          disabled={updating}
-                          className="flex-1 px-3 py-2 text-sm font-medium rounded-lg text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 shadow-sm transition-colors"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                 </div>
               </div>
             </div>
