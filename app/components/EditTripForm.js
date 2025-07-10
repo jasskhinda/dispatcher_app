@@ -268,19 +268,44 @@ export default function EditTripForm({ trip, onSave, onCancel }) {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Pickup Date * <span className="text-xs text-gray-500">(mm/dd/yyyy)</span>
                 </label>
-                <input
-                  type="date"
-                  value={formData.pickupDate}
-                  onChange={(e) => setFormData({ ...formData, pickupDate: e.target.value })}
-                  min={today}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                  disabled={loading}
-                  placeholder="mm/dd/yyyy"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={formData.pickupDate ? new Date(formData.pickupDate + 'T00:00:00').toLocaleDateString('en-US', {
+                      month: '2-digit',
+                      day: '2-digit',  
+                      year: 'numeric'
+                    }) : ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      // Convert mm/dd/yyyy to yyyy-mm-dd for internal storage
+                      const match = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+                      if (match) {
+                        const [, month, day, year] = match;
+                        const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                        setFormData({ ...formData, pickupDate: isoDate });
+                      } else if (value === '') {
+                        setFormData({ ...formData, pickupDate: '' });
+                      }
+                    }}
+                    placeholder="mm/dd/yyyy"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                    disabled={loading}
+                  />
+                  <input
+                    type="date"
+                    value={formData.pickupDate}
+                    onChange={(e) => setFormData({ ...formData, pickupDate: e.target.value })}
+                    min={today}
+                    className="absolute inset-0 opacity-0 cursor-pointer"
+                    required
+                    disabled={loading}
+                  />
+                </div>
                 {formData.pickupDate && (
-                  <p className="mt-1 text-xs text-gray-600">
-                    Selected: {new Date(formData.pickupDate + 'T00:00:00').toLocaleDateString('en-US', {
+                  <p className="mt-1 text-xs text-green-600">
+                    ✓ Selected: {new Date(formData.pickupDate + 'T00:00:00').toLocaleDateString('en-US', {
                       month: '2-digit',
                       day: '2-digit',
                       year: 'numeric'
