@@ -500,36 +500,6 @@ export default function EditTripForm({ trip, onSave, onCancel }) {
               />
             </div>
 
-            {/* Billing */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Bill To
-              </label>
-              <div className="space-y-2">
-                <label className="flex items-center space-x-3">
-                  <input
-                    type="radio"
-                    value="facility"
-                    checked={formData.billTo === 'facility'}
-                    onChange={(e) => setFormData({ ...formData, billTo: e.target.value })}
-                    className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                    disabled={loading}
-                  />
-                  <span className="text-gray-700">Facility</span>
-                </label>
-                <label className="flex items-center space-x-3">
-                  <input
-                    type="radio"
-                    value="client"
-                    checked={formData.billTo === 'client'}
-                    onChange={(e) => setFormData({ ...formData, billTo: e.target.value })}
-                    className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                    disabled={loading}
-                  />
-                  <span className="text-gray-700">Client</span>
-                </label>
-              </div>
-            </div>
 
             {/* Pricing Display */}
             <PricingDisplay 
