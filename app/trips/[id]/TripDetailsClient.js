@@ -173,13 +173,20 @@ export default function TripDetailsClient({ trip, user }) {
                                      (currentTrip.user_profile ? 
                                        `${currentTrip.user_profile.first_name || ''} ${currentTrip.user_profile.last_name || ''}`.trim() : 
                                        null) ||
+                                     (currentTrip.managed_client ? 
+                                       `${currentTrip.managed_client.first_name || ''} ${currentTrip.managed_client.last_name || ''}`.trim() : 
+                                       null) ||
                                      currentTrip.passenger_name ||
                                      currentTrip.name ||
-                                     (currentTrip.user_id ? `Client ${currentTrip.user_id.substring(0, 8)}` : null);
+                                     (currentTrip.user_id ? `Client ${currentTrip.user_id.substring(0, 8)}` : null) ||
+                                     (currentTrip.managed_client_id ? `Managed Client ${currentTrip.managed_client_id.substring(0, 8)}` : null);
                     
                     const clientPhone = currentTrip.phone_number || 
                                       currentTrip.client_phone || 
-                                      (currentTrip.user_profile ? currentTrip.user_profile.phone_number : null);
+                                      (currentTrip.user_profile ? currentTrip.user_profile.phone_number : null) ||
+                                      (currentTrip.managed_client ? currentTrip.managed_client.phone_number : null);
+                    
+                    const clientEmail = currentTrip.user_profile?.email || currentTrip.managed_client?.email;
                     
                     return clientName ? (
                       <dl className="space-y-3">
@@ -195,10 +202,16 @@ export default function TripDetailsClient({ trip, user }) {
                             <dd className="mt-1 text-sm text-gray-900">{clientPhone}</dd>
                           </div>
                         )}
-                        {currentTrip.user_profile?.email && (
+                        {clientEmail && (
                           <div>
                             <dt className="text-sm font-medium text-gray-600">Email</dt>
-                            <dd className="mt-1 text-sm text-gray-900">{currentTrip.user_profile.email}</dd>
+                            <dd className="mt-1 text-sm text-gray-900">{clientEmail}</dd>
+                          </div>
+                        )}
+                        {currentTrip.managed_client?.date_of_birth && (
+                          <div>
+                            <dt className="text-sm font-medium text-gray-600">Date of Birth</dt>
+                            <dd className="mt-1 text-sm text-gray-900">{new Date(currentTrip.managed_client.date_of_birth).toLocaleDateString()}</dd>
                           </div>
                         )}
                       </dl>
@@ -208,8 +221,10 @@ export default function TripDetailsClient({ trip, user }) {
                         <div className="text-xs text-gray-400 bg-gray-50 p-2 rounded">
                           <strong>Debug:</strong><br/>
                           user_id: {currentTrip.user_id || 'none'}<br/>
+                          managed_client_id: {currentTrip.managed_client_id || 'none'}<br/>
                           client_name: {currentTrip.client_name || 'none'}<br/>
-                          user_profile: {currentTrip.user_profile ? 'present' : 'none'}
+                          user_profile: {currentTrip.user_profile ? 'present' : 'none'}<br/>
+                          managed_client: {currentTrip.managed_client ? 'present' : 'none'}
                         </div>
                       </div>
                     );

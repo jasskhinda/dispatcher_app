@@ -58,6 +58,19 @@ export default async function TripDetailsPage({ params }) {
       }
     }
 
+    // Also fetch managed client info if managed_client_id exists
+    if (trip.managed_client_id) {
+      const { data: managedClient } = await supabase
+        .from('managed_clients')
+        .select('first_name, last_name, phone_number, email, date_of_birth')
+        .eq('id', trip.managed_client_id)
+        .single();
+      
+      if (managedClient) {
+        trip.managed_client = managedClient;
+      }
+    }
+
     // Then fetch related facility if facility_id exists
     if (trip.facility_id) {
       const { data: facility } = await supabase
@@ -71,15 +84,24 @@ export default async function TripDetailsPage({ params }) {
       }
     }
 
-    // Set client name from joined user_profile data if not already set
-    if (!trip.client_name && trip.user_profile) {
-      trip.client_name = `${trip.user_profile.first_name || ''} ${trip.user_profile.last_name || ''}`.trim() || 
-                        `Client ${trip.user_id?.substring(0, 4) || 'Unknown'}`;
+    // Set client name from joined data if not already set
+    if (!trip.client_name) {
+      if (trip.user_profile) {
+        trip.client_name = `${trip.user_profile.first_name || ''} ${trip.user_profile.last_name || ''}`.trim() || 
+                          `Client ${trip.user_id?.substring(0, 8) || 'Unknown'}`;
+      } else if (trip.managed_client) {
+        trip.client_name = `${trip.managed_client.first_name || ''} ${trip.managed_client.last_name || ''}`.trim() || 
+                          `Managed Client ${trip.managed_client_id?.substring(0, 8) || 'Unknown'}`;
+      }
     }
     
-    // Set phone number from joined user_profile data if not already set
-    if (!trip.phone_number && trip.user_profile?.phone_number) {
-      trip.phone_number = trip.user_profile.phone_number;
+    // Set phone number from joined data if not already set
+    if (!trip.phone_number) {
+      if (trip.user_profile?.phone_number) {
+        trip.phone_number = trip.user_profile.phone_number;
+      } else if (trip.managed_client?.phone_number) {
+        trip.phone_number = trip.managed_client.phone_number;
+      }
     }
 
     // If trip has a last_edited_by, fetch editor information
