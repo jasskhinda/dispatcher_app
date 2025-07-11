@@ -2258,6 +2258,7 @@ export default function FacilityMonthlyInvoicePage() {
                                                 })()
                                             }`}>
                                                 <tr>
+                                                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-700 uppercase border-b">Trip ID</th>
                                                     <th className="text-left px-4 py-3 text-xs font-medium text-gray-700 uppercase border-b">Date</th>
                                                     <th className="text-left px-4 py-3 text-xs font-medium text-gray-700 uppercase border-b">Client</th>
                                                     <th className="text-left px-4 py-3 text-xs font-medium text-gray-700 uppercase border-b">Route</th>
@@ -2268,6 +2269,11 @@ export default function FacilityMonthlyInvoicePage() {
                                             <tbody>
                                                 {billableTrips.map((trip, index) => (
                                                     <tr key={trip.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                                        <td className="px-4 py-3 border-b">
+                                                            <div className="text-xs font-mono text-gray-600">
+                                                                #{trip.id.slice(0, 8)}
+                                                            </div>
+                                                        </td>
                                                         <td className="px-4 py-3 border-b">
                                                             <div className="text-sm font-bold text-gray-900">
                                                                 {new Date(trip.pickup_time).toLocaleDateString('en-US', {
