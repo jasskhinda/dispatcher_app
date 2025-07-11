@@ -140,7 +140,7 @@ export default function EditTripForm({ trip, onSave, onCancel }) {
         throw new Error('Please fill in all required fields');
       }
 
-      // Check if trip is still pending (only pending trips can be edited)
+      // Check if trip can be edited (pending or approved trips only, not completed)
       const { data: currentTrip, error: checkError } = await supabase
         .from('trips')
         .select('status')
@@ -151,8 +151,10 @@ export default function EditTripForm({ trip, onSave, onCancel }) {
         throw new Error('Failed to verify trip status');
       }
 
-      if (currentTrip.status !== 'pending') {
-        throw new Error('This trip can no longer be edited. Only pending trips can be modified.');
+      // Allow editing of pending and approved trips, but not completed trips
+      const editableStatuses = ['pending', 'approved_pending_payment', 'paid_in_progress', 'upcoming', 'in_process'];
+      if (!editableStatuses.includes(currentTrip.status)) {
+        throw new Error('This trip can no longer be edited. Only pending and approved trips can be modified.');
       }
 
       // Combine date and time
@@ -191,7 +193,7 @@ export default function EditTripForm({ trip, onSave, onCancel }) {
         .from('trips')
         .update(updateData)
         .eq('id', trip.id)
-        .eq('status', 'pending'); // Double check status constraint
+        .in('status', editableStatuses); // Allow updates for editable statuses
 
       if (updateError) {
         throw updateError;
@@ -243,7 +245,7 @@ export default function EditTripForm({ trip, onSave, onCancel }) {
                 <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
               <span className="text-sm text-yellow-800">
-                Trip Status: <strong>Pending Approval</strong> - Only pending trips can be edited
+                Trip Status: <strong>{trip?.status || 'Unknown'}</strong> - Pending and approved trips can be edited
               </span>
             </div>
           </div>
