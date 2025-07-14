@@ -185,6 +185,7 @@ export default function EditTripForm({ trip, onSave, onCancel }) {
         // Add edit tracking
         last_edited_by: currentUser?.id || null,
         edited_by_role: currentUser?.role || 'dispatcher',
+        last_edited_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
 

@@ -38,6 +38,20 @@ export default function TripDetailsClient({ trip, user }) {
     });
   };
 
+  // Format edit date for display
+  const formatEditDate = (dateString) => {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: true
+    }).format(date);
+  };
+
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
@@ -98,6 +112,29 @@ export default function TripDetailsClient({ trip, user }) {
                     {currentTrip.status?.replace('_', ' ') || 'pending'}
                   </span>
                 </div>
+                
+                {/* Last Edited Notification */}
+                {currentTrip.last_edited_by && currentTrip.last_edited_at && (
+                  <div className="px-6 py-4 bg-blue-50 border-b border-blue-200">
+                    <div className="flex items-start space-x-3">
+                      <svg className="w-5 h-5 text-blue-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                      <div>
+                        <p className="text-sm font-medium text-blue-800">
+                          Last Edited
+                        </p>
+                        <p className="text-sm text-blue-700">
+                          {formatEditDate(currentTrip.last_edited_at)}
+                        </p>
+                        <p className="text-sm font-medium text-blue-800 mt-1">
+                          📝 EDITED BY {currentTrip.edited_by_role?.toUpperCase() || 'UNKNOWN'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
                 <div className="p-6">
                   <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-6">
                     <div className="col-span-2">
