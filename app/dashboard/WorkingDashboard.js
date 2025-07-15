@@ -85,74 +85,129 @@ export default function WorkingDashboard() {
             const cacheKey = Date.now();
             console.log(`🔄 Cache-busting query with key: ${cacheKey}`);
 
-            // Fetch trips from ALL sources using API route with admin privileges
-            console.log('🔍 Fetching trips from all sources via API...');
+            // Fetch trips from ALL sources using direct database query (same approach as individual trips page)
+            console.log('🔍 Fetching trips from all sources...');
             
-            const response = await fetch('/api/trips/all', {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            });
+            // Step 1: Get all trips (both individual and facility)
+            const { data: allTripsData, error: tripsError } = await supabase
+                .from('trips')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(200);
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                console.error('❌ API error:', errorData);
-                setError('Failed to fetch trips: ' + (errorData.error || 'Unknown error'));
+            if (tripsError) {
+                console.error('❌ Trips query error:', tripsError);
+                setError('Failed to fetch trips: ' + tripsError.message);
                 setInitialTrips([]);
             } else {
-                const data = await response.json();
-                const tripsData = data.trips || [];
+                console.log(`✅ Raw trips query succeeded! Loaded ${allTripsData?.length || 0} trips from all sources`);
                 
-                console.log(`✅ API query succeeded! Loaded ${tripsData.length} trips from all sources`);
-                
-                // Count trips by source with detailed breakdown
-                const facilityTrips = tripsData.filter(trip => trip.facility_id) || [];
-                const individualTrips = tripsData.filter(trip => !trip.facility_id && trip.user_id) || [];
-                const unknownTrips = tripsData.filter(trip => !trip.facility_id && !trip.user_id) || [];
+                // Separate trips by source
+                const facilityTrips = allTripsData?.filter(trip => trip.facility_id) || [];
+                const individualTrips = allTripsData?.filter(trip => !trip.facility_id && trip.user_id) || [];
+                const unknownTrips = allTripsData?.filter(trip => !trip.facility_id && !trip.user_id) || [];
                 
                 console.log(`📊 Detailed trip sources breakdown:`);
                 console.log(`   - Facility app trips (has facility_id): ${facilityTrips.length}`);
                 console.log(`   - Booking app trips (has user_id, no facility_id): ${individualTrips.length}`);
                 console.log(`   - Unknown source trips (no facility_id or user_id): ${unknownTrips.length}`);
-                console.log(`   - Total trips: ${tripsData.length}`);
+                console.log(`   - Total trips: ${allTripsData?.length || 0}`);
                 
-                // Show sample data from each source
-                if (facilityTrips.length > 0) {
-                    console.log(`🏥 Sample facility trip:`, {
-                        id: facilityTrips[0].id,
-                        facility_id: facilityTrips[0].facility_id,
-                        managed_client_id: facilityTrips[0].managed_client_id,
-                        source: 'Facility App'
-                    });
-                }
+                // Step 2: Enhance with user profiles for individual trips
+                let enhancedTrips = [...allTripsData];
                 
                 if (individualTrips.length > 0) {
-                    console.log(`👤 Sample booking app trip:`, {
-                        id: individualTrips[0].id,
-                        user_id: individualTrips[0].user_id,
-                        created_at: individualTrips[0].created_at,
-                        source: 'Booking App'
-                    });
+                    const userIds = [...new Set(individualTrips.map(trip => trip.user_id).filter(Boolean))];
+                    console.log(`🔍 Fetching ${userIds.length} user profiles for individual trips...`);
+                    
+                    const { data: profilesData, error: profilesError } = await supabase
+                        .from('profiles')
+                        .select('id, first_name, last_name, phone_number, address, email')
+                        .in('id', userIds);
+
+                    if (profilesError) {
+                        console.warn('Could not fetch user profiles:', profilesError);
+                    } else {
+                        console.log(`   ✅ Fetched ${profilesData?.length || 0} user profiles`);
+                        // Enhance individual trips with profile data
+                        enhancedTrips = enhancedTrips.map(trip => {
+                            if (!trip.facility_id && trip.user_id) {
+                                const userProfile = profilesData?.find(profile => profile.id === trip.user_id);
+                                return { ...trip, user_profile: userProfile };
+                            }
+                            return trip;
+                        });
+                    }
                 }
                 
-                // Set the trips data directly (already enhanced by API)
-                setInitialTrips(tripsData);
-                console.log(`✅ Final trips count: ${tripsData.length}`);
+                // Step 3: Enhance with facility data for facility trips
+                if (facilityTrips.length > 0) {
+                    const facilityIds = [...new Set(facilityTrips.map(trip => trip.facility_id).filter(Boolean))];
+                    console.log(`🔍 Fetching ${facilityIds.length} facilities for facility trips...`);
+                    
+                    const { data: facilitiesData, error: facilitiesError } = await supabase
+                        .from('facilities')
+                        .select('id, name, contact_email, phone_number')
+                        .in('id', facilityIds);
+
+                    if (facilitiesError) {
+                        console.warn('Could not fetch facilities:', facilitiesError);
+                    } else {
+                        console.log(`   ✅ Fetched ${facilitiesData?.length || 0} facilities`);
+                        // Enhance facility trips with facility data
+                        enhancedTrips = enhancedTrips.map(trip => {
+                            if (trip.facility_id) {
+                                const facility = facilitiesData?.find(f => f.id === trip.facility_id);
+                                return { ...trip, facility };
+                            }
+                            return trip;
+                        });
+                    }
+                }
+                
+                // Step 4: Enhance with managed client data for facility trips
+                if (facilityTrips.length > 0) {
+                    const managedClientIds = [...new Set(facilityTrips.map(trip => trip.managed_client_id).filter(Boolean))];
+                    if (managedClientIds.length > 0) {
+                        console.log(`🔍 Fetching ${managedClientIds.length} managed clients for facility trips...`);
+                        
+                        const { data: managedClientsData, error: managedClientsError } = await supabase
+                            .from('facility_managed_clients')
+                            .select('id, first_name, last_name, email, phone_number')
+                            .in('id', managedClientIds);
+
+                        if (managedClientsError) {
+                            console.warn('Could not fetch managed clients:', managedClientsError);
+                        } else {
+                            console.log(`   ✅ Fetched ${managedClientsData?.length || 0} managed clients`);
+                            // Enhance facility trips with managed client data
+                            enhancedTrips = enhancedTrips.map(trip => {
+                                if (trip.managed_client_id) {
+                                    const managedClient = managedClientsData?.find(c => c.id === trip.managed_client_id);
+                                    return { ...trip, managed_client: managedClient };
+                                }
+                                return trip;
+                            });
+                        }
+                    }
+                }
+                
+                setInitialTrips(enhancedTrips);
+                console.log(`✅ Final enhanced trips count: ${enhancedTrips.length}`);
                 
                 // DEBUG: Show sample trip data structure
-                if (tripsData.length > 0) {
+                if (enhancedTrips.length > 0) {
                     console.log('🔍 Sample trip data structure:', {
                         sample_trip: {
-                            id: tripsData[0].id,
-                            facility_id: tripsData[0].facility_id,
-                            user_id: tripsData[0].user_id,
-                            managed_client_id: tripsData[0].managed_client_id,
-                            has_user_profile: !!tripsData[0].user_profile,
-                            has_managed_client: !!tripsData[0].managed_client,
-                            has_facility: !!tripsData[0].facility,
-                            pickup_address: tripsData[0].pickup_address?.substring(0, 50) + '...',
-                            source: tripsData[0].facility_id ? 'Facility App' : 'Booking App'
+                            id: enhancedTrips[0].id,
+                            facility_id: enhancedTrips[0].facility_id,
+                            user_id: enhancedTrips[0].user_id,
+                            managed_client_id: enhancedTrips[0].managed_client_id,
+                            has_user_profile: !!enhancedTrips[0].user_profile,
+                            has_managed_client: !!enhancedTrips[0].managed_client,
+                            has_facility: !!enhancedTrips[0].facility,
+                            pickup_address: enhancedTrips[0].pickup_address?.substring(0, 50) + '...',
+                            source: enhancedTrips[0].facility_id ? 'Facility App' : 'Booking App'
                         }
                     });
                 }
