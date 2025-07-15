@@ -85,64 +85,37 @@ export default function WorkingDashboard() {
             const cacheKey = Date.now();
             console.log(`🔄 Cache-busting query with key: ${cacheKey}`);
 
-            // Fetch trips from ALL databases/apps with enhanced client and facility information
-            // This will include trips from BookingCCT, facility_app, and any other sources
-            console.log('🔍 Fetching trips from all sources...');
+            // Fetch trips from ALL sources using API route with admin privileges
+            console.log('🔍 Fetching trips from all sources via API...');
             
-            const { data: tripsData, error: tripsError } = await Promise.race([
-                supabase
-                    .from('trips')
-                    .select(`
-                        *,
-                        user_profile:profiles(first_name, last_name, phone_number, email),
-                        facility:facilities(id, name, contact_email, phone_number)
-                    `)
-                    .order('created_at', { ascending: false })
-                    .limit(200), // Increased limit to show more trips from all sources
-                new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Trips query timeout')), 8000)
-                )
-            ]);
+            const response = await fetch('/api/trips/all', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
 
-            if (tripsError) {
-                console.error('❌ Trips error:', tripsError);
-                console.error('❌ Trips error details:', JSON.stringify(tripsError, null, 2));
-                console.log('⚠️ Falling back to basic trip query...');
-                
-                // Fallback: Try basic query without joins - SHOW NEWEST FIRST
-                const { data: basicTrips, error: basicError } = await Promise.race([
-                    supabase
-                        .from('trips')
-                        .select('*')
-                        .order('created_at', { ascending: false })
-                        .limit(200),
-                    new Promise((_, reject) => 
-                        setTimeout(() => reject(new Error('Basic trips query timeout')), 5000)
-                    )
-                ]);
-                
-                if (basicError) {
-                    console.error('❌ Basic trips error:', basicError);
-                    setInitialTrips([]);
-                } else {
-                    console.log(`✅ Loaded ${basicTrips?.length || 0} trips via fallback query from all sources`);
-                    // Enhance basic trips with client information
-                    const enhancedTrips = await enhanceTripsWithClientInfo(basicTrips);
-                    setInitialTrips(enhancedTrips || []);
-                }
+            if (!response.ok) {
+                const errorData = await response.json();
+                console.error('❌ API error:', errorData);
+                setError('Failed to fetch trips: ' + (errorData.error || 'Unknown error'));
+                setInitialTrips([]);
             } else {
-                console.log(`✅ Main query succeeded! Loaded ${tripsData?.length || 0} trips from all sources`);
+                const data = await response.json();
+                const tripsData = data.trips || [];
+                
+                console.log(`✅ API query succeeded! Loaded ${tripsData.length} trips from all sources`);
                 
                 // Count trips by source with detailed breakdown
-                const facilityTrips = tripsData?.filter(trip => trip.facility_id) || [];
-                const individualTrips = tripsData?.filter(trip => !trip.facility_id && trip.user_id) || [];
-                const unknownTrips = tripsData?.filter(trip => !trip.facility_id && !trip.user_id) || [];
+                const facilityTrips = tripsData.filter(trip => trip.facility_id) || [];
+                const individualTrips = tripsData.filter(trip => !trip.facility_id && trip.user_id) || [];
+                const unknownTrips = tripsData.filter(trip => !trip.facility_id && !trip.user_id) || [];
                 
                 console.log(`📊 Detailed trip sources breakdown:`);
                 console.log(`   - Facility app trips (has facility_id): ${facilityTrips.length}`);
                 console.log(`   - Booking app trips (has user_id, no facility_id): ${individualTrips.length}`);
                 console.log(`   - Unknown source trips (no facility_id or user_id): ${unknownTrips.length}`);
-                console.log(`   - Total trips: ${tripsData?.length || 0}`);
+                console.log(`   - Total trips: ${tripsData.length}`);
                 
                 // Show sample data from each source
                 if (facilityTrips.length > 0) {
@@ -163,51 +136,23 @@ export default function WorkingDashboard() {
                     });
                 }
                 
-                // Check if facility data is included
-                const tripsWithFacilities = tripsData?.filter(trip => trip.facility) || [];
-                console.log(`📊 Trips with facility data: ${tripsWithFacilities.length}/${tripsData?.length || 0}`);
-                
-                if (tripsWithFacilities.length > 0) {
-                    console.log('🏥 Sample facility data:', tripsWithFacilities[0].facility);
-                }
-                
-                // For CareBridge Living specific debugging
-                const carebridgeTrips = tripsData?.filter(trip => 
-                    trip.facility_id && trip.facility_id.startsWith('e1b94bde')
-                ) || [];
-                
-                if (carebridgeTrips.length > 0) {
-                    console.log('🎯 CAREBRIDGE LIVING TRIPS FOUND IN MAIN QUERY:');
-                    carebridgeTrips.forEach((trip, index) => {
-                        console.log(`   Trip ${index + 1}:`);
-                        console.log(`     Facility ID: ${trip.facility_id}`);
-                        console.log(`     Facility data:`, trip.facility);
-                        if (trip.facility?.name === 'CareBridge Living') {
-                            console.log('     ✅ CareBridge Living name is present!');
-                        } else {
-                            console.log('     ❌ CareBridge Living name is missing!');
-                        }
-                    });
-                }
-                
-                // Enhance trips with managed client information manually
-                const enhancedTrips = await enhanceTripsWithClientInfo(tripsData);
-                setInitialTrips(enhancedTrips || []);
-                console.log(`✅ Final enhanced trips count: ${enhancedTrips?.length || 0}`);
+                // Set the trips data directly (already enhanced by API)
+                setInitialTrips(tripsData);
+                console.log(`✅ Final trips count: ${tripsData.length}`);
                 
                 // DEBUG: Show sample trip data structure
-                if (enhancedTrips && enhancedTrips.length > 0) {
+                if (tripsData.length > 0) {
                     console.log('🔍 Sample trip data structure:', {
                         sample_trip: {
-                            id: enhancedTrips[0].id,
-                            facility_id: enhancedTrips[0].facility_id,
-                            user_id: enhancedTrips[0].user_id,
-                            managed_client_id: enhancedTrips[0].managed_client_id,
-                            has_user_profile: !!enhancedTrips[0].user_profile,
-                            has_managed_client: !!enhancedTrips[0].managed_client,
-                            has_facility: !!enhancedTrips[0].facility,
-                            pickup_address: enhancedTrips[0].pickup_address?.substring(0, 50) + '...',
-                            source: enhancedTrips[0].facility_id ? 'Facility App' : 'Booking App'
+                            id: tripsData[0].id,
+                            facility_id: tripsData[0].facility_id,
+                            user_id: tripsData[0].user_id,
+                            managed_client_id: tripsData[0].managed_client_id,
+                            has_user_profile: !!tripsData[0].user_profile,
+                            has_managed_client: !!tripsData[0].managed_client,
+                            has_facility: !!tripsData[0].facility,
+                            pickup_address: tripsData[0].pickup_address?.substring(0, 50) + '...',
+                            source: tripsData[0].facility_id ? 'Facility App' : 'Booking App'
                         }
                     });
                 }
