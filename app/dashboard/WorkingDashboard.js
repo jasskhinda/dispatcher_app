@@ -255,6 +255,13 @@ export default function WorkingDashboard() {
             }
         }
         
+        // Handle cancel action with confirmation
+        if (action === 'cancel') {
+            if (!confirm('Are you sure you want to cancel this trip? This action cannot be undone.')) {
+                return; // User cancelled
+            }
+        }
+        
         try {
             setActionLoading(prev => ({ ...prev, [tripId]: true }));
             setActionMessage('');
@@ -275,6 +282,16 @@ export default function WorkingDashboard() {
                 case 'complete':
                     newStatus = 'completed';
                     message = 'Trip completed successfully!';
+                    updateData.status = newStatus;
+                    break;
+                case 'cancel':
+                    newStatus = 'cancelled';
+                    message = 'Trip cancelled successfully!';
+                    updateData.status = newStatus;
+                    break;
+                case 'reject':
+                    newStatus = 'cancelled';
+                    message = 'Trip rejected successfully!';
                     updateData.status = newStatus;
                     break;
                 default:
