@@ -899,7 +899,7 @@ export default function WorkingDashboard() {
                 </div>
 
                 {/* Dashboard Stats */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
                     <div className="bg-white rounded-lg shadow p-6">
                         <div className="flex items-center">
                             <div className="flex-shrink-0">
@@ -945,6 +945,23 @@ export default function WorkingDashboard() {
                                     {filteredTrips.filter(t => t.status === 'upcoming').length}
                                 </p>
                                 <p className="text-xs text-gray-400">Scheduled</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div className="bg-white rounded-lg shadow p-6">
+                        <div className="flex items-center">
+                            <div className="flex-shrink-0">
+                                <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
+                                    <span className="text-white text-sm font-medium">I</span>
+                                </div>
+                            </div>
+                            <div className="ml-4">
+                                <p className="text-sm font-medium text-gray-500">In Progress</p>
+                                <p className="text-2xl font-semibold text-gray-900">
+                                    {filteredTrips.filter(t => t.status === 'in_progress').length}
+                                </p>
+                                <p className="text-xs text-gray-400">Currently active</p>
                             </div>
                         </div>
                     </div>
@@ -1145,6 +1162,7 @@ export default function WorkingDashboard() {
                                                         trip.status === 'completed' ? 'bg-green-100 text-green-800' :
                                                         trip.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                                                         trip.status === 'upcoming' ? 'bg-blue-100 text-blue-800' :
+                                                        trip.status === 'in_progress' ? 'bg-orange-100 text-orange-800' :
                                                         trip.status === 'cancelled' ? 'bg-red-100 text-red-800' :
                                                         'bg-gray-100 text-gray-800'
                                                     }`}>
@@ -1200,24 +1218,26 @@ export default function WorkingDashboard() {
                                                                 </>
                                                             )}
                                                             
-                                                            {(trip.status === 'upcoming' || trip.status === 'approved') && (
+                                                            {(trip.status === 'upcoming' || trip.status === 'approved' || trip.status === 'in_progress') && (
                                                                 <>
                                                                     <button 
                                                                         onClick={() => handleTripAction(trip.id, 'complete')}
                                                                         disabled={actionLoading[trip.id]}
-                                                                        className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
+                                                                        className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
                                                                         title="Complete Trip"
                                                                     >
                                                                         {actionLoading[trip.id] ? '...' : '✅ COMPLETE'}
                                                                     </button>
-                                                                    <button 
-                                                                        onClick={() => handleTripAction(trip.id, 'cancel')}
-                                                                        disabled={actionLoading[trip.id]}
-                                                                        className="bg-orange-600 hover:bg-orange-700 text-white px-2 py-1 rounded text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
-                                                                        title="Cancel Trip"
-                                                                    >
-                                                                        {actionLoading[trip.id] ? '...' : '🚫 CANCEL'}
-                                                                    </button>
+                                                                    {trip.status !== 'in_progress' && (
+                                                                        <button 
+                                                                            onClick={() => handleTripAction(trip.id, 'cancel')}
+                                                                            disabled={actionLoading[trip.id]}
+                                                                            className="bg-orange-600 hover:bg-orange-700 text-white px-2 py-1 rounded text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
+                                                                            title="Cancel Trip"
+                                                                        >
+                                                                            {actionLoading[trip.id] ? '...' : '🚫 CANCEL'}
+                                                                        </button>
+                                                                    )}
                                                                 </>
                                                             )}
                                                             
