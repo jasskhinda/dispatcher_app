@@ -1,7 +1,7 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/admin-supabase';
+import { adminSupabase } from '@/lib/admin-supabase';
 
 export async function POST(request) {
   try {
@@ -26,7 +26,7 @@ export async function POST(request) {
     console.log(`Setting profile role to ${profileRole} (overriding ${role} if provided)`);
     
     // First check if a profile already exists
-    const { data: existingProfile, error: checkError } = await supabaseAdmin
+    const { data: existingProfile, error: checkError } = await adminSupabase
       .from('profiles')
       .select('id, role')
       .eq('id', id)
@@ -41,7 +41,7 @@ export async function POST(request) {
       
       // If profile exists but doesn't have dispatcher role, update it
       if (existingProfile.role !== profileRole) {
-        const { error: updateError } = await supabaseAdmin
+        const { error: updateError } = await adminSupabase
           .from('profiles')
           .update({
             role: profileRole,
@@ -78,7 +78,7 @@ export async function POST(request) {
     console.log('Creating new profile with role:', profileRole);
     
     // Create profile record using admin client to bypass RLS
-    const { error: profileError } = await supabaseAdmin
+    const { error: profileError } = await adminSupabase
       .from('profiles')
       .insert([
         {

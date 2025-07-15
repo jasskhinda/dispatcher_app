@@ -1,7 +1,7 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/admin-supabase';
+import { adminSupabase } from '@/lib/admin-supabase';
 
 export async function POST(request) {
   try {
@@ -47,7 +47,7 @@ export async function POST(request) {
     
     try {
       // First try to find by email directly
-      const { data, error } = await supabaseAdmin.auth.admin.getUserByEmail(email);
+      const { data, error } = await adminSupabase.auth.admin.getUserByEmail(email);
       
       if (error) {
         console.log('Error finding user by email:', error);
@@ -67,7 +67,7 @@ export async function POST(request) {
     } else {
       // Create new Auth user
       console.log('Creating new auth user');
-      const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
+      const { data: userData, error: createError } = await adminSupabase.auth.admin.createUser({
         email,
         password,
         email_confirm: true,
@@ -95,7 +95,7 @@ export async function POST(request) {
     }
     
     // Step 2: Check for existing profile
-    const { data: existingProfile } = await supabaseAdmin
+    const { data: existingProfile } = await adminSupabase
       .from('profiles')
       .select('id, role')
       .eq('id', newUserId)
@@ -112,7 +112,7 @@ export async function POST(request) {
       }
       
       // Otherwise, maybe update some fields
-      const { error: updateError } = await supabaseAdmin
+      const { error: updateError } = await adminSupabase
         .from('profiles')
         .update({
           email: email, // Ensure email is included in the update
@@ -170,7 +170,7 @@ export async function POST(request) {
     };
     
     // Create the profile
-    const { error: profileError } = await supabaseAdmin
+    const { error: profileError } = await adminSupabase
       .from('profiles')
       .insert([profileData]);
     

@@ -1,12 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 
 export function useRealtimeTripUpdates(initialTrips = []) {
   const [trips, setTrips] = useState(initialTrips);
   const [lastUpdate, setLastUpdate] = useState(null);
-  const supabase = createClient();
 
   useEffect(() => {
     // Set up real-time subscription for trips table
