@@ -7,6 +7,14 @@ export function useRealtimeTripUpdates(initialTrips = []) {
   const [trips, setTrips] = useState(initialTrips);
   const [lastUpdate, setLastUpdate] = useState(null);
 
+  // Update trips when initialTrips changes (important for data loading)
+  useEffect(() => {
+    if (initialTrips && initialTrips.length > 0) {
+      console.log(`🔄 useRealtimeTripUpdates: Updating with ${initialTrips.length} initial trips`);
+      setTrips(initialTrips);
+    }
+  }, [initialTrips]);
+
   useEffect(() => {
     // Set up real-time subscription for trips table
     const channel = supabase
