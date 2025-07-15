@@ -3,11 +3,12 @@
 import { useEffect, useState } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
+import { useRealtimeTripUpdates } from '@/hooks/useRealtimeTripUpdates';
 
 export default function WorkingDashboard() {
     const [loading, setLoading] = useState(true);
     const [user, setUser] = useState(null);
-    const [trips, setTrips] = useState([]);
+    const [initialTrips, setInitialTrips] = useState([]);
     const [filteredTrips, setFilteredTrips] = useState([]);
     const [error, setError] = useState(null);
     const [actionLoading, setActionLoading] = useState({});
@@ -21,6 +22,9 @@ export default function WorkingDashboard() {
     
     const router = useRouter();
     const supabase = createClientComponentClient();
+    
+    // Use real-time updates for trips
+    const { trips, lastUpdate, updateTripOptimistically } = useRealtimeTripUpdates(initialTrips);
 
     useEffect(() => {
         getSession();
@@ -119,12 +123,12 @@ export default function WorkingDashboard() {
                 
                 if (basicError) {
                     console.error('❌ Basic trips error:', basicError);
-                    setTrips([]);
+                    setInitialTrips([]);
                 } else {
                     console.log(`✅ Loaded ${basicTrips?.length || 0} trips via fallback query from all sources`);
                     // Enhance basic trips with client information
                     const enhancedTrips = await enhanceTripsWithClientInfo(basicTrips);
-                    setTrips(enhancedTrips || []);
+                    setInitialTrips(enhancedTrips || []);
                 }
             } else {
                 console.log(`✅ Main query succeeded! Loaded ${tripsData?.length || 0} trips from all sources`);
@@ -188,7 +192,7 @@ export default function WorkingDashboard() {
                 
                 // Enhance trips with managed client information manually
                 const enhancedTrips = await enhanceTripsWithClientInfo(tripsData);
-                setTrips(enhancedTrips || []);
+                setInitialTrips(enhancedTrips || []);
                 console.log(`✅ Final enhanced trips count: ${enhancedTrips?.length || 0}`);
                 
                 // DEBUG: Show sample trip data structure
@@ -287,12 +291,8 @@ export default function WorkingDashboard() {
                 throw updateError;
             }
 
-            // Update local state
-            setTrips(prev => prev.map(trip => 
-                trip.id === tripId 
-                    ? { ...trip, status: newStatus, updated_at: new Date().toISOString() }
-                    : trip
-            ));
+            // Update local state - real-time updates will handle this automatically
+            // No need to manually update state since real-time subscription will do it
 
             setActionMessage(message);
             
@@ -332,12 +332,8 @@ export default function WorkingDashboard() {
                 throw updateError;
             }
 
-            // Update local state
-            setTrips(prev => prev.map(trip => 
-                trip.id === rejectingTripId 
-                    ? { ...trip, status: 'cancelled', cancellation_reason: updateData.cancellation_reason, updated_at: new Date().toISOString() }
-                    : trip
-            ));
+            // Update local state - real-time updates will handle this automatically
+            // No need to manually update state since real-time subscription will do it
 
             setActionMessage('Trip rejected successfully!');
             
@@ -778,7 +774,8 @@ export default function WorkingDashboard() {
             
             if (facilityData) {
                 // Update trips with refreshed facility data
-                setTrips(prevTrips => {
+                // Update initial trips with refreshed facility data
+                setInitialTrips(prevTrips => {
                     return prevTrips.map(trip => {
                         if (trip.facility_id) {
                             const updatedFacility = facilityData.find(f => f.id === trip.facility_id);
