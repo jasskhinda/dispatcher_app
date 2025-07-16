@@ -35,7 +35,7 @@ export function CalendarView({ user, userProfile, trips: initialTrips, drivers =
     }
     acc[dateStr].push(trip);
     return acc;
-  }, {});
+  }, {}); 
 
   // Generate calendar days for the current month
   const generateCalendarDays = () => {
