@@ -269,59 +269,38 @@ export default function WorkingDashboard() {
             setActionLoading(prev => ({ ...prev, [tripId]: true }));
             setActionMessage('');
 
-            let newStatus;
-            let message;
-            let updateData = {
-                status: null,
-                updated_at: new Date().toISOString()
-            };
-
-            switch (action) {
-                case 'approve':
-                    newStatus = 'upcoming';
-                    message = 'Trip approved successfully!';
-                    updateData.status = newStatus;
-                    break;
-                case 'complete':
-                    newStatus = 'completed';
-                    message = 'Trip completed successfully!';
-                    updateData.status = newStatus;
-                    break;
-                case 'cancel':
-                    newStatus = 'cancelled';
-                    message = 'Trip cancelled successfully!';
-                    updateData.status = newStatus;
-                    break;
-                case 'reject':
-                    newStatus = 'cancelled';
-                    message = 'Trip rejected successfully!';
-                    updateData.status = newStatus;
-                    break;
-                default:
-                    throw new Error('Invalid action');
-            }
-
-            // Update trip status in database
-            console.log('📤 Updating trip in database:', { tripId, updateData });
-            const { error: updateError } = await supabase
-                .from('trips')
-                .update(updateData)
-                .eq('id', tripId);
-
-            if (updateError) {
-                console.error('❌ Database update error:', updateError);
-                throw updateError;
-            }
+            console.log('📤 Calling trip actions API:', { tripId, action });
             
-            console.log('✅ Trip updated successfully');
+            // Use the proper API route instead of direct database updates
+            const response = await fetch('/api/trips/actions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    tripId: tripId,
+                    action: action,
+                    reason: action === 'reject' ? 'Rejected by dispatcher' : undefined
+                }),
+            });
 
-            // Update local state - real-time updates will handle this automatically
-            // No need to manually update state since real-time subscription will do it
+            const result = await response.json();
 
-            setActionMessage(message);
+            if (!response.ok) {
+                console.error('❌ API call failed:', result);
+                throw new Error(result.error || `Failed to ${action} trip`);
+            }
+
+            console.log(`✅ Trip ${action} result:`, result);
+
+            // Show success message
+            setActionMessage(result.message || `Trip ${action}d successfully!`);
             
             // Clear message after 3 seconds
             setTimeout(() => setActionMessage(''), 3000);
+
+            // Refresh trips data to show updated state
+            await refreshTrips();
 
         } catch (err) {
             console.error(`Error ${action}ing trip:`, err);
@@ -340,26 +319,32 @@ export default function WorkingDashboard() {
             setActionLoading(prev => ({ ...prev, [rejectingTripId]: true }));
             setActionMessage('');
 
-            const updateData = {
-                status: 'cancelled',
-                cancellation_reason: rejectionNotes.trim() || 'Rejected by dispatcher',
-                updated_at: new Date().toISOString()
-            };
+            console.log('📤 Calling trip actions API for rejection:', { tripId: rejectingTripId, reason: rejectionNotes });
+            
+            // Use the proper API route instead of direct database updates
+            const response = await fetch('/api/trips/actions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    tripId: rejectingTripId,
+                    action: 'reject',
+                    reason: rejectionNotes.trim() || 'Rejected by dispatcher'
+                }),
+            });
 
-            // Update trip status in database
-            const { error: updateError } = await supabase
-                .from('trips')
-                .update(updateData)
-                .eq('id', rejectingTripId);
+            const result = await response.json();
 
-            if (updateError) {
-                throw updateError;
+            if (!response.ok) {
+                console.error('❌ API call failed:', result);
+                throw new Error(result.error || 'Failed to reject trip');
             }
 
-            // Update local state - real-time updates will handle this automatically
-            // No need to manually update state since real-time subscription will do it
+            console.log('✅ Trip rejection result:', result);
 
-            setActionMessage('Trip rejected successfully!');
+            // Show success message
+            setActionMessage(result.message || 'Trip rejected successfully!');
             
             // Clear message after 3 seconds
             setTimeout(() => setActionMessage(''), 3000);
@@ -368,6 +353,9 @@ export default function WorkingDashboard() {
             setShowRejectModal(false);
             setRejectingTripId(null);
             setRejectionNotes('');
+
+            // Refresh trips data to show updated state
+            await refreshTrips();
 
         } catch (err) {
             console.error('Error rejecting trip:', err);
