@@ -127,6 +127,27 @@ export async function POST(request) {
       }, { status: 404 });
     }
 
+    // Check driver availability status
+    if (driver.status === 'on_trip') {
+      console.error(`❌ Driver unavailable [${requestId}]: ${driver.first_name} ${driver.last_name} is currently on another trip`);
+      return NextResponse.json({
+        error: 'Driver is currently on another trip',
+        details: `${driver.first_name} ${driver.last_name} is currently assigned to another trip and cannot be assigned to new trips until they complete their current trip.`,
+        driverStatus: driver.status,
+        requestId
+      }, { status: 400 });
+    }
+
+    if (driver.status === 'offline') {
+      console.error(`❌ Driver offline [${requestId}]: ${driver.first_name} ${driver.last_name} is offline`);
+      return NextResponse.json({
+        error: 'Driver is offline',
+        details: `${driver.first_name} ${driver.last_name} is currently offline and unavailable for trip assignments.`,
+        driverStatus: driver.status,
+        requestId
+      }, { status: 400 });
+    }
+
     // Check for conflicting trips (optional - basic time conflict check)
     if (trip.pickup_time) {
       const { data: conflictingTrips, error: conflictError } = await supabase

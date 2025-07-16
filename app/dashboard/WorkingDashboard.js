@@ -411,6 +411,26 @@ export default function WorkingDashboard() {
     async function confirmDriverAssignment() {
         if (!assigningTripId || !selectedDriverId) return;
         
+        // Check if selected driver is available
+        const selectedDriver = availableDrivers.find(d => d.id === selectedDriverId);
+        if (!selectedDriver) {
+            setActionMessage('Error: Selected driver not found');
+            setTimeout(() => setActionMessage(''), 5000);
+            return;
+        }
+
+        if (selectedDriver.status === 'on_trip') {
+            setActionMessage('Error: This driver is currently on another trip. Please wait for them to complete their current trip.');
+            setTimeout(() => setActionMessage(''), 5000);
+            return;
+        }
+
+        if (selectedDriver.status === 'offline') {
+            setActionMessage('Error: This driver is offline. Please select an available driver.');
+            setTimeout(() => setActionMessage(''), 5000);
+            return;
+        }
+        
         try {
             setAssignmentLoading(true);
             setActionMessage('');
@@ -1516,19 +1536,50 @@ export default function WorkingDashboard() {
                                 required
                             >
                                 <option value="">Select a driver...</option>
-                                {availableDrivers.map((driver) => (
-                                    <option key={driver.id} value={driver.id}>
-                                        {driver.first_name} {driver.last_name} 
-                                        {driver.vehicle_model && ` - ${driver.vehicle_model}`}
-                                        {driver.status === 'on_trip' && ' (On Trip)'}
-                                        {driver.status === 'offline' && ' (Offline)'}
-                                    </option>
-                                ))}
+                                {availableDrivers.map((driver) => {
+                                    const isAvailable = driver.status !== 'on_trip' && driver.status !== 'offline';
+                                    return (
+                                        <option 
+                                            key={driver.id} 
+                                            value={driver.id}
+                                            disabled={!isAvailable}
+                                            className={!isAvailable ? 'text-gray-400' : ''}
+                                        >
+                                            {driver.first_name} {driver.last_name} 
+                                            {driver.vehicle_model && ` - ${driver.vehicle_model}`}
+                                            {driver.status === 'on_trip' && ' 🚗 (Currently on Trip - Unavailable)'}
+                                            {driver.status === 'offline' && ' 🔴 (Offline - Unavailable)'}
+                                            {driver.status === 'available' && ' ✅ (Available)'}
+                                            {!driver.status && ' ✅ (Available)'}
+                                        </option>
+                                    );
+                                })}
                             </select>
-                            {availableDrivers.length === 0 && (
+                            {availableDrivers.length === 0 ? (
                                 <p className="text-xs text-gray-500 mt-1">
                                     No drivers available. Please create driver accounts first.
                                 </p>
+                            ) : (
+                                <div className="mt-2 text-xs text-gray-600">
+                                    {(() => {
+                                        const availableCount = availableDrivers.filter(d => d.status !== 'on_trip' && d.status !== 'offline').length;
+                                        const onTripCount = availableDrivers.filter(d => d.status === 'on_trip').length;
+                                        const offlineCount = availableDrivers.filter(d => d.status === 'offline').length;
+                                        
+                                        return (
+                                            <div className="space-y-1">
+                                                <p>✅ Available drivers: {availableCount}</p>
+                                                {onTripCount > 0 && <p>🚗 On trip: {onTripCount}</p>}
+                                                {offlineCount > 0 && <p>🔴 Offline: {offlineCount}</p>}
+                                                {onTripCount > 0 && (
+                                                    <p className="text-amber-600 font-medium">
+                                                        ⚠️ Drivers on trip must complete their current trip before being assigned to new ones.
+                                                    </p>
+                                                )}
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
                             )}
                         </div>
                         
@@ -1542,7 +1593,10 @@ export default function WorkingDashboard() {
                             </button>
                             <button
                                 onClick={confirmDriverAssignment}
-                                disabled={!selectedDriverId || assignmentLoading}
+                                disabled={!selectedDriverId || assignmentLoading || (() => {
+                                    const selectedDriver = availableDrivers.find(d => d.id === selectedDriverId);
+                                    return selectedDriver && (selectedDriver.status === 'on_trip' || selectedDriver.status === 'offline');
+                                })()}
                                 className="px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
                             >
                                 {assignmentLoading ? 'Assigning...' : 'Assign Driver'}
