@@ -20,6 +20,13 @@ export default function WorkingDashboard() {
     const [rejectingTripId, setRejectingTripId] = useState(null);
     const [rejectionNotes, setRejectionNotes] = useState('');
     
+    // Driver assignment states
+    const [availableDrivers, setAvailableDrivers] = useState([]);
+    const [showDriverAssignModal, setShowDriverAssignModal] = useState(false);
+    const [assigningTripId, setAssigningTripId] = useState(null);
+    const [selectedDriverId, setSelectedDriverId] = useState('');
+    const [assignmentLoading, setAssignmentLoading] = useState(false);
+    
     const router = useRouter();
     const supabase = createClientComponentClient();
     
@@ -48,6 +55,29 @@ export default function WorkingDashboard() {
             setFilteredTrips(trips.filter(trip => trip.facility_id));
         } else if (tripFilter === 'individual') {
             setFilteredTrips(trips.filter(trip => !trip.facility_id));
+        }
+    }
+
+    // Fetch available drivers
+    async function fetchAvailableDrivers() {
+        try {
+            console.log('🔍 Fetching available drivers...');
+            const { data: drivers, error: driversError } = await supabase
+                .from('profiles')
+                .select('id, first_name, last_name, phone_number, email, vehicle_model, vehicle_license, status')
+                .eq('role', 'driver')
+                .order('first_name');
+
+            if (driversError) {
+                console.error('❌ Error fetching drivers:', driversError);
+                throw driversError;
+            }
+
+            console.log(`✅ Found ${drivers?.length || 0} drivers`);
+            setAvailableDrivers(drivers || []);
+        } catch (error) {
+            console.error('Error fetching drivers:', error);
+            setActionMessage('Error fetching drivers: ' + error.message);
         }
     }
 
@@ -364,6 +394,77 @@ export default function WorkingDashboard() {
         } finally {
             setActionLoading(prev => ({ ...prev, [rejectingTripId]: false }));
         }
+    }
+
+    // Driver assignment functions
+    async function handleAssignDriver(tripId) {
+        console.log('🎯 Opening driver assignment modal for trip:', tripId);
+        
+        // Fetch drivers when modal opens
+        await fetchAvailableDrivers();
+        
+        setAssigningTripId(tripId);
+        setSelectedDriverId('');
+        setShowDriverAssignModal(true);
+    }
+
+    async function confirmDriverAssignment() {
+        if (!assigningTripId || !selectedDriverId) return;
+        
+        try {
+            setAssignmentLoading(true);
+            setActionMessage('');
+
+            console.log('📤 Assigning driver to trip:', { tripId: assigningTripId, driverId: selectedDriverId });
+            
+            // Call driver assignment API
+            const response = await fetch('/api/trips/assign-driver', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    tripId: assigningTripId,
+                    driverId: selectedDriverId
+                }),
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                console.error('❌ Driver assignment failed:', result);
+                throw new Error(result.error || 'Failed to assign driver');
+            }
+
+            console.log('✅ Driver assignment result:', result);
+
+            // Show success message
+            setActionMessage(result.message || 'Driver assigned successfully!');
+            
+            // Close modal
+            setShowDriverAssignModal(false);
+            setAssigningTripId(null);
+            setSelectedDriverId('');
+            
+            // Clear message after 3 seconds
+            setTimeout(() => setActionMessage(''), 3000);
+
+            // Refresh trips data to show updated state
+            await refreshTrips();
+
+        } catch (err) {
+            console.error('Error assigning driver:', err);
+            setActionMessage(`Error: ${err.message}`);
+            setTimeout(() => setActionMessage(''), 5000);
+        } finally {
+            setAssignmentLoading(false);
+        }
+    }
+
+    function cancelDriverAssignment() {
+        setShowDriverAssignModal(false);
+        setAssigningTripId(null);
+        setSelectedDriverId('');
     }
 
     async function handleCreateInvoice(trip) {
@@ -1229,6 +1330,25 @@ export default function WorkingDashboard() {
                                                             
                                                             {(trip.status === 'upcoming' || trip.status === 'approved' || trip.status === 'in_progress') && (
                                                                 <>
+                                                                    {/* Driver Assignment Button - Only for upcoming trips without driver */}
+                                                                    {trip.status === 'upcoming' && !trip.driver_id && (
+                                                                        <button 
+                                                                            onClick={() => handleAssignDriver(trip.id)}
+                                                                            disabled={actionLoading[trip.id]}
+                                                                            className="bg-purple-600 hover:bg-purple-700 text-white px-2 py-1 rounded text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
+                                                                            title="Assign Driver to Trip"
+                                                                        >
+                                                                            🚗 ASSIGN DRIVER
+                                                                        </button>
+                                                                    )}
+                                                                    
+                                                                    {/* Show driver info if assigned */}
+                                                                    {trip.driver_id && (
+                                                                        <div className="text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded">
+                                                                            🚗 Driver assigned
+                                                                        </div>
+                                                                    )}
+                                                                    
                                                                     <button 
                                                                         onClick={() => handleTripAction(trip.id, 'complete')}
                                                                         disabled={actionLoading[trip.id]}
@@ -1367,6 +1487,65 @@ export default function WorkingDashboard() {
                                 className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
                             >
                                 {actionLoading[rejectingTripId] ? 'Rejecting...' : 'Confirm Rejection'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Driver Assignment Modal */}
+            {showDriverAssignModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                            🚗 Assign Driver to Trip
+                        </h3>
+                        <p className="text-gray-600 mb-4">
+                            Select a driver to assign to this trip. The driver will be notified of the assignment.
+                        </p>
+                        
+                        <div className="mb-6">
+                            <label htmlFor="driverSelect" className="block text-sm font-medium text-gray-700 mb-2">
+                                Available Drivers *
+                            </label>
+                            <select
+                                id="driverSelect"
+                                value={selectedDriverId}
+                                onChange={(e) => setSelectedDriverId(e.target.value)}
+                                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                required
+                            >
+                                <option value="">Select a driver...</option>
+                                {availableDrivers.map((driver) => (
+                                    <option key={driver.id} value={driver.id}>
+                                        {driver.first_name} {driver.last_name} 
+                                        {driver.vehicle_model && ` - ${driver.vehicle_model}`}
+                                        {driver.status === 'on_trip' && ' (On Trip)'}
+                                        {driver.status === 'offline' && ' (Offline)'}
+                                    </option>
+                                ))}
+                            </select>
+                            {availableDrivers.length === 0 && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                    No drivers available. Please create driver accounts first.
+                                </p>
+                            )}
+                        </div>
+                        
+                        <div className="flex justify-end space-x-3">
+                            <button
+                                onClick={cancelDriverAssignment}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors duration-200"
+                                disabled={assignmentLoading}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmDriverAssignment}
+                                disabled={!selectedDriverId || assignmentLoading}
+                                className="px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                            >
+                                {assignmentLoading ? 'Assigning...' : 'Assign Driver'}
                             </button>
                         </div>
                     </div>
