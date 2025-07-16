@@ -292,8 +292,8 @@ async function handleComplete(supabase, trip, requestId) {
   console.log(`🔄 Completing trip [${requestId}]: ${trip.id}`);
   console.log(`   Current status: ${trip.status}`);
   
-  // Allow completion from multiple statuses
-  const allowedStatuses = ['upcoming', 'paid_in_progress', 'approved_pending_payment', 'in_process'];
+  // Allow completion from multiple statuses including in_progress
+  const allowedStatuses = ['upcoming', 'in_progress', 'paid_in_progress', 'approved_pending_payment', 'in_process'];
   if (!allowedStatuses.includes(trip.status)) {
     console.error(`❌ Invalid status for completion [${requestId}]: ${trip.status}`);
     return NextResponse.json({
@@ -324,6 +324,28 @@ async function handleComplete(supabase, trip, requestId) {
     if (!updatedTrip) {
       console.error(`❌ No trip returned after completion [${requestId}]`);
       throw new Error('Trip update succeeded but no data returned');
+    }
+
+    // Update driver status back to available if there was a driver assigned
+    if (trip.driver_id) {
+      try {
+        const { error: driverUpdateError } = await supabase
+          .from('profiles')
+          .update({ 
+            status: 'available',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', trip.driver_id);
+
+        if (driverUpdateError) {
+          console.warn(`⚠️ Driver status update failed [${requestId}]:`, driverUpdateError);
+          // Don't fail the trip completion if driver update fails
+        } else {
+          console.log(`✅ Driver status updated to available [${requestId}]: ${trip.driver_id}`);
+        }
+      } catch (driverUpdateErr) {
+        console.warn(`⚠️ Driver status update error [${requestId}]:`, driverUpdateErr);
+      }
     }
 
     console.log(`✅ Trip completed [${requestId}]: ${updatedTrip.id}`);

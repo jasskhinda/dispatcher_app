@@ -114,6 +114,7 @@ export default function DriverDetailPage({ params }) {
       );
 
       setCurrentTrips(enrichedTrips);
+      console.log('Current trips loaded:', enrichedTrips.map(t => ({ id: t.id.slice(0, 8), status: t.status })));
     } catch (err) {
       console.error('Error loading current trips:', err);
     }
@@ -305,6 +306,8 @@ export default function DriverDetailPage({ params }) {
     setActionMessage('');
     
     try {
+      console.log('Attempting to complete trip:', tripId);
+      
       const response = await fetch('/api/trips/actions', {
         method: 'POST',
         headers: {
@@ -317,6 +320,7 @@ export default function DriverDetailPage({ params }) {
       });
 
       const result = await response.json();
+      console.log('Complete trip response:', result);
 
       if (!response.ok) {
         throw new Error(result.error || 'Failed to complete trip');
@@ -332,6 +336,7 @@ export default function DriverDetailPage({ params }) {
       setTimeout(() => setActionMessage(''), 3000);
 
     } catch (err) {
+      console.error('Error completing trip:', err);
       setActionMessage(`Error: ${err.message}`);
       setTimeout(() => setActionMessage(''), 5000);
     } finally {
@@ -681,7 +686,7 @@ export default function DriverDetailPage({ params }) {
                                 {formatDate(trip.pickup_time)}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                {trip.status === 'in_progress' && (
+                                {(trip.status === 'in_progress' || trip.status === 'upcoming') && (
                                   <button
                                     onClick={() => handleCompleteTrip(trip.id)}
                                     disabled={assignmentLoading}
