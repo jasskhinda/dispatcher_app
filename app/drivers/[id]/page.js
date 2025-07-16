@@ -56,7 +56,7 @@ export default function DriverDetailPage({ params }) {
   const loadCurrentTrips = async () => {
     try {
       // Get current trips assigned to this driver (in progress, upcoming with driver assigned)
-      const { data, error } = await supabase
+      const { data: tripsData, error } = await supabase
         .from('trips')
         .select('*')
         .eq('driver_id', driverId)
@@ -67,7 +67,53 @@ export default function DriverDetailPage({ params }) {
         throw error;
       }
 
-      setCurrentTrips(data || []);
+      // Enrich with client and facility information
+      const enrichedTrips = await Promise.all(
+        (tripsData || []).map(async (trip) => {
+          let clientInfo = null;
+          let facilityInfo = null;
+
+          if (trip.user_id) {
+            try {
+              const { data: clientData } = await supabase
+                .from('profiles')
+                .select('first_name, last_name, phone_number, email')
+                .eq('id', trip.user_id)
+                .single();
+              
+              if (clientData) {
+                clientInfo = clientData;
+              }
+            } catch (err) {
+              console.error('Error loading client info:', err);
+            }
+          }
+
+          if (trip.facility_id) {
+            try {
+              const { data: facilityData } = await supabase
+                .from('facilities')
+                .select('name, contact_email, contact_phone')
+                .eq('id', trip.facility_id)
+                .single();
+              
+              if (facilityData) {
+                facilityInfo = facilityData;
+              }
+            } catch (err) {
+              console.error('Error loading facility info:', err);
+            }
+          }
+
+          return {
+            ...trip,
+            clientInfo,
+            facilityInfo
+          };
+        })
+      );
+
+      setCurrentTrips(enrichedTrips);
     } catch (err) {
       console.error('Error loading current trips:', err);
     }
@@ -76,7 +122,7 @@ export default function DriverDetailPage({ params }) {
   const loadPastTrips = async () => {
     try {
       // Get past trips by this driver (completed, cancelled)
-      const { data, error } = await supabase
+      const { data: tripsData, error } = await supabase
         .from('trips')
         .select('*')
         .eq('driver_id', driverId)
@@ -88,7 +134,53 @@ export default function DriverDetailPage({ params }) {
         throw error;
       }
 
-      setPastTrips(data || []);
+      // Enrich with client and facility information
+      const enrichedTrips = await Promise.all(
+        (tripsData || []).map(async (trip) => {
+          let clientInfo = null;
+          let facilityInfo = null;
+
+          if (trip.user_id) {
+            try {
+              const { data: clientData } = await supabase
+                .from('profiles')
+                .select('first_name, last_name, phone_number, email')
+                .eq('id', trip.user_id)
+                .single();
+              
+              if (clientData) {
+                clientInfo = clientData;
+              }
+            } catch (err) {
+              console.error('Error loading client info:', err);
+            }
+          }
+
+          if (trip.facility_id) {
+            try {
+              const { data: facilityData } = await supabase
+                .from('facilities')
+                .select('name, contact_email, contact_phone')
+                .eq('id', trip.facility_id)
+                .single();
+              
+              if (facilityData) {
+                facilityInfo = facilityData;
+              }
+            } catch (err) {
+              console.error('Error loading facility info:', err);
+            }
+          }
+
+          return {
+            ...trip,
+            clientInfo,
+            facilityInfo
+          };
+        })
+      );
+
+      setPastTrips(enrichedTrips);
     } catch (err) {
       console.error('Error loading past trips:', err);
     }
@@ -98,7 +190,7 @@ export default function DriverDetailPage({ params }) {
     setTripsLoading(true);
     try {
       // Get upcoming trips that don't have a driver assigned
-      const { data, error } = await supabase
+      const { data: tripsData, error } = await supabase
         .from('trips')
         .select('*')
         .eq('status', 'upcoming')
@@ -109,7 +201,55 @@ export default function DriverDetailPage({ params }) {
         throw error;
       }
 
-      setAvailableTrips(data || []);
+      // Enrich trips with client and facility information
+      const enrichedTrips = await Promise.all(
+        (tripsData || []).map(async (trip) => {
+          let clientInfo = null;
+          let facilityInfo = null;
+
+          // Get client information if user_id exists
+          if (trip.user_id) {
+            try {
+              const { data: clientData } = await supabase
+                .from('profiles')
+                .select('first_name, last_name, phone_number, email')
+                .eq('id', trip.user_id)
+                .single();
+              
+              if (clientData) {
+                clientInfo = clientData;
+              }
+            } catch (err) {
+              console.error('Error loading client info:', err);
+            }
+          }
+
+          // Get facility information if facility_id exists
+          if (trip.facility_id) {
+            try {
+              const { data: facilityData } = await supabase
+                .from('facilities')
+                .select('name, contact_email, contact_phone')
+                .eq('id', trip.facility_id)
+                .single();
+              
+              if (facilityData) {
+                facilityInfo = facilityData;
+              }
+            } catch (err) {
+              console.error('Error loading facility info:', err);
+            }
+          }
+
+          return {
+            ...trip,
+            clientInfo,
+            facilityInfo
+          };
+        })
+      );
+
+      setAvailableTrips(enrichedTrips);
     } catch (err) {
       setError(`Error loading available trips: ${err.message}`);
     } finally {
@@ -261,13 +401,39 @@ export default function DriverDetailPage({ params }) {
   };
 
   const getClientDisplayName = (trip) => {
-    if (trip.facility_id) {
-      return 'Facility Trip';
+    if (trip.facility_id && trip.facilityInfo) {
+      return trip.facilityInfo.name || 'Facility Trip';
     }
-    if (trip.user_id) {
-      return 'Individual Trip';
+    if (trip.user_id && trip.clientInfo) {
+      const { first_name, last_name } = trip.clientInfo;
+      return `${first_name || ''} ${last_name || ''}`.trim() || 'Individual Client';
     }
-    return 'Unknown Client';
+    return trip.facility_id ? 'Facility Trip' : 'Individual Trip';
+  };
+
+  const getClientDetails = (trip) => {
+    if (trip.facility_id && trip.facilityInfo) {
+      return {
+        type: 'facility',
+        facilityName: trip.facilityInfo.name || 'Unknown Facility',
+        contactEmail: trip.facilityInfo.contact_email || 'N/A',
+        contactPhone: trip.facilityInfo.contact_phone || 'N/A'
+      };
+    }
+    if (trip.user_id && trip.clientInfo) {
+      return {
+        type: 'individual',
+        clientName: `${trip.clientInfo.first_name || ''} ${trip.clientInfo.last_name || ''}`.trim() || 'Unknown Client',
+        email: trip.clientInfo.email || 'N/A',
+        phone: trip.clientInfo.phone_number || 'N/A'
+      };
+    }
+    return {
+      type: 'unknown',
+      clientName: 'Unknown Client',
+      email: 'N/A',
+      phone: 'N/A'
+    };
   };
 
   const getStatusBadge = (status) => {
@@ -645,7 +811,10 @@ export default function DriverDetailPage({ params }) {
                       <thead className="bg-gray-50">
                         <tr>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Client
+                            Trip ID
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Client Details
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Trip Route
@@ -659,53 +828,91 @@ export default function DriverDetailPage({ params }) {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {availableTrips.map((trip) => (
-                          <tr key={trip.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="flex items-center">
-                                <div className="flex-shrink-0 h-10 w-10">
-                                  <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
-                                    {trip.facility_id ? (
-                                      <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                                      </svg>
+                        {availableTrips.map((trip) => {
+                          const clientDetails = getClientDetails(trip);
+                          return (
+                            <tr key={trip.id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-mono text-gray-900">
+                                  #{trip.id.slice(0, 8)}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {trip.id.slice(8, 16)}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex items-start">
+                                  <div className="flex-shrink-0 h-10 w-10 mr-3">
+                                    <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
+                                      {trip.facility_id ? (
+                                        <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                        </svg>
+                                      ) : (
+                                        <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                        </svg>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    {clientDetails.type === 'facility' ? (
+                                      <>
+                                        <div className="text-sm font-medium text-gray-900">
+                                          {clientDetails.facilityName}
+                                        </div>
+                                        <div className="text-sm text-gray-500">
+                                          Facility Trip
+                                        </div>
+                                        <div className="text-xs text-gray-400 mt-1">
+                                          <div>📧 {clientDetails.contactEmail}</div>
+                                          <div>📞 {clientDetails.contactPhone}</div>
+                                        </div>
+                                      </>
                                     ) : (
-                                      <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                      </svg>
+                                      <>
+                                        <div className="text-sm font-medium text-gray-900">
+                                          {clientDetails.clientName}
+                                        </div>
+                                        <div className="text-sm text-gray-500">
+                                          Individual Trip
+                                        </div>
+                                        <div className="text-xs text-gray-400 mt-1">
+                                          <div>📧 {clientDetails.email}</div>
+                                          <div>📞 {clientDetails.phone}</div>
+                                        </div>
+                                      </>
                                     )}
                                   </div>
                                 </div>
-                                <div className="ml-4">
-                                  <div className="text-sm font-medium text-gray-900">
-                                    {getClientDisplayName(trip)}
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="text-sm text-gray-900">
+                                  <div className="font-medium mb-1">
+                                    📍 <span className="text-green-600">From:</span> {trip.pickup_address || 'Not specified'}
                                   </div>
-                                  <div className="text-sm text-gray-500">
-                                    {trip.facility ? 'Facility Trip' : 'Individual Trip'}
+                                  <div className="text-gray-600">
+                                    🎯 <span className="text-red-600">To:</span> {trip.destination_address || 'Not specified'}
                                   </div>
                                 </div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="text-sm text-gray-900">
-                                <div className="font-medium">From: {trip.pickup_address || 'Not specified'}</div>
-                                <div className="text-gray-500">To: {trip.destination_address || 'Not specified'}</div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {formatDate(trip.pickup_time)}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                              <button
-                                onClick={() => handleAssignTrip(trip.id)}
-                                disabled={assignmentLoading}
-                                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-                              >
-                                {assignmentLoading ? 'Assigning...' : 'Assign Trip'}
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                <div className="font-medium">
+                                  {formatDate(trip.pickup_time)}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <button
+                                  onClick={() => handleAssignTrip(trip.id)}
+                                  disabled={assignmentLoading}
+                                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                                >
+                                  {assignmentLoading ? 'Assigning...' : 'Assign Trip'}
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
