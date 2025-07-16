@@ -234,9 +234,12 @@ export default function WorkingDashboard() {
     }
 
     async function handleTripAction(tripId, action) {
+        console.log('🎯 handleTripAction called:', { tripId, action });
+        
         // Handle approve action with confirmation
         if (action === 'approve') {
             if (!confirm('Are you sure you want to approve this trip? This will make it available for driver assignment.')) {
+                console.log('❌ User cancelled approve action');
                 return; // User cancelled
             }
         }
@@ -299,14 +302,18 @@ export default function WorkingDashboard() {
             }
 
             // Update trip status in database
+            console.log('📤 Updating trip in database:', { tripId, updateData });
             const { error: updateError } = await supabase
                 .from('trips')
                 .update(updateData)
                 .eq('id', tripId);
 
             if (updateError) {
+                console.error('❌ Database update error:', updateError);
                 throw updateError;
             }
+            
+            console.log('✅ Trip updated successfully');
 
             // Update local state - real-time updates will handle this automatically
             // No need to manually update state since real-time subscription will do it
