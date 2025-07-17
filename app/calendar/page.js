@@ -71,9 +71,11 @@ export default async function CalendarPage() {
             console.error('Error fetching drivers:', driversError);
         }
         
-        // Get all user IDs and facility IDs from trips to fetch their information
+        // Get all user IDs, facility IDs, managed client IDs, and driver IDs from trips to fetch their information
         const userIds = (trips || []).map(trip => trip.user_id).filter(Boolean);
         const facilityIds = (trips || []).map(trip => trip.facility_id).filter(Boolean);
+        const managedClientIds = (trips || []).map(trip => trip.managed_client_id).filter(Boolean);
+        const driverIds = (trips || []).map(trip => trip.driver_id).filter(Boolean);
         
         // Fetch user profiles
         let userProfiles = {};
@@ -113,21 +115,65 @@ export default async function CalendarPage() {
             }
         }
         
+        // Fetch managed clients information
+        let managedClientProfiles = {};
+        if (managedClientIds.length > 0) {
+            try {
+                const { data: managedClients } = await supabase
+                    .from('facility_managed_clients')
+                    .select('id, first_name, last_name, phone_number, email, facility_id')
+                    .in('id', managedClientIds);
+                
+                // Create lookup object by ID
+                managedClientProfiles = (managedClients || []).reduce((acc, client) => {
+                    acc[client.id] = client;
+                    return acc;
+                }, {});
+            } catch (error) {
+                console.error('Error fetching managed clients:', error);
+            }
+        }
+        
+        // Fetch driver information
+        let driverProfiles = {};
+        if (driverIds.length > 0) {
+            try {
+                const { data: driverData } = await supabase
+                    .from('profiles')
+                    .select('id, first_name, last_name, phone_number, email')
+                    .eq('role', 'driver')
+                    .in('id', driverIds);
+                
+                // Create lookup object by ID
+                driverProfiles = (driverData || []).reduce((acc, driver) => {
+                    acc[driver.id] = driver;
+                    return acc;
+                }, {});
+            } catch (error) {
+                console.error('Error fetching driver profiles:', error);
+            }
+        }
+        
         // Process trips with user profiles and facility information
         const processedTrips = (trips || []).map(trip => {
             let clientName = trip.client_name;
             let facilityName = null;
             let clientInfo = null;
             let facilityInfo = null;
+            let managedClientInfo = null;
+            let driverInfo = null;
             
-            // Handle facility trips
+            // Handle facility information
             if (trip.facility_id && facilityProfiles[trip.facility_id]) {
                 facilityInfo = facilityProfiles[trip.facility_id];
                 facilityName = facilityInfo.name;
-                
-                // For facility trips, use facility name as primary identifier
-                if (!clientName) {
-                    clientName = facilityName;
+            }
+            
+            // Handle managed client trips (facility clients)
+            if (trip.managed_client_id && managedClientProfiles[trip.managed_client_id]) {
+                managedClientInfo = managedClientProfiles[trip.managed_client_id];
+                if (!clientName && (managedClientInfo.first_name || managedClientInfo.last_name)) {
+                    clientName = `${managedClientInfo.first_name || ''} ${managedClientInfo.last_name || ''}`.trim();
                 }
             }
             
@@ -139,10 +185,17 @@ export default async function CalendarPage() {
                 }
             }
             
-            // Fall back to other methods if we still don't have a name
+            // Handle driver information
+            if (trip.driver_id && driverProfiles[trip.driver_id]) {
+                driverInfo = driverProfiles[trip.driver_id];
+            }
+            
+            // Fall back to other methods if we still don't have a client name
             if (!clientName) {
-                if (trip.facility_id) {
-                    clientName = `Facility ${trip.facility_id.substring(0, 6)}`;
+                if (trip.managed_client_id) {
+                    clientName = `Managed Client ${trip.managed_client_id.substring(0, 6)}`;
+                } else if (trip.facility_id && facilityName) {
+                    clientName = facilityName;
                 } else if (trip.user_id) {
                     clientName = `Client ${trip.user_id.substring(0, 6)}`;
                 } else {
@@ -150,8 +203,13 @@ export default async function CalendarPage() {
                 }
             }
             
-            // Use driver_name from the trip if available
-            let driverName = trip.driver_name || null;
+            // Get driver name with fallback
+            let driverName = null;
+            if (driverInfo && (driverInfo.first_name || driverInfo.last_name)) {
+                driverName = `${driverInfo.first_name || ''} ${driverInfo.last_name || ''}`.trim();
+            } else if (trip.driver_name) {
+                driverName = trip.driver_name;
+            }
                 
             return {
                 ...trip,
@@ -162,7 +220,9 @@ export default async function CalendarPage() {
                 facility_name: facilityName,
                 client_info: clientInfo,
                 facility_info: facilityInfo,
-                driver_name: driverName
+                managed_client_info: managedClientInfo,
+                driver_name: driverName,
+                driver_info: driverInfo
             };
         });
 

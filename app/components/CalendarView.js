@@ -327,13 +327,18 @@ export function CalendarView({ user, userProfile, trips: initialTrips, drivers =
                           #{trip.id.slice(0, 8)}
                         </div>
                         <div className="truncate opacity-90">
-                          {new Date(trip.pickup_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {trip.client_name || 'Client'}
+                          {new Date(trip.pickup_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - 
+                          {trip.facility_name ? (
+                            <span>
+                              {trip.facility_name}
+                              {trip.client_name && trip.client_name !== trip.facility_name && (
+                                <span className="text-xs opacity-75"> • {trip.client_name}</span>
+                              )}
+                            </span>
+                          ) : (
+                            <span>{trip.client_name || 'Client'}</span>
+                          )}
                         </div>
-                        {trip.facility_name && trip.facility_name !== trip.client_name && (
-                          <div className="truncate opacity-75 text-xs">
-                            📍 {trip.facility_name}
-                          </div>
-                        )}
                       </div>
                     ))}
                     {dayTrips.length > 3 && (
@@ -442,7 +447,27 @@ export function CalendarView({ user, userProfile, trips: initialTrips, drivers =
                                 )}
                               </>
                             )}
-                            {selectedTrip.client_name && selectedTrip.client_name !== selectedTrip.facility_name && (
+                            {/* Show managed client info if available */}
+                            {selectedTrip.managed_client_info ? (
+                              <div>
+                                <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">Client Name</dt>
+                                <dd className="mt-1 text-sm text-gray-900">
+                                  {selectedTrip.managed_client_info.first_name} {selectedTrip.managed_client_info.last_name}
+                                </dd>
+                                {selectedTrip.managed_client_info.phone_number && (
+                                  <div className="mt-2">
+                                    <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">Client Phone</dt>
+                                    <dd className="mt-1 text-sm text-gray-900">{selectedTrip.managed_client_info.phone_number}</dd>
+                                  </div>
+                                )}
+                                {selectedTrip.managed_client_info.email && (
+                                  <div className="mt-2">
+                                    <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">Client Email</dt>
+                                    <dd className="mt-1 text-sm text-gray-900">{selectedTrip.managed_client_info.email}</dd>
+                                  </div>
+                                )}
+                              </div>
+                            ) : selectedTrip.client_name && selectedTrip.client_name !== selectedTrip.facility_name && (
                               <div>
                                 <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">Client Name</dt>
                                 <dd className="mt-1 text-sm text-gray-900">{selectedTrip.client_name}</dd>
@@ -493,6 +518,22 @@ export function CalendarView({ user, userProfile, trips: initialTrips, drivers =
                                 <span className="text-orange-600 font-medium">No driver assigned</span>
                               )}
                             </dd>
+                            {selectedTrip.driver_info && (
+                              <>
+                                {selectedTrip.driver_info.phone_number && (
+                                  <div className="mt-2">
+                                    <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">Driver Phone</dt>
+                                    <dd className="mt-1 text-sm text-gray-900">{selectedTrip.driver_info.phone_number}</dd>
+                                  </div>
+                                )}
+                                {selectedTrip.driver_info.email && (
+                                  <div className="mt-2">
+                                    <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">Driver Email</dt>
+                                    <dd className="mt-1 text-sm text-gray-900">{selectedTrip.driver_info.email}</dd>
+                                  </div>
+                                )}
+                              </>
+                            )}
                           </div>
                           
                           <div>
