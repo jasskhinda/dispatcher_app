@@ -14,6 +14,7 @@ export default function WorkingDashboard() {
     const [actionLoading, setActionLoading] = useState({});
     const [actionMessage, setActionMessage] = useState('');
     const [tripFilter, setTripFilter] = useState('all'); // 'all', 'facility', 'individual'
+    const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'pending', 'upcoming', 'in_progress', 'completed', 'cancelled'
     
     // Enhanced button interaction states
     const [showRejectModal, setShowRejectModal] = useState(false);
@@ -46,16 +47,24 @@ export default function WorkingDashboard() {
     // Filter trips whenever trips or filter changes
     useEffect(() => {
         filterTrips();
-    }, [trips, tripFilter]);
+    }, [trips, tripFilter, statusFilter]);
 
     function filterTrips() {
-        if (tripFilter === 'all') {
-            setFilteredTrips(trips);
-        } else if (tripFilter === 'facility') {
-            setFilteredTrips(trips.filter(trip => trip.facility_id));
+        let filtered = trips;
+        
+        // Filter by trip type
+        if (tripFilter === 'facility') {
+            filtered = filtered.filter(trip => trip.facility_id);
         } else if (tripFilter === 'individual') {
-            setFilteredTrips(trips.filter(trip => !trip.facility_id));
+            filtered = filtered.filter(trip => !trip.facility_id);
         }
+        
+        // Filter by status
+        if (statusFilter !== 'all') {
+            filtered = filtered.filter(trip => trip.status === statusFilter);
+        }
+        
+        setFilteredTrips(filtered);
     }
 
     // Fetch available drivers
@@ -1192,7 +1201,7 @@ export default function WorkingDashboard() {
                         <div className="flex justify-between items-center">
                             <h2 className="text-lg font-semibold text-gray-900">Recent Trips Overview</h2>
                             
-                            {/* Trip Filter */}
+                            {/* Trip Filters */}
                             <div className="flex items-center space-x-4">
                                 <label className="text-sm font-medium text-gray-700">Filter by:</label>
                                 <select
@@ -1203,6 +1212,18 @@ export default function WorkingDashboard() {
                                     <option value="all">All Trips</option>
                                     <option value="facility">Facility Bookings</option>
                                     <option value="individual">Individual Bookings</option>
+                                </select>
+                                <select
+                                    value={statusFilter}
+                                    onChange={(e) => setStatusFilter(e.target.value)}
+                                    className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                >
+                                    <option value="all">All Status</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="upcoming">Upcoming</option>
+                                    <option value="in_progress">In Progress</option>
+                                    <option value="completed">Completed</option>
+                                    <option value="cancelled">Cancelled</option>
                                 </select>
                                 <div className="text-xs text-gray-500">
                                     Showing {filteredTrips.length} of {trips.length} trips
