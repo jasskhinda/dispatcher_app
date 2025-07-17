@@ -679,18 +679,18 @@ export default function IndividualTripsPage() {
                             </h3>
                             
                             <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className="block text-sm font-bold text-gray-900 mb-2">
                                     Select Driver:
                                 </label>
                                 <select
                                     value={selectedDriverId}
                                     onChange={(e) => setSelectedDriverId(e.target.value)}
-                                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 font-semibold bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                                    style={{color: '#111827'}}
+                                    className="w-full border-2 border-gray-400 rounded-md px-3 py-2 text-gray-900 font-bold bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                    style={{color: '#000000', fontSize: '14px'}}
                                 >
-                                    <option value="" className="text-gray-900 font-semibold">Choose a driver...</option>
+                                    <option value="" style={{color: '#000000', fontWeight: 'bold'}}>Choose a driver...</option>
                                     {availableDrivers.map(driver => (
-                                        <option key={driver.id} value={driver.id} className="text-gray-900 font-semibold">
+                                        <option key={driver.id} value={driver.id} style={{color: '#000000', fontWeight: 'bold'}}>
                                             {driver.first_name} {driver.last_name}
                                             {driver.phone_number && ` • ${driver.phone_number}`}
                                         </option>
