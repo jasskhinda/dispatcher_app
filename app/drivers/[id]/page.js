@@ -548,72 +548,72 @@ export default function DriverDetailPage({ params }) {
             {(activeTab === 'details' || activeTab === null) && (
               <div className="space-y-6">
                 {/* Driver Info Card */}
-                <div className="bg-white shadow rounded-lg p-6">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white shadow-lg rounded-xl p-8 border border-gray-200">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                     {/* Personal Information */}
-                    <div className="md:col-span-2 space-y-4">
-                      <h2 className="text-lg font-medium pb-2 border-b border-gray-200">
+                    <div className="md:col-span-2 space-y-6">
+                      <h2 className="text-xl font-bold text-gray-900 pb-3 border-b-2 border-gray-300 mb-6">
                         Personal Information
                       </h2>
                       
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-2 gap-6">
                         <div>
-                          <p className="text-sm text-gray-500">First Name</p>
-                          <p className="font-medium">{driver.first_name || 'N/A'}</p>
+                          <p className="text-sm font-medium text-gray-700 mb-2">First Name</p>
+                          <p className="text-lg font-semibold text-gray-900 bg-gray-50 px-4 py-3 rounded-lg border">{driver.first_name || 'Not specified'}</p>
                         </div>
                         
                         <div>
-                          <p className="text-sm text-gray-500">Last Name</p>
-                          <p className="font-medium">{driver.last_name || 'N/A'}</p>
+                          <p className="text-sm font-medium text-gray-700 mb-2">Last Name</p>
+                          <p className="text-lg font-semibold text-gray-900 bg-gray-50 px-4 py-3 rounded-lg border">{driver.last_name || 'Not specified'}</p>
                         </div>
                         
                         <div>
-                          <p className="text-sm text-gray-500">Phone Number</p>
-                          <p className="font-medium">{driver.phone_number || 'N/A'}</p>
+                          <p className="text-sm font-medium text-gray-700 mb-2">Phone Number</p>
+                          <p className="text-lg font-semibold text-gray-900 bg-gray-50 px-4 py-3 rounded-lg border">{driver.phone_number || 'Not specified'}</p>
                         </div>
                         
                         <div>
-                          <p className="text-sm text-gray-500">Email</p>
-                          <p className="font-medium">{driver.email || 'N/A'}</p>
+                          <p className="text-sm font-medium text-gray-700 mb-2">Email</p>
+                          <p className="text-lg font-semibold text-gray-900 bg-gray-50 px-4 py-3 rounded-lg border">{driver.email || 'Not specified'}</p>
                         </div>
                       </div>
                     </div>
                     
                     {/* Status Information */}
-                    <div className="space-y-4">
-                      <h2 className="text-lg font-medium pb-2 border-b border-gray-200">
+                    <div className="space-y-6">
+                      <h2 className="text-xl font-bold text-gray-900 pb-3 border-b-2 border-gray-300 mb-6">
                         Status
                       </h2>
                       
-                      <div className="p-4 bg-gray-50 rounded-md">
-                        <p className="text-sm text-gray-500 mb-1">Current Status</p>
+                      <div className="p-6 bg-blue-50 rounded-lg border border-blue-200">
+                        <p className="text-sm font-medium text-gray-700 mb-3">Current Status</p>
                         <div className="flex items-center">
-                          <span className={`inline-flex rounded-full h-3 w-3 mr-2 ${
+                          <span className={`inline-flex rounded-full h-5 w-5 mr-4 ${
                             driver.status === 'available' ? 'bg-green-500' : 
                             driver.status === 'on_trip' ? 'bg-orange-500' : 
                             driver.status === 'offline' ? 'bg-red-500' : 'bg-gray-500'
                           }`}></span>
-                          <p className="font-medium capitalize">{driver.status?.replace('_', ' ') || 'Available'}</p>
+                          <p className="text-xl font-bold text-gray-900 capitalize">{driver.status?.replace('_', ' ') || 'Available'}</p>
                         </div>
                       </div>
                     </div>
                   </div>
                   
                   {/* Vehicle Information */}
-                  <div className="mt-8 space-y-4">
-                    <h2 className="text-lg font-medium pb-2 border-b border-gray-200">
+                  <div className="mt-10 space-y-6">
+                    <h2 className="text-xl font-bold text-gray-900 pb-3 border-b-2 border-gray-300 mb-6">
                       Vehicle Information
                     </h2>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
-                        <p className="text-sm text-gray-500">Vehicle Model</p>
-                        <p className="font-medium">{driver.vehicle_model || 'N/A'}</p>
+                        <p className="text-sm font-medium text-gray-700 mb-2">Vehicle Model</p>
+                        <p className="text-lg font-semibold text-gray-900 bg-gray-50 px-4 py-3 rounded-lg border">{driver.vehicle_model || 'Not specified'}</p>
                       </div>
                       
                       <div>
-                        <p className="text-sm text-gray-500">License Plate</p>
-                        <p className="font-medium">{driver.vehicle_license || 'N/A'}</p>
+                        <p className="text-sm font-medium text-gray-700 mb-2">License Plate</p>
+                        <p className="text-lg font-semibold text-gray-900 bg-gray-50 px-4 py-3 rounded-lg border">{driver.vehicle_license || 'Not specified'}</p>
                       </div>
                     </div>
                   </div>
