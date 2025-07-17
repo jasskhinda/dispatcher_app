@@ -108,24 +108,19 @@ export default async function CalendarPage() {
         let facilityProfiles = {};
         if (facilityIds.length > 0) {
             try {
-                console.log('🔍 Fetching facilities for IDs:', facilityIds);
                 const { data: facilities, error: facilitiesError } = await supabase
                     .from('facilities')
-                    .select('id, name, contact_email, contact_phone')
+                    .select('id, name, contact_email, phone_number')
                     .in('id', facilityIds);
                 
                 if (facilitiesError) {
                     console.error('❌ Error fetching facilities:', facilitiesError);
                 } else {
-                    console.log('✅ Fetched facilities:', facilities);
-                    
                     // Create lookup object by ID
                     facilityProfiles = (facilities || []).reduce((acc, facility) => {
                         acc[facility.id] = facility;
                         return acc;
                     }, {});
-                    
-                    console.log('📊 Facility lookup object:', facilityProfiles);
                 }
             } catch (error) {
                 console.error('Error fetching facilities:', error);
@@ -181,17 +176,9 @@ export default async function CalendarPage() {
             let driverInfo = null;
             
             // Handle facility information
-            if (trip.facility_id) {
-                console.log('🔍 Processing facility for trip:', trip.id.substring(0, 8), 'facility_id:', trip.facility_id);
-                console.log('🔍 Available facility profiles:', Object.keys(facilityProfiles));
-                
-                if (facilityProfiles[trip.facility_id]) {
-                    facilityInfo = facilityProfiles[trip.facility_id];
-                    facilityName = facilityInfo.name;
-                    console.log('✅ Facility found:', facilityName);
-                } else {
-                    console.log('❌ Facility not found in lookup for ID:', trip.facility_id);
-                }
+            if (trip.facility_id && facilityProfiles[trip.facility_id]) {
+                facilityInfo = facilityProfiles[trip.facility_id];
+                facilityName = facilityInfo.name;
             }
             
             // Handle managed client trips (facility clients)

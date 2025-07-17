@@ -447,10 +447,10 @@ export function CalendarView({ user, userProfile, trips: initialTrips, drivers =
                                     <dd className="mt-1 text-sm text-gray-900">{selectedTrip.facility_info.contact_email}</dd>
                                   </div>
                                 )}
-                                {selectedTrip.facility_info.contact_phone && (
+                                {selectedTrip.facility_info.phone_number && (
                                   <div>
                                     <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</dt>
-                                    <dd className="mt-1 text-sm text-gray-900">{selectedTrip.facility_info.contact_phone}</dd>
+                                    <dd className="mt-1 text-sm text-gray-900">{selectedTrip.facility_info.phone_number}</dd>
                                   </div>
                                 )}
                               </>
