@@ -8,6 +8,10 @@ export function CalendarView({ user, userProfile, trips: initialTrips, drivers =
   const router = useRouter();
   const [trips, setTrips] = useState(initialTrips || []);
   const [filteredTrips, setFilteredTrips] = useState(initialTrips || []);
+
+  // Debug the trips data
+  console.log('🔍 CalendarView received trips:', initialTrips);
+  console.log('🔍 Trip with ID 8693d4c2:', initialTrips?.find(t => t.id?.includes('8693d4c2')));
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [loading, setLoading] = useState(false);
