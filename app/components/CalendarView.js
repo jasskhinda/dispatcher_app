@@ -321,14 +321,19 @@ export function CalendarView({ user, userProfile, trips: initialTrips, drivers =
                         className={`text-xs rounded px-1 py-0.5 truncate cursor-pointer hover:shadow-sm transition-shadow border ${
                           getStatusColor(trip.status)
                         }`}
-                        title={`${new Date(trip.pickup_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${trip.client_name || 'Client'}`}
+                        title={`Trip #${trip.id.slice(0, 8)} - ${trip.client_name || 'Client'} at ${new Date(trip.pickup_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`}
                       >
                         <div className="font-medium truncate">
-                          {new Date(trip.pickup_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          #{trip.id.slice(0, 8)}
                         </div>
                         <div className="truncate opacity-90">
-                          {trip.client_name || 'Client'}
+                          {new Date(trip.pickup_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {trip.client_name || 'Client'}
                         </div>
+                        {trip.facility_name && trip.facility_name !== trip.client_name && (
+                          <div className="truncate opacity-75 text-xs">
+                            📍 {trip.facility_name}
+                          </div>
+                        )}
                       </div>
                     ))}
                     {dayTrips.length > 3 && (
@@ -371,122 +376,149 @@ export function CalendarView({ user, userProfile, trips: initialTrips, drivers =
                       </svg>
                     </button>
                   </div>
-                  <div className="px-6 py-5">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      {/* Trip information - left column */}
-                      <div className="md:col-span-2">
-                        <div className="mb-6">
-                          <div className="flex justify-between items-center mb-4">
-                            <h4 className="text-md font-medium">Trip Information</h4>
-                            <span className={`px-2 py-1 text-xs rounded-full font-medium
-                              ${selectedTrip.status === 'completed' ? 'bg-green-100 text-green-800' : 
-                                selectedTrip.status === 'in_progress' ? 'bg-orange-100 text-orange-800' : 
-                                selectedTrip.status === 'cancelled' ? 'bg-red-100 text-red-800' : 
-                                selectedTrip.status === 'upcoming' ? 'bg-blue-100 text-blue-800' : 
-                                'bg-yellow-100 text-yellow-800'}`}>
-                              {selectedTrip.status.replace('_', ' ')}
-                            </span>
-                          </div>
-                          <dl className="grid grid-cols-1 gap-x-4 gap-y-4">
-                            <div>
-                              <dt className="text-sm font-medium opacity-70">Pickup Time</dt>
-                              <dd className="mt-1 text-sm">{formatTime(selectedTrip.pickup_time)}</dd>
-                            </div>
-                            
-                            {selectedTrip.return_pickup_time && (
-                              <div>
-                                <dt className="text-sm font-medium opacity-70">Return Pickup Time</dt>
-                                <dd className="mt-1 text-sm">{formatTime(selectedTrip.return_pickup_time)}</dd>
-                              </div>
-                            )}
-                            
-                            <div>
-                              <dt className="text-sm font-medium text-gray-700">Route</dt>
-                              <dd className="mt-1 text-sm">
-                                <div className="flex items-center mb-2">
-                                  <span className="h-2 w-2 rounded-full bg-green-500 inline-block mr-2 flex-shrink-0"></span>
-                                  <span className="text-gray-900">{selectedTrip.pickup_location}</span>
-                                </div>
-                                <div className="flex items-center">
-                                  <span className="h-2 w-2 rounded-full bg-red-500 inline-block mr-2 flex-shrink-0"></span>
-                                  <span className="text-gray-900">{selectedTrip.dropoff_location}</span>
-                                </div>
-                              </dd>
-                            </div>
-                            
-                            <div>
-                              <dt className="text-sm font-medium opacity-70">Estimated Duration</dt>
-                              <dd className="mt-1 text-sm">{selectedTrip.estimated_duration || 30} minutes</dd>
-                            </div>
-                            
-                            {selectedTrip.special_requirements && (
-                              <div>
-                                <dt className="text-sm font-medium opacity-70">Special Requirements</dt>
-                                <dd className="mt-1 text-sm">{selectedTrip.special_requirements}</dd>
-                              </div>
-                            )}
-                            
-                            {selectedTrip.notes && (
-                              <div>
-                                <dt className="text-sm font-medium opacity-70">Notes</dt>
-                                <dd className="mt-1 text-sm">{selectedTrip.notes}</dd>
-                              </div>
-                            )}
-                          </dl>
+                  <div className="px-6 py-6">
+                    {/* Trip Header */}
+                    <div className="mb-6 p-4 bg-gray-50 rounded-lg border">
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <h4 className="text-lg font-semibold text-gray-900">Trip #{selectedTrip.id.slice(0, 8)}</h4>
+                          <p className="text-sm text-gray-600 mt-1">
+                            {formatTime(selectedTrip.pickup_time)}
+                          </p>
                         </div>
+                        <span className={`px-3 py-1 text-sm rounded-full font-medium
+                          ${selectedTrip.status === 'completed' ? 'bg-green-100 text-green-800' : 
+                            selectedTrip.status === 'in_progress' ? 'bg-orange-100 text-orange-800' : 
+                            selectedTrip.status === 'cancelled' ? 'bg-red-100 text-red-800' : 
+                            selectedTrip.status === 'upcoming' ? 'bg-blue-100 text-blue-800' : 
+                            'bg-yellow-100 text-yellow-800'}`}>
+                          {selectedTrip.status.replace('_', ' ').toUpperCase()}
+                        </span>
                       </div>
                       
-                      {/* Client and driver information - right column */}
-                      <div>
-                        {/* Client information */}
-                        <div className="mb-6">
-                          <h4 className="text-md font-medium mb-3">Client Information</h4>
-                          {selectedTrip.client_name ? (
-                            <dl className="space-y-2">
-                              <div>
-                                <dt className="text-sm font-medium opacity-70">Name</dt>
-                                <dd className="mt-1 text-sm">
-                                  {selectedTrip.client_name}
-                                </dd>
-                              </div>
-                              {selectedTrip.phone_number && (
-                                <div>
-                                  <dt className="text-sm font-medium opacity-70">Phone</dt>
-                                  <dd className="mt-1 text-sm">{selectedTrip.phone_number}</dd>
-                                </div>
-                              )}
-                              {selectedTrip.user_id && (
-                                <div>
-                                  <dt className="text-sm font-medium opacity-70">User ID</dt>
-                                  <dd className="mt-1 text-sm text-xs opacity-60">{selectedTrip.user_id.substring(0, 8)}...</dd>
-                                </div>
-                              )}
-                            </dl>
-                          ) : (
-                            <p className="text-sm opacity-70">Client information not available</p>
-                          )}
+                      {/* Route Display */}
+                      <div className="space-y-2">
+                        <div className="flex items-center">
+                          <span className="h-3 w-3 rounded-full bg-green-500 inline-block mr-3 flex-shrink-0"></span>
+                          <span className="text-sm font-medium text-gray-900">From: {selectedTrip.pickup_location}</span>
                         </div>
+                        <div className="flex items-center">
+                          <span className="h-3 w-3 rounded-full bg-red-500 inline-block mr-3 flex-shrink-0"></span>
+                          <span className="text-sm font-medium text-gray-900">To: {selectedTrip.dropoff_location}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Client Information */}
+                      <div className="bg-white border border-gray-200 rounded-lg p-4">
+                        <h5 className="text-md font-semibold text-gray-900 mb-3 flex items-center">
+                          <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                          Client Information
+                        </h5>
                         
-                        {/* Driver information */}
-                        <div>
-                          <h4 className="text-md font-medium mb-3">Driver Information</h4>
-                          {selectedTrip.driver_name ? (
-                            <dl className="space-y-2">
+                        {selectedTrip.facility_id ? (
+                          /* Facility Trip */
+                          <div className="space-y-3">
+                            <div>
+                              <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">Facility</dt>
+                              <dd className="mt-1 text-sm font-semibold text-gray-900">{selectedTrip.facility_name || 'Unknown Facility'}</dd>
+                            </div>
+                            {selectedTrip.facility_info && (
+                              <>
+                                {selectedTrip.facility_info.contact_email && (
+                                  <div>
+                                    <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">Email</dt>
+                                    <dd className="mt-1 text-sm text-gray-900">{selectedTrip.facility_info.contact_email}</dd>
+                                  </div>
+                                )}
+                                {selectedTrip.facility_info.contact_phone && (
+                                  <div>
+                                    <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</dt>
+                                    <dd className="mt-1 text-sm text-gray-900">{selectedTrip.facility_info.contact_phone}</dd>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                            {selectedTrip.client_name && selectedTrip.client_name !== selectedTrip.facility_name && (
                               <div>
-                                <dt className="text-sm font-medium opacity-70">Name</dt>
-                                <dd className="mt-1 text-sm">
-                                  {selectedTrip.driver_name}
-                                </dd>
+                                <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">Client Name</dt>
+                                <dd className="mt-1 text-sm text-gray-900">{selectedTrip.client_name}</dd>
                               </div>
-                              {selectedTrip.driver_phone && (
-                                <div>
-                                  <dt className="text-sm font-medium opacity-70">Phone</dt>
-                                  <dd className="mt-1 text-sm">{selectedTrip.driver_phone}</dd>
-                                </div>
+                            )}
+                          </div>
+                        ) : (
+                          /* Individual Trip */
+                          <div className="space-y-3">
+                            <div>
+                              <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">Name</dt>
+                              <dd className="mt-1 text-sm font-semibold text-gray-900">{selectedTrip.client_name || 'Unknown Client'}</dd>
+                            </div>
+                            {selectedTrip.client_info && (
+                              <>
+                                {selectedTrip.client_info.email && (
+                                  <div>
+                                    <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">Email</dt>
+                                    <dd className="mt-1 text-sm text-gray-900">{selectedTrip.client_info.email}</dd>
+                                  </div>
+                                )}
+                                {selectedTrip.client_info.phone_number && (
+                                  <div>
+                                    <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</dt>
+                                    <dd className="mt-1 text-sm text-gray-900">{selectedTrip.client_info.phone_number}</dd>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Driver & Trip Details */}
+                      <div className="bg-white border border-gray-200 rounded-lg p-4">
+                        <h5 className="text-md font-semibold text-gray-900 mb-3 flex items-center">
+                          <svg className="w-5 h-5 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3a2 2 0 012-2h4a2 2 0 012 2v4m-6 4V7m6 4V7m-6 4l-2 2a2 2 0 01-3 0l2-2m8 0l2 2a2 2 0 003 0l-2-2" />
+                          </svg>
+                          Driver & Details
+                        </h5>
+                        
+                        <div className="space-y-3">
+                          <div>
+                            <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">Driver</dt>
+                            <dd className="mt-1 text-sm font-semibold text-gray-900">
+                              {selectedTrip.driver_name || (
+                                <span className="text-orange-600 font-medium">No driver assigned</span>
                               )}
-                            </dl>
-                          ) : (
-                            <p className="text-sm opacity-70">No driver assigned to this trip</p>
+                            </dd>
+                          </div>
+                          
+                          <div>
+                            <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</dt>
+                            <dd className="mt-1 text-sm text-gray-900">{selectedTrip.estimated_duration || 30} minutes</dd>
+                          </div>
+                          
+                          {selectedTrip.price && (
+                            <div>
+                              <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">Price</dt>
+                              <dd className="mt-1 text-sm font-semibold text-gray-900">${parseFloat(selectedTrip.price).toFixed(2)}</dd>
+                            </div>
+                          )}
+                          
+                          {selectedTrip.special_requirements && (
+                            <div>
+                              <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">Special Requirements</dt>
+                              <dd className="mt-1 text-sm text-gray-900">{selectedTrip.special_requirements}</dd>
+                            </div>
+                          )}
+                          
+                          {selectedTrip.notes && (
+                            <div>
+                              <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</dt>
+                              <dd className="mt-1 text-sm text-gray-900">{selectedTrip.notes}</dd>
+                            </div>
                           )}
                         </div>
                       </div>
