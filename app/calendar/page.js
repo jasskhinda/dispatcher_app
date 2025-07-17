@@ -72,10 +72,18 @@ export default async function CalendarPage() {
         }
         
         // Get all user IDs, facility IDs, managed client IDs, and driver IDs from trips to fetch their information
-        const userIds = (trips || []).map(trip => trip.user_id).filter(Boolean);
-        const facilityIds = (trips || []).map(trip => trip.facility_id).filter(Boolean);
-        const managedClientIds = (trips || []).map(trip => trip.managed_client_id).filter(Boolean);
-        const driverIds = (trips || []).map(trip => trip.driver_id).filter(Boolean);
+        const userIds = [...new Set((trips || []).map(trip => trip.user_id).filter(Boolean))];
+        const facilityIds = [...new Set((trips || []).map(trip => trip.facility_id).filter(Boolean))];
+        const managedClientIds = [...new Set((trips || []).map(trip => trip.managed_client_id).filter(Boolean))];
+        const driverIds = [...new Set((trips || []).map(trip => trip.driver_id).filter(Boolean))];
+        
+        console.log('📊 Found unique IDs to fetch:', {
+            userIds: userIds.length,
+            facilityIds: facilityIds.length,
+            managedClientIds: managedClientIds.length,
+            driverIds: driverIds.length
+        });
+        console.log('🏥 Facility IDs to fetch:', facilityIds);
         
         // Fetch user profiles
         let userProfiles = {};
@@ -100,16 +108,25 @@ export default async function CalendarPage() {
         let facilityProfiles = {};
         if (facilityIds.length > 0) {
             try {
-                const { data: facilities } = await supabase
+                console.log('🔍 Fetching facilities for IDs:', facilityIds);
+                const { data: facilities, error: facilitiesError } = await supabase
                     .from('facilities')
                     .select('id, name, contact_email, contact_phone')
                     .in('id', facilityIds);
                 
-                // Create lookup object by ID
-                facilityProfiles = (facilities || []).reduce((acc, facility) => {
-                    acc[facility.id] = facility;
-                    return acc;
-                }, {});
+                if (facilitiesError) {
+                    console.error('❌ Error fetching facilities:', facilitiesError);
+                } else {
+                    console.log('✅ Fetched facilities:', facilities);
+                    
+                    // Create lookup object by ID
+                    facilityProfiles = (facilities || []).reduce((acc, facility) => {
+                        acc[facility.id] = facility;
+                        return acc;
+                    }, {});
+                    
+                    console.log('📊 Facility lookup object:', facilityProfiles);
+                }
             } catch (error) {
                 console.error('Error fetching facilities:', error);
             }
@@ -164,9 +181,17 @@ export default async function CalendarPage() {
             let driverInfo = null;
             
             // Handle facility information
-            if (trip.facility_id && facilityProfiles[trip.facility_id]) {
-                facilityInfo = facilityProfiles[trip.facility_id];
-                facilityName = facilityInfo.name;
+            if (trip.facility_id) {
+                console.log('🔍 Processing facility for trip:', trip.id.substring(0, 8), 'facility_id:', trip.facility_id);
+                console.log('🔍 Available facility profiles:', Object.keys(facilityProfiles));
+                
+                if (facilityProfiles[trip.facility_id]) {
+                    facilityInfo = facilityProfiles[trip.facility_id];
+                    facilityName = facilityInfo.name;
+                    console.log('✅ Facility found:', facilityName);
+                } else {
+                    console.log('❌ Facility not found in lookup for ID:', trip.facility_id);
+                }
             }
             
             // Handle managed client trips (facility clients)
