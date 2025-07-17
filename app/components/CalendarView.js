@@ -18,7 +18,7 @@ export function CalendarView({ user, userProfile, trips: initialTrips, drivers =
   const [selectedDriver, setSelectedDriver] = useState('all');
   const [selectedTrip, setSelectedTrip] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [selectedStatuses, setSelectedStatuses] = useState(['all']);
+  const [selectedStatuses, setSelectedStatuses] = useState(['upcoming', 'pending', 'cancelled']);
 
   // Filter trips based on selected driver and status
   useEffect(() => {
@@ -103,6 +103,9 @@ export function CalendarView({ user, userProfile, trips: initialTrips, drivers =
 
   // Show trip details
   const showTripDetails = (trip) => {
+    console.log('🔍 Opening modal for trip:', trip);
+    console.log('🏥 Trip facility_name:', trip.facility_name);
+    console.log('🏥 Trip facility_info:', trip.facility_info);
     setSelectedTrip(trip);
     setShowModal(true);
   };
@@ -118,13 +121,14 @@ export function CalendarView({ user, userProfile, trips: initialTrips, drivers =
     if (status === 'All') {
       setSelectedStatuses(['all']);
     } else {
+      const statusKey = status.toLowerCase();
       setSelectedStatuses(prev => {
         const newStatuses = prev.filter(s => s !== 'all');
-        if (newStatuses.includes(status)) {
-          const filtered = newStatuses.filter(s => s !== status);
+        if (newStatuses.includes(statusKey)) {
+          const filtered = newStatuses.filter(s => s !== statusKey);
           return filtered.length === 0 ? ['all'] : filtered;
         } else {
-          return [...newStatuses, status];
+          return [...newStatuses, statusKey];
         }
       });
     }
@@ -157,7 +161,7 @@ export function CalendarView({ user, userProfile, trips: initialTrips, drivers =
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Calendar</h1>
               <p className="mt-2 text-sm text-gray-600">
-                View and manage transportation schedules
+                View upcoming trips and transportation schedules
               </p>
             </div>
             <div className="flex items-center space-x-4">
@@ -184,13 +188,13 @@ export function CalendarView({ user, userProfile, trips: initialTrips, drivers =
             <div>
               <div className="flex flex-wrap items-center">
                 <span className="text-sm font-medium text-gray-700 mr-4 mb-2">Status:</span>
-                {['All', 'Pending', 'Confirmed', 'In Progress', 'Completed', 'Cancelled'].map(status => (
+                {['All', 'Upcoming', 'Pending', 'Cancelled'].map(status => (
                   <div key={status} className="flex items-center mr-4 mb-2">
                     <input
                       id={`filter-${status.toLowerCase().replace(' ', '-')}`}
                       type="checkbox"
                       className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                      checked={selectedStatuses.includes('all') ? status === 'All' : selectedStatuses.includes(status)}
+                      checked={selectedStatuses.includes('all') ? status === 'All' : selectedStatuses.includes(status.toLowerCase())}
                       onChange={() => handleStatusChange(status)}
                     />
                     <label htmlFor={`filter-${status.toLowerCase().replace(' ', '-')}`} className="ml-2 text-sm text-gray-700 whitespace-nowrap">
