@@ -199,6 +199,35 @@ export default function IndividualTripsPage() {
         setAssigningTripId(null);
     }
 
+    // Handle marking trip as complete
+    async function handleCompleteTrip(tripId) {
+        try {
+            setActionLoading(prev => ({ ...prev, [tripId]: true }));
+            setActionMessage('');
+
+            const { error } = await supabase
+                .from('trips')
+                .update({ 
+                    status: 'completed',
+                    completed_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', tripId);
+
+            if (error) throw error;
+
+            setActionMessage('✅ Trip marked as completed successfully');
+            
+            // Refresh trips
+            await fetchIndividualTrips();
+        } catch (error) {
+            console.error('Error completing trip:', error);
+            setActionMessage('❌ Failed to complete trip');
+        } finally {
+            setActionLoading(prev => ({ ...prev, [tripId]: false }));
+        }
+    }
+
     async function handleTripAction(tripId, action) {
         try {
             setActionLoading(prev => ({ ...prev, [tripId]: true }));
@@ -597,13 +626,13 @@ export default function IndividualTripsPage() {
                                                             </>
                                                         )}
                                                         
-                                                        {trip.status === 'in_process' && (
+                                                        {(trip.status === 'in_process' || trip.status === 'in_progress') && (
                                                             <button 
-                                                                onClick={() => handleTripAction(trip.id, 'complete')}
+                                                                onClick={() => handleCompleteTrip(trip.id)}
                                                                 disabled={actionLoading[trip.id]}
-                                                                className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                                                                className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
                                                             >
-                                                                {actionLoading[trip.id] ? '...' : '✅ COMPLETE'}
+                                                                {actionLoading[trip.id] ? 'Completing...' : '✅ COMPLETE'}
                                                             </button>
                                                         )}
                                                         
