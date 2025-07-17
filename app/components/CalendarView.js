@@ -18,7 +18,7 @@ export function CalendarView({ user, userProfile, trips: initialTrips, drivers =
   const [selectedDriver, setSelectedDriver] = useState('all');
   const [selectedTrip, setSelectedTrip] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [selectedStatuses, setSelectedStatuses] = useState(['upcoming', 'pending', 'cancelled']);
+  const [selectedStatuses, setSelectedStatuses] = useState(['upcoming', 'pending', 'in_progress', 'cancelled']);
 
   // Filter trips based on selected driver and status
   useEffect(() => {
@@ -161,7 +161,7 @@ export function CalendarView({ user, userProfile, trips: initialTrips, drivers =
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Calendar</h1>
               <p className="mt-2 text-sm text-gray-600">
-                View upcoming trips and transportation schedules
+                View upcoming, in-progress, and scheduled transportation trips
               </p>
             </div>
             <div className="flex items-center space-x-4">
@@ -188,7 +188,7 @@ export function CalendarView({ user, userProfile, trips: initialTrips, drivers =
             <div>
               <div className="flex flex-wrap items-center">
                 <span className="text-sm font-medium text-gray-700 mr-4 mb-2">Status:</span>
-                {['All', 'Upcoming', 'Pending', 'Cancelled'].map(status => (
+                {['All', 'Upcoming', 'Pending', 'In Progress', 'Cancelled'].map(status => (
                   <div key={status} className="flex items-center mr-4 mb-2">
                     <input
                       id={`filter-${status.toLowerCase().replace(' ', '-')}`}
