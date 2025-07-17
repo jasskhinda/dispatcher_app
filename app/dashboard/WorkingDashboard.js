@@ -1420,33 +1420,49 @@ export default function WorkingDashboard() {
                     </div>
                 </div>
 
-                {/* Quick Actions */}
-                <div className="mt-8 grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <div className="bg-white rounded-lg shadow p-6 text-center">
-                        <div className="text-blue-500 text-4xl mb-3">📅</div>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Calendar View</h3>
-                        <p className="text-gray-600 text-sm mb-4">View all trips in calendar format</p>
-                        <a href="/calendar" className="inline-block bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 text-sm">
-                            Open Calendar
-                        </a>
+                {/* Professional Quick Actions */}
+                <div className="mt-8">
+                    <div className="mb-6">
+                        <h2 className="text-xl font-bold text-gray-900 mb-2">Quick Actions</h2>
+                        <p className="text-gray-600 text-sm">Access key management tools and features</p>
                     </div>
                     
-                    <div className="bg-white rounded-lg shadow p-6 text-center">
-                        <div className="text-green-500 text-4xl mb-3">👥</div>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Manage Clients</h3>
-                        <p className="text-gray-600 text-sm mb-4">View and manage client information</p>
-                        <a href="/clients" className="inline-block bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 text-sm">
-                            View Clients
-                        </a>
-                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 text-center hover:shadow-md transition-shadow">
+                            <div className="text-blue-600 text-4xl mb-3">📅</div>
+                            <h3 className="text-lg font-semibold text-gray-900 mb-2">Calendar View</h3>
+                            <p className="text-gray-600 text-sm mb-4">View all trips in calendar format</p>
+                            <a href="/calendar" className="inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                                Open Calendar
+                            </a>
+                        </div>
+                        
+                        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 text-center hover:shadow-md transition-shadow">
+                            <div className="text-green-600 text-4xl mb-3">👥</div>
+                            <h3 className="text-lg font-semibold text-gray-900 mb-2">Manage Clients</h3>
+                            <p className="text-gray-600 text-sm mb-4">View and manage client information</p>
+                            <a href="/clients" className="inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors">
+                                View Clients
+                            </a>
+                        </div>
 
-                    <div className="bg-white rounded-lg shadow p-6 text-center">
-                        <div className="text-purple-500 text-4xl mb-3">💳</div>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Individual Billing</h3>
-                        <p className="text-gray-600 text-sm mb-4">Create invoices for individual bookings</p>
-                        <a href="/trips/individual" className="inline-block bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600 text-sm">
-                            Individual Trips
-                        </a>
+                        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 text-center hover:shadow-md transition-shadow">
+                            <div className="text-purple-600 text-4xl mb-3">🚗</div>
+                            <h3 className="text-lg font-semibold text-gray-900 mb-2">Individual Trips Management</h3>
+                            <p className="text-gray-600 text-sm mb-4">Manage individual client trips and bookings</p>
+                            <a href="/trips/individual" className="inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors">
+                                Individual Trips
+                            </a>
+                        </div>
+
+                        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 text-center hover:shadow-md transition-shadow">
+                            <div className="text-orange-600 text-4xl mb-3">🏥</div>
+                            <h3 className="text-lg font-semibold text-gray-900 mb-2">Facility Management</h3>
+                            <p className="text-gray-600 text-sm mb-4">Manage facility trips and billing</p>
+                            <a href="/trips/facility" className="inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors">
+                                Facility Trips
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
