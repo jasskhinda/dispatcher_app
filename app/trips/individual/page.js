@@ -423,10 +423,9 @@ export default function IndividualTripsPage() {
                                         className="border border-gray-300 rounded-md px-3 py-1 text-sm font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                     >
                                         <option value="all">All Status</option>
-                                        <option value="pending">Pending Approval</option>
-                                        <option value="approved_pending_payment">Approved - Processing Payment</option>
-                                        <option value="paid_in_progress">Paid & In Progress</option>
-                                        <option value="payment_failed">Payment Failed</option>
+                                        <option value="pending">Pending</option>
+                                        <option value="upcoming">Approved</option>
+                                        <option value="in_progress">In Progress</option>
                                         <option value="completed">Completed</option>
                                         <option value="cancelled">Cancelled</option>
                                     </select>
