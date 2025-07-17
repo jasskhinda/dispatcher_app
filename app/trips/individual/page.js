@@ -685,11 +685,12 @@ export default function IndividualTripsPage() {
                                 <select
                                     value={selectedDriverId}
                                     onChange={(e) => setSelectedDriverId(e.target.value)}
-                                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 font-semibold bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                    style={{color: '#111827'}}
                                 >
-                                    <option value="">Choose a driver...</option>
+                                    <option value="" className="text-gray-900 font-semibold">Choose a driver...</option>
                                     {availableDrivers.map(driver => (
-                                        <option key={driver.id} value={driver.id}>
+                                        <option key={driver.id} value={driver.id} className="text-gray-900 font-semibold">
                                             {driver.first_name} {driver.last_name}
                                             {driver.phone_number && ` • ${driver.phone_number}`}
                                         </option>
