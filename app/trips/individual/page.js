@@ -315,11 +315,11 @@ export default function IndividualTripsPage() {
                             {/* Filters */}
                             <div className="flex items-center space-x-4">
                                 <div className="flex items-center space-x-2">
-                                    <label className="text-sm font-medium text-gray-700">Status:</label>
+                                    <label className="text-sm font-bold text-gray-900">Status:</label>
                                     <select
                                         value={statusFilter}
                                         onChange={(e) => setStatusFilter(e.target.value)}
-                                        className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        className="border border-gray-300 rounded-md px-3 py-1 text-sm font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                     >
                                         <option value="all">All Status</option>
                                         <option value="pending">Pending Approval</option>
@@ -331,7 +331,7 @@ export default function IndividualTripsPage() {
                                     </select>
                                 </div>
                                 
-                                <div className="text-xs text-gray-500">
+                                <div className="text-sm font-bold text-gray-900">
                                     Showing {filteredTrips.length} trips
                                 </div>
                             </div>

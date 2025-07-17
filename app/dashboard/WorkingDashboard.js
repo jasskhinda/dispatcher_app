@@ -1141,16 +1141,16 @@ export default function WorkingDashboard() {
                             </div>
                             <div className="mb-4">
                                 <div className="flex justify-between text-sm mb-2">
-                                    <span className="text-gray-600">Total:</span>
-                                    <span className="font-medium">{trips.filter(t => t.facility_id).length}</span>
+                                    <span className="font-bold text-gray-900">Total:</span>
+                                    <span className="font-bold text-gray-900">{trips.filter(t => t.facility_id).length}</span>
                                 </div>
                                 <div className="flex justify-between text-sm mb-2">
-                                    <span className="text-gray-600">Pending:</span>
-                                    <span className="font-medium text-yellow-600">{trips.filter(t => t.facility_id && t.status === 'pending').length}</span>
+                                    <span className="font-bold text-gray-900">Pending:</span>
+                                    <span className="font-bold text-yellow-600">{trips.filter(t => t.facility_id && t.status === 'pending').length}</span>
                                 </div>
                                 <div className="flex justify-between text-sm">
-                                    <span className="text-gray-600">Upcoming:</span>
-                                    <span className="font-medium text-blue-600">{trips.filter(t => t.facility_id && t.status === 'upcoming').length}</span>
+                                    <span className="font-bold text-gray-900">Upcoming:</span>
+                                    <span className="font-bold text-blue-600">{trips.filter(t => t.facility_id && t.status === 'upcoming').length}</span>
                                 </div>
                             </div>
                             <button
@@ -1173,16 +1173,16 @@ export default function WorkingDashboard() {
                             </div>
                             <div className="mb-4">
                                 <div className="flex justify-between text-sm mb-2">
-                                    <span className="text-gray-600">Total:</span>
-                                    <span className="font-medium">{trips.filter(t => !t.facility_id && t.user_id).length}</span>
+                                    <span className="font-bold text-gray-900">Total:</span>
+                                    <span className="font-bold text-gray-900">{trips.filter(t => !t.facility_id && t.user_id).length}</span>
                                 </div>
                                 <div className="flex justify-between text-sm mb-2">
-                                    <span className="text-gray-600">Pending:</span>
-                                    <span className="font-medium text-yellow-600">{trips.filter(t => !t.facility_id && t.user_id && t.status === 'pending').length}</span>
+                                    <span className="font-bold text-gray-900">Pending:</span>
+                                    <span className="font-bold text-yellow-600">{trips.filter(t => !t.facility_id && t.user_id && t.status === 'pending').length}</span>
                                 </div>
                                 <div className="flex justify-between text-sm">
-                                    <span className="text-gray-600">Upcoming:</span>
-                                    <span className="font-medium text-blue-600">{trips.filter(t => !t.facility_id && t.user_id && t.status === 'upcoming').length}</span>
+                                    <span className="font-bold text-gray-900">Upcoming:</span>
+                                    <span className="font-bold text-blue-600">{trips.filter(t => !t.facility_id && t.user_id && t.status === 'upcoming').length}</span>
                                 </div>
                             </div>
                             <button
@@ -1203,11 +1203,11 @@ export default function WorkingDashboard() {
                             
                             {/* Trip Filters */}
                             <div className="flex items-center space-x-4">
-                                <label className="text-sm font-medium text-gray-700">Filter by:</label>
+                                <label className="text-sm font-bold text-gray-900">Filter by:</label>
                                 <select
                                     value={tripFilter}
                                     onChange={(e) => setTripFilter(e.target.value)}
-                                    className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    className="border border-gray-300 rounded-md px-3 py-1 text-sm font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                 >
                                     <option value="all">All Trips</option>
                                     <option value="facility">Facility Bookings</option>
@@ -1216,7 +1216,7 @@ export default function WorkingDashboard() {
                                 <select
                                     value={statusFilter}
                                     onChange={(e) => setStatusFilter(e.target.value)}
-                                    className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    className="border border-gray-300 rounded-md px-3 py-1 text-sm font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                 >
                                     <option value="all">All Status</option>
                                     <option value="pending">Pending</option>
@@ -1225,7 +1225,7 @@ export default function WorkingDashboard() {
                                     <option value="completed">Completed</option>
                                     <option value="cancelled">Cancelled</option>
                                 </select>
-                                <div className="text-xs text-gray-500">
+                                <div className="text-sm font-bold text-gray-900">
                                     Showing {filteredTrips.length} of {trips.length} trips
                                 </div>
                             </div>
