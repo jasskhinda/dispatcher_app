@@ -1003,7 +1003,7 @@ export default function WorkingDashboard() {
                         <div>
                             <h1 className="text-3xl font-bold text-gray-900">Dispatcher Dashboard</h1>
                             <p className="mt-2 text-gray-600">
-                                Manage trips, create invoices, and oversee facility billings
+                                Manage trips, create invoices, and oversee operations
                             </p>
                         </div>
                         <div className="flex items-center space-x-4">
@@ -1440,15 +1440,6 @@ export default function WorkingDashboard() {
                         </a>
                     </div>
 
-                    <div className="bg-white rounded-lg shadow p-6 text-center">
-                        <div className="text-yellow-500 text-4xl mb-3">🏥</div>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Facility Billing</h3>
-                        <p className="text-gray-600 text-sm mb-4">Manage monthly facility invoices and payments</p>
-                        <a href="/dashboard/facility-billing" className="inline-block bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 text-sm">
-                            Facility Billing
-                        </a>
-                    </div>
-                    
                     <div className="bg-white rounded-lg shadow p-6 text-center">
                         <div className="text-purple-500 text-4xl mb-3">💳</div>
                         <h3 className="text-lg font-semibold text-gray-900 mb-2">Individual Billing</h3>
