@@ -14,6 +14,11 @@ export default function IndividualTripsPage() {
     const [actionMessage, setActionMessage] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [userProfiles, setUserProfiles] = useState([]);
+    const [availableDrivers, setAvailableDrivers] = useState([]);
+    const [showDriverAssignModal, setShowDriverAssignModal] = useState(false);
+    const [assigningTripId, setAssigningTripId] = useState(null);
+    const [selectedDriverId, setSelectedDriverId] = useState('');
+    const [assignmentLoading, setAssignmentLoading] = useState(false);
     
     const router = useRouter();
     const supabase = createClientComponentClient();
@@ -125,6 +130,73 @@ export default function IndividualTripsPage() {
         }
 
         setFilteredTrips(filtered);
+    }
+
+    // Fetch available drivers
+    async function fetchAvailableDrivers() {
+        try {
+            const { data: drivers, error: driversError } = await supabase
+                .from('profiles')
+                .select('id, first_name, last_name, phone_number, email')
+                .eq('role', 'driver')
+                .order('first_name');
+
+            if (driversError) throw driversError;
+
+            setAvailableDrivers(drivers || []);
+        } catch (error) {
+            console.error('Error fetching drivers:', error);
+            setActionMessage('❌ Failed to load drivers');
+        }
+    }
+
+    // Handle driver assignment
+    async function handleDriverAssignment() {
+        if (!selectedDriverId || !assigningTripId) return;
+
+        setAssignmentLoading(true);
+        try {
+            const { error } = await supabase
+                .from('trips')
+                .update({ 
+                    driver_id: selectedDriverId,
+                    status: 'in_progress',
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', assigningTripId);
+
+            if (error) throw error;
+
+            setActionMessage('✅ Driver assigned successfully');
+            setShowDriverAssignModal(false);
+            setSelectedDriverId('');
+            setAssigningTripId(null);
+            
+            // Refresh trips
+            await fetchIndividualTrips();
+        } catch (error) {
+            console.error('Error assigning driver:', error);
+            setActionMessage('❌ Failed to assign driver');
+        } finally {
+            setAssignmentLoading(false);
+        }
+    }
+
+    // Open driver assignment modal
+    function openDriverAssignModal(tripId) {
+        setAssigningTripId(tripId);
+        setSelectedDriverId('');
+        setShowDriverAssignModal(true);
+        if (availableDrivers.length === 0) {
+            fetchAvailableDrivers();
+        }
+    }
+
+    // Close driver assignment modal
+    function closeDriverAssignModal() {
+        setShowDriverAssignModal(false);
+        setSelectedDriverId('');
+        setAssigningTripId(null);
     }
 
     async function handleTripAction(tripId, action) {
@@ -504,13 +576,25 @@ export default function IndividualTripsPage() {
                                                         )}
                                                         
                                                         {trip.status === 'upcoming' && (
-                                                            <button 
-                                                                onClick={() => handleTripAction(trip.id, 'complete')}
-                                                                disabled={actionLoading[trip.id]}
-                                                                className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-                                                            >
-                                                                {actionLoading[trip.id] ? '...' : '✅ COMPLETE'}
-                                                            </button>
+                                                            <>
+                                                                {!trip.driver_id && (
+                                                                    <button 
+                                                                        onClick={() => openDriverAssignModal(trip.id)}
+                                                                        className="bg-purple-600 hover:bg-purple-700 text-white px-2 py-1 rounded text-xs font-medium transition-colors duration-200"
+                                                                    >
+                                                                        🚗 ASSIGN DRIVER
+                                                                    </button>
+                                                                )}
+                                                                {trip.driver_id && (
+                                                                    <button 
+                                                                        onClick={() => handleTripAction(trip.id, 'complete')}
+                                                                        disabled={actionLoading[trip.id]}
+                                                                        className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                                                                    >
+                                                                        {actionLoading[trip.id] ? '...' : '✅ COMPLETE'}
+                                                                    </button>
+                                                                )}
+                                                            </>
                                                         )}
                                                         
                                                         {trip.status === 'in_process' && (
@@ -556,6 +640,54 @@ export default function IndividualTripsPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Driver Assignment Modal */}
+            {showDriverAssignModal && (
+                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+                    <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+                        <div className="mt-3">
+                            <h3 className="text-lg font-medium text-gray-900 mb-4">
+                                Assign Driver to Trip
+                            </h3>
+                            
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Select Driver:
+                                </label>
+                                <select
+                                    value={selectedDriverId}
+                                    onChange={(e) => setSelectedDriverId(e.target.value)}
+                                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                >
+                                    <option value="">Choose a driver...</option>
+                                    {availableDrivers.map(driver => (
+                                        <option key={driver.id} value={driver.id}>
+                                            {driver.first_name} {driver.last_name}
+                                            {driver.phone_number && ` • ${driver.phone_number}`}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="flex justify-end space-x-3">
+                                <button
+                                    onClick={closeDriverAssignModal}
+                                    className="px-4 py-2 text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleDriverAssignment}
+                                    disabled={!selectedDriverId || assignmentLoading}
+                                    className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {assignmentLoading ? 'Assigning...' : 'Assign Driver'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
