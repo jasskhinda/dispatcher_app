@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
-import { createClient } from '@/utils/supabase/client';
+import { supabase } from '@/lib/supabase';
 
 const AuthContext = createContext();
 
@@ -9,7 +9,6 @@ export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
     const [userProfile, setUserProfile] = useState(null);
     const [loading, setLoading] = useState(true);
-    const supabase = createClient();
 
     // Fetch user profile data including role
     const fetchUserProfile = async(userId) => {

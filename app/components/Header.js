@@ -2,13 +2,13 @@
 
 import Link from 'next/link';
 // ThemeSwitcher removed as requested
-import { createClient } from '@/utils/supabase/client';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 export default function Header() {
   const [user, setUser] = useState(null);
-  const supabase = createClient();
+  const supabase = createClientComponentClient();
   const router = useRouter();
   
   useEffect(() => {
