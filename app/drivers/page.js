@@ -116,5 +116,5 @@ export default function DispatcherDriversPage() {
         );
     }
 
-    return <DriversView user={user} userProfile={userProfile} drivers={drivers} />;
+    return <DriversView user={user} userProfile={userProfile} drivers={drivers} loading={loading} />;
 }

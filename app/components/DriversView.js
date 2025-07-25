@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
-export function DriversView({ user, userProfile, drivers }) {
+export function DriversView({ user, userProfile, drivers, loading = false }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [sortBy, setSortBy] = useState('name');
@@ -12,6 +12,14 @@ export function DriversView({ user, userProfile, drivers }) {
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, driver: null, loading: false });
   const [deleteError, setDeleteError] = useState('');
   const router = useRouter();
+
+  // Calculate statistics from drivers data
+  const stats = {
+    total: drivers.length,
+    available: drivers.filter(d => d.status === 'active').length,
+    on_trip: drivers.filter(d => d.status === 'on_trip').length,
+    offline: drivers.filter(d => d.status === 'inactive').length
+  };
 
   // Filtering and sorting logic
   const filteredDrivers = drivers.filter(driver => {
@@ -263,14 +271,13 @@ export function DriversView({ user, userProfile, drivers }) {
               <div className="mt-4 sm:mt-0 sm:ml-4">
                 <select
                   className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
                 >
                   <option value="all">All Status</option>
-                  <option value="available">Available</option>
+                  <option value="active">Available</option>
                   <option value="on_trip">On Trip</option>
-                  <option value="offline">Offline</option>
-                  <option value="inactive">Inactive</option>
+                  <option value="inactive">Offline</option>
                 </select>
               </div>
             </div>
@@ -346,7 +353,6 @@ export function DriversView({ user, userProfile, drivers }) {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredDrivers.map((driver) => {
-                    const statusConfig = getStatusConfig(driver.status);
                     return (
                       <tr key={driver.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -377,10 +383,7 @@ export function DriversView({ user, userProfile, drivers }) {
                           <div className="text-sm text-gray-500">{driver.vehicle_license || 'No license plate'}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusConfig.bg} ${statusConfig.text}`}>
-                            <span className="mr-1">{statusConfig.icon}</span>
-                            {statusConfig.label}
-                          </span>
+                          {getStatusBadge(driver.status)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {formatDate(driver.created_at)}
