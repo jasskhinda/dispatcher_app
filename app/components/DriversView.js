@@ -309,12 +309,12 @@ export function DriversView({ user, userProfile, drivers, loading = false }) {
               </svg>
               <h3 className="text-lg font-medium text-gray-900 mb-2">No drivers found</h3>
               <p className="text-gray-500 mb-4">
-                {searchTerm || statusFilter !== 'all' 
+                {searchTerm || filterStatus !== 'all' 
                   ? 'Try adjusting your search criteria or filters.'
                   : 'Get started by adding your first driver to the system.'
                 }
               </p>
-              {(!searchTerm && statusFilter === 'all') && (
+              {(!searchTerm && filterStatus === 'all') && (
                 <button
                   onClick={() => router.push('/drivers/add')}
                   className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
