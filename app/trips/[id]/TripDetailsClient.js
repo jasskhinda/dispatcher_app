@@ -33,25 +33,29 @@ export default function TripDetailsClient({ trip, user }) {
     setError('');
     
     try {
-      const { data, error } = await supabase
-        .from('trips')
-        .update({ 
-          status: 'completed',
-          completed_at: new Date().toISOString()
-        })
-        .eq('id', currentTrip.id)
-        .select()
-        .single();
+      const response = await fetch('/api/trips/actions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tripId: currentTrip.id,
+          action: 'complete'
+        }),
+      });
+
+      const result = await response.json();
       
-      if (error) {
-        console.error('Error marking trip complete:', error);
-        setError('Failed to mark trip as complete. Please try again.');
+      if (!response.ok) {
+        console.error('Error marking trip complete:', result);
+        setError(result.details || result.error || 'Failed to mark trip as complete. Please try again.');
       } else {
-        // Update the current trip state
+        // Update the current trip state with the returned data
         setCurrentTrip({
           ...currentTrip,
           status: 'completed',
-          completed_at: new Date().toISOString()
+          completed_at: new Date().toISOString(),
+          updated_at: result.trip.updated_at
         });
       }
     } catch (error) {
