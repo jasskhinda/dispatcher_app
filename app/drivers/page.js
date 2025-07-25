@@ -1,69 +1,147 @@
 import { redirect } from 'next/navigation';
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { createClient } from '@/utils/supabase/server';
+import { DriversView } from '@/app/components/DriversView';
 
 // This is a Server Component
-export default async function DriversPage() {
-    console.log('Drivers page server component executing');
+export default async function DispatcherDriversPage() {
+    console.log('Dispatcher drivers page server component executing');
     
     try {
-        // Create server component client
-        const supabase = createServerComponentClient({ cookies });
-
-        // This will refresh the session if needed
-        const { data: { session } } = await supabase.auth.getSession();
-        console.log('Auth session check result:', session ? 'Session exists' : 'No session found');
-
-        // Redirect to login if there's no session
-        if (!session) {
-            console.log('No session, redirecting to login');
+        // Create server client
+        const supabase = await createClient();
+        
+        // Check user - always use getUser for security
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        
+        // Redirect to login if there's no user
+        if (userError || !user) {
+            console.error('Auth error:', userError);
             redirect('/login');
         }
 
-        // Get user profile
-        let userProfile = null;
-        try {
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', session.user.id)
-                .single();
-
-            if (error) {
-                console.log('Note: Unable to fetch user profile, using session data');
-                userProfile = {
-                    id: session.user.id,
-                    email: session.user.email,
-                    role: 'dispatcher'
-                };
-            } else {
-                userProfile = data;
-            }
-        } catch (error) {
-            console.error('Error fetching user profile:', error);
-            userProfile = {
-                id: session.user.id,
-                email: session.user.email,
-                role: 'dispatcher'
-            };
-        }
-
-        // Fetch drivers (users with role 'driver')
-        const { data: drivers, error: driversError } = await supabase
+        // Get user profile and verify it has dispatcher role
+        const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('*')
-            .eq('role', 'driver')
-            .order('created_at', { ascending: false });
+            .eq('id', user.id)
+            .single();
 
-        if (driversError) {
-            console.error('Error fetching drivers:', driversError);
+        if (profileError || !profile || profile.role !== 'dispatcher') {
+            redirect('/login?error=Access%20denied.%20Dispatcher%20privileges%20required.');
+        }
+        
+        // Fetch drivers (users with role 'driver')
+        let drivers = [];
+        
+        try {
+            const { data: driverProfiles, error: driversError } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('role', 'driver')
+                .order('created_at', { ascending: false });
+            
+            if (driversError) {
+                console.error('Error fetching drivers:', driversError);
+            } else {
+                drivers = driverProfiles || [];
+            }
+        } catch (fetchError) {
+            console.error('Exception in driver profiles fetching:', fetchError);
+            drivers = [];
+        }
+        
+        console.log(`Successfully fetched ${drivers.length} drivers`);
+
+        // Optimize: Get trip statistics for all drivers in fewer queries
+        let driversWithTrips = drivers.map(driver => ({
+            ...driver,
+            trips: [],
+            trip_count: 0,
+            completed_trips: 0,
+            last_trip: null,
+            vehicle: null
+        }));
+
+        // Only fetch trip data if we have drivers to avoid unnecessary queries
+        if (drivers.length > 0) {
+            try {
+                // Get all trips for all drivers in one query
+                const driverIds = drivers.map(d => d.id);
+                const { data: allTrips, error: tripsError } = await supabase
+                    .from('trips')
+                    .select('id, driver_id, status, created_at, pickup_time')
+                    .in('driver_id', driverIds)
+                    .order('created_at', { ascending: false });
+
+                if (!tripsError && allTrips) {
+                    // Group trips by driver
+                    const tripsByDriver = {};
+                    allTrips.forEach(trip => {
+                        if (!tripsByDriver[trip.driver_id]) {
+                            tripsByDriver[trip.driver_id] = [];
+                        }
+                        tripsByDriver[trip.driver_id].push(trip);
+                    });
+
+                    // Update drivers with trip stats
+                    driversWithTrips = driversWithTrips.map(driver => {
+                        const driverTrips = tripsByDriver[driver.id] || [];
+                        return {
+                            ...driver,
+                            trips: driverTrips,
+                            trip_count: driverTrips.length,
+                            completed_trips: driverTrips.filter(trip => trip.status === 'completed').length,
+                            last_trip: driverTrips.length > 0 ? driverTrips[0] : null
+                        };
+                    });
+                }
+            } catch (error) {
+                console.warn('Could not fetch trip statistics:', error.message);
+            }
+
+            // Optionally fetch vehicle data in a single query too
+            try {
+                const { data: vehicles, error: vehicleError } = await supabase
+                    .from('vehicles')
+                    .select('*')
+                    .in('driver_id', driverIds);
+
+                if (!vehicleError && vehicles) {
+                    const vehiclesByDriver = {};
+                    vehicles.forEach(vehicle => {
+                        vehiclesByDriver[vehicle.driver_id] = vehicle;
+                    });
+
+                    driversWithTrips = driversWithTrips.map(driver => ({
+                        ...driver,
+                        vehicle: vehiclesByDriver[driver.id] || null
+                    }));
+                }
+            } catch (error) {
+                console.warn('Could not fetch vehicle data:', error.message);
+            }
         }
 
-        const { DriversView } = require('../components/DriversView');
+        // Get email addresses from auth.users for drivers
+        const { supabaseAdmin } = await import('@/lib/admin-supabase');
+        if (supabaseAdmin) {
+            for (let driver of driversWithTrips) {
+                if (!driver.email && driver.id) {
+                    try {
+                        const { data: { user: authUser } } = await supabaseAdmin.auth.admin.getUserById(driver.id);
+                        if (authUser?.email) {
+                            driver.email = authUser.email;
+                        }
+                    } catch (error) {
+                        console.error('Error fetching email for driver:', driver.id);
+                    }
+                }
+            }
+        }
         
-        return <DriversView user={session.user} userProfile={userProfile} drivers={drivers || []} />;
+        return <DriversView user={user} userProfile={profile} drivers={driversWithTrips} />;
     } catch (error) {
-        console.error('Error in drivers page:', error);
+        console.error('Error in dispatcher drivers page:', error);
         redirect('/login?error=server_error');
     }
 }
