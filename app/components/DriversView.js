@@ -4,14 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
-export function DriversView({ user, userProfile, drivers }) {
-  // Calculate statistics from drivers data
-  const stats = {
-    total: drivers.length,
-    available: drivers.filter(d => d.status === 'active').length,
-    on_trip: drivers.filter(d => d.status === 'on_trip').length,
-    offline: drivers.filter(d => d.status === 'inactive').length
-  };
+export function DriversView({ user, userProfile, drivers, loading = false }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [sortBy, setSortBy] = useState('name');
@@ -19,6 +12,14 @@ export function DriversView({ user, userProfile, drivers }) {
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, driver: null, loading: false });
   const [deleteError, setDeleteError] = useState('');
   const router = useRouter();
+
+  // Calculate statistics from drivers data
+  const stats = {
+    total: drivers.length,
+    available: drivers.filter(d => d.status === 'active').length,
+    on_trip: drivers.filter(d => d.status === 'on_trip').length,
+    offline: drivers.filter(d => d.status === 'inactive').length
+  };
 
   // Filtering and sorting logic
   const filteredDrivers = drivers.filter(driver => {
@@ -274,10 +275,9 @@ export function DriversView({ user, userProfile, drivers }) {
                   onChange={(e) => setFilterStatus(e.target.value)}
                 >
                   <option value="all">All Status</option>
-                  <option value="available">Available</option>
+                  <option value="active">Available</option>
                   <option value="on_trip">On Trip</option>
-                  <option value="offline">Offline</option>
-                  <option value="inactive">Inactive</option>
+                  <option value="inactive">Offline</option>
                 </select>
               </div>
             </div>

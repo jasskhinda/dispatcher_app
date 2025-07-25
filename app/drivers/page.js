@@ -1,147 +1,132 @@
-import { redirect } from 'next/navigation';
-import { createClient } from '@/utils/supabase/server';
+'use client';
+
 import { DriversView } from '@/app/components/DriversView';
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/lib/supabase';
 
-// This is a Server Component
-export default async function DispatcherDriversPage() {
-    console.log('Dispatcher drivers page server component executing');
-    
-    try {
-        // Create server client
-        const supabase = await createClient();
-        
-        // Check user - always use getUser for security
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        
-        // Redirect to login if there's no user
-        if (userError || !user) {
-            console.error('Auth error:', userError);
-            redirect('/login');
-        }
+export default function DispatcherDriversPage() {
+    const [drivers, setDrivers] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const { user, userProfile } = useAuth();
 
-        // Get user profile and verify it has dispatcher role
-        const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .single();
-
-        if (profileError || !profile || profile.role !== 'dispatcher') {
-            redirect('/login?error=Access%20denied.%20Dispatcher%20privileges%20required.');
-        }
-        
-        // Fetch drivers (users with role 'driver')
-        let drivers = [];
-        
-        try {
-            const { data: driverProfiles, error: driversError } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('role', 'driver')
-                .order('created_at', { ascending: false });
-            
-            if (driversError) {
-                console.error('Error fetching drivers:', driversError);
-            } else {
-                drivers = driverProfiles || [];
-            }
-        } catch (fetchError) {
-            console.error('Exception in driver profiles fetching:', fetchError);
-            drivers = [];
-        }
-        
-        console.log(`Successfully fetched ${drivers.length} drivers`);
-
-        // Optimize: Get trip statistics for all drivers in fewer queries
-        let driversWithTrips = drivers.map(driver => ({
-            ...driver,
-            trips: [],
-            trip_count: 0,
-            completed_trips: 0,
-            last_trip: null,
-            vehicle: null
-        }));
-
-        // Only fetch trip data if we have drivers to avoid unnecessary queries
-        if (drivers.length > 0) {
+    useEffect(() => {
+        async function loadDrivers() {
             try {
-                // Get all trips for all drivers in one query
-                const driverIds = drivers.map(d => d.id);
-                const { data: allTrips, error: tripsError } = await supabase
-                    .from('trips')
-                    .select('id, driver_id, status, created_at, pickup_time')
-                    .in('driver_id', driverIds)
-                    .order('created_at', { ascending: false });
-
-                if (!tripsError && allTrips) {
-                    // Group trips by driver
-                    const tripsByDriver = {};
-                    allTrips.forEach(trip => {
-                        if (!tripsByDriver[trip.driver_id]) {
-                            tripsByDriver[trip.driver_id] = [];
-                        }
-                        tripsByDriver[trip.driver_id].push(trip);
-                    });
-
-                    // Update drivers with trip stats
-                    driversWithTrips = driversWithTrips.map(driver => {
-                        const driverTrips = tripsByDriver[driver.id] || [];
-                        return {
-                            ...driver,
-                            trips: driverTrips,
-                            trip_count: driverTrips.length,
-                            completed_trips: driverTrips.filter(trip => trip.status === 'completed').length,
-                            last_trip: driverTrips.length > 0 ? driverTrips[0] : null
-                        };
-                    });
+                // Check if user is authenticated through context
+                if (!user || !userProfile) {
+                    setLoading(false);
+                    return;
                 }
-            } catch (error) {
-                console.warn('Could not fetch trip statistics:', error.message);
-            }
 
-            // Optionally fetch vehicle data in a single query too
-            try {
-                const { data: vehicles, error: vehicleError } = await supabase
-                    .from('vehicles')
+                // First, let's check what profiles exist
+                const { data: allProfiles } = await supabase
+                    .from('profiles')
+                    .select('id, role, email, full_name')
+                    .limit(20);
+                
+                console.log('Sample profiles in database:', allProfiles?.map(p => ({ role: p.role, email: p.email })));
+                
+                // Fetch drivers
+                console.log('Fetching drivers from profiles table...');
+                const { data: driverProfiles, error: driversError } = await supabase
+                    .from('profiles')
                     .select('*')
-                    .in('driver_id', driverIds);
-
-                if (!vehicleError && vehicles) {
-                    const vehiclesByDriver = {};
-                    vehicles.forEach(vehicle => {
-                        vehiclesByDriver[vehicle.driver_id] = vehicle;
-                    });
-
-                    driversWithTrips = driversWithTrips.map(driver => ({
-                        ...driver,
-                        vehicle: vehiclesByDriver[driver.id] || null
-                    }));
+                    .eq('role', 'driver')
+                    .order('created_at', { ascending: false });
+                
+                console.log('Driver query result:', { driverProfiles, driversError });
+                
+                if (driversError) {
+                    console.error('Error fetching drivers:', driversError);
+                    setDrivers([]);
+                    return;
                 }
-            } catch (error) {
-                console.warn('Could not fetch vehicle data:', error.message);
-            }
-        }
+                
+                const driversData = driverProfiles || [];
+                console.log(`Found ${driversData.length} drivers`);
+                
+                // Get trip statistics for all drivers
+                let driversWithTrips = driversData.map(driver => ({
+                    ...driver,
+                    trips: [],
+                    trip_count: 0,
+                    completed_trips: 0,
+                    last_trip: null,
+                    vehicle: null
+                }));
 
-        // Get email addresses from auth.users for drivers
-        const { supabaseAdmin } = await import('@/lib/admin-supabase');
-        if (supabaseAdmin) {
-            for (let driver of driversWithTrips) {
-                if (!driver.email && driver.id) {
-                    try {
-                        const { data: { user: authUser } } = await supabaseAdmin.auth.admin.getUserById(driver.id);
-                        if (authUser?.email) {
-                            driver.email = authUser.email;
-                        }
-                    } catch (error) {
-                        console.error('Error fetching email for driver:', driver.id);
+                if (driversData.length > 0) {
+                    // Get all trips for all drivers in one query
+                    const driverIds = driversData.map(d => d.id);
+                    const { data: allTrips } = await supabase
+                        .from('trips')
+                        .select('id, driver_id, status, created_at, pickup_time')
+                        .in('driver_id', driverIds)
+                        .order('created_at', { ascending: false });
+
+                    if (allTrips) {
+                        // Group trips by driver
+                        const tripsByDriver = {};
+                        allTrips.forEach(trip => {
+                            if (!tripsByDriver[trip.driver_id]) {
+                                tripsByDriver[trip.driver_id] = [];
+                            }
+                            tripsByDriver[trip.driver_id].push(trip);
+                        });
+
+                        // Update drivers with trip stats
+                        driversWithTrips = driversWithTrips.map(driver => {
+                            const driverTrips = tripsByDriver[driver.id] || [];
+                            return {
+                                ...driver,
+                                trips: driverTrips,
+                                trip_count: driverTrips.length,
+                                completed_trips: driverTrips.filter(trip => trip.status === 'completed').length,
+                                last_trip: driverTrips.length > 0 ? driverTrips[0] : null
+                            };
+                        });
+                    }
+
+                    // Get vehicle data
+                    const { data: vehicles } = await supabase
+                        .from('vehicles')
+                        .select('*')
+                        .in('driver_id', driverIds);
+
+                    if (vehicles) {
+                        const vehiclesByDriver = {};
+                        vehicles.forEach(vehicle => {
+                            vehiclesByDriver[vehicle.driver_id] = vehicle;
+                        });
+
+                        driversWithTrips = driversWithTrips.map(driver => ({
+                            ...driver,
+                            vehicle: vehiclesByDriver[driver.id] || null
+                        }));
                     }
                 }
+                
+                setDrivers(driversWithTrips);
+                
+            } catch (error) {
+                console.error('Error loading drivers:', error);
+                setDrivers([]);
+            } finally {
+                setLoading(false);
             }
         }
         
-        return <DriversView user={user} userProfile={profile} drivers={driversWithTrips} />;
-    } catch (error) {
-        console.error('Error in dispatcher drivers page:', error);
-        redirect('/login?error=server_error');
+        loadDrivers();
+    }, [user, userProfile]);
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="text-lg">Loading drivers...</div>
+            </div>
+        );
     }
+
+    return <DriversView user={user} userProfile={userProfile} drivers={drivers} loading={loading} />;
 }
