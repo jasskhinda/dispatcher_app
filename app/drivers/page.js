@@ -1,51 +1,33 @@
 import { redirect } from 'next/navigation';
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { createClient } from '@/utils/supabase/server';
+import { DriversView } from '../components/DriversView';
 
 // This is a Server Component
 export default async function DriversPage() {
     console.log('Drivers page server component executing');
     
     try {
-        // Create server component client
-        const supabase = createServerComponentClient({ cookies });
-
-        // This will refresh the session if needed
-        const { data: { session } } = await supabase.auth.getSession();
-        console.log('Auth session check result:', session ? 'Session exists' : 'No session found');
-
-        // Redirect to login if there's no session
-        if (!session) {
-            console.log('No session, redirecting to login');
+        // Create server client
+        const supabase = await createClient();
+        
+        // Check user - always use getUser for security
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        
+        // Redirect to login if there's no user
+        if (userError || !user) {
+            console.error('Auth error:', userError);
             redirect('/login');
         }
 
-        // Get user profile
-        let userProfile = null;
-        try {
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', session.user.id)
-                .single();
+        // Get user profile and verify it has dispatcher role
+        const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single();
 
-            if (error) {
-                console.log('Note: Unable to fetch user profile, using session data');
-                userProfile = {
-                    id: session.user.id,
-                    email: session.user.email,
-                    role: 'dispatcher'
-                };
-            } else {
-                userProfile = data;
-            }
-        } catch (error) {
-            console.error('Error fetching user profile:', error);
-            userProfile = {
-                id: session.user.id,
-                email: session.user.email,
-                role: 'dispatcher'
-            };
+        if (profileError || !profile || profile.role !== 'dispatcher') {
+            redirect('/login?error=Access%20denied.%20Dispatcher%20privileges%20required.');
         }
 
         // Fetch drivers (users with role 'driver')
@@ -58,12 +40,10 @@ export default async function DriversPage() {
         if (driversError) {
             console.error('Error fetching drivers:', driversError);
         }
-
-        const { DriversView } = require('../components/DriversView');
         
-        return <DriversView user={session.user} userProfile={userProfile} drivers={drivers || []} />;
+        return <DriversView user={user} userProfile={profile} drivers={drivers || []} />;
     } catch (error) {
         console.error('Error in drivers page:', error);
-        redirect('/login?error=server_error');
+        redirect('/drivers?error=server_error');
     }
 }
