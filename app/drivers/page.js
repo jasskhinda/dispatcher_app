@@ -44,6 +44,6 @@ export default async function DriversPage() {
         return <DriversView user={user} userProfile={profile} drivers={drivers || []} />;
     } catch (error) {
         console.error('Error in drivers page:', error);
-        redirect('/drivers?error=server_error');
+        redirect('/login?error=server_error');
     }
 }
