@@ -1,29 +1,100 @@
 'use client';
 
 import { useState, useEffect, use } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 export default function DriverDetailPage({ params }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const supabase = createClientComponentClient();
   const unwrappedParams = use(params);
   const driverId = unwrappedParams.id;
-  const activeTab = searchParams.get('tab') || 'details';
   
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [driver, setDriver] = useState(null);
-  const [availableTrips, setAvailableTrips] = useState([]);
-  const [currentTrips, setCurrentTrips] = useState([]);
-  const [pastTrips, setPastTrips] = useState([]);
-  const [tripsLoading, setTripsLoading] = useState(false);
-  const [assignmentLoading, setAssignmentLoading] = useState(false);
-  const [actionMessage, setActionMessage] = useState('');
+  const [assignedTrips, setAssignedTrips] = useState([]);
+  const [waitingTrips, setWaitingTrips] = useState([]);
+  const [rejectedTrips, setRejectedTrips] = useState([]);
+  const [completedTrips, setCompletedTrips] = useState([]);
+  const [allTrips, setAllTrips] = useState([]);
+  const [tripStats, setTripStats] = useState({
+    total_trips: 0,
+    completed_trips: 0,
+    assigned_trips: 0,
+    waiting_trips: 0,
+    rejected_trips: 0
+  });
 
-  const loadDriverData = async (session) => {
+  // Helper function to process client information for a trip
+  const processClientInfo = async (trip) => {
+    // Handle individual clients from BookingCCT app
+    if (trip.user_id) {
+      try {
+        const { data: clientProfile } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, full_name, email, phone_number, role')
+          .eq('id', trip.user_id)
+          .single();
+        
+        if (clientProfile) {
+          trip.profiles = {
+            id: clientProfile.id,
+            first_name: clientProfile.first_name,
+            last_name: clientProfile.last_name,
+            full_name: clientProfile.full_name || `${clientProfile.first_name || ''} ${clientProfile.last_name || ''}`.trim(),
+            email: clientProfile.email,
+            phone_number: clientProfile.phone_number,
+            role: clientProfile.role
+          };
+        }
+      } catch (clientError) {
+        console.warn(`Could not fetch individual client for trip ${trip.id}:`, clientError.message);
+      }
+    }
+    // Handle facility managed clients from facility_app
+    else if (trip.managed_client_id) {
+      try {
+        const { data: managedClient } = await supabase
+          .from('facility_managed_clients')
+          .select('id, first_name, last_name, email, phone_number')
+          .eq('id', trip.managed_client_id)
+          .single();
+        
+        if (managedClient) {
+          trip.profiles = {
+            id: managedClient.id,
+            first_name: managedClient.first_name,
+            last_name: managedClient.last_name,
+            full_name: `${managedClient.first_name || ''} ${managedClient.last_name || ''}`.trim(),
+            email: managedClient.email,
+            phone_number: managedClient.phone_number,
+            role: 'facility_client'
+          };
+        }
+      } catch (clientError) {
+        console.warn(`Could not fetch managed client for trip ${trip.id}:`, clientError.message);
+      }
+    }
+    
+    // Create fallback profile if needed
+    if (!trip.profiles || !trip.profiles.full_name) {
+      let fallbackName = trip.client_name || trip.passenger_name || 'Unknown Client';
+      let fallbackEmail = trip.client_email || 'No email available';
+      
+      trip.profiles = {
+        full_name: fallbackName,
+        email: fallbackEmail,
+        first_name: fallbackName.split(' ')[0],
+        last_name: fallbackName.split(' ').slice(1).join(' ') || '',
+        role: trip.facility_id ? 'facility_client' : 'client',
+        ...(trip.profiles || {})
+      };
+    }
+  };
+
+  const loadDriverData = async () => {
     try {
       // Get driver profile
       const { data, error } = await supabase
@@ -46,301 +117,50 @@ export default function DriverDetailPage({ params }) {
       }
       
       setDriver(data);
+
+      // Load all trips for this driver
+      const { data: tripsData, error: tripsError } = await supabase
+        .from('trips')
+        .select('*')
+        .eq('driver_id', driverId)
+        .order('created_at', { ascending: false });
+
+      if (tripsError) {
+        console.error('Error fetching trips:', tripsError);
+      } else if (tripsData) {
+        // Process each trip to get client information
+        for (let trip of tripsData) {
+          await processClientInfo(trip);
+        }
+        
+        setAllTrips(tripsData);
+
+        // Categorize trips
+        const assigned = tripsData.filter(trip => ['in_progress', 'upcoming'].includes(trip.status));
+        const waiting = tripsData.filter(trip => trip.status === 'awaiting_driver_acceptance');
+        const rejected = tripsData.filter(trip => trip.status === 'rejected' && trip.rejected_by_driver_id === driverId);
+        const completed = tripsData.filter(trip => trip.status === 'completed');
+
+        setAssignedTrips(assigned);
+        setWaitingTrips(waiting);
+        setRejectedTrips(rejected);
+        setCompletedTrips(completed);
+
+        // Calculate trip statistics
+        const stats = {
+          total_trips: tripsData.length,
+          completed_trips: completed.length,
+          assigned_trips: assigned.length,
+          waiting_trips: waiting.length,
+          rejected_trips: rejected.length
+        };
+        setTripStats(stats);
+      }
+      
       setLoading(false);
     } catch (err) {
       setError(`An unexpected error occurred: ${err.message}`);
       setLoading(false);
-    }
-  };
-
-  const loadCurrentTrips = async () => {
-    try {
-      // Get current trips assigned to this driver (in progress, upcoming with driver assigned)
-      const { data: tripsData, error } = await supabase
-        .from('trips')
-        .select('*')
-        .eq('driver_id', driverId)
-        .in('status', ['in_progress', 'upcoming'])
-        .order('pickup_time', { ascending: true });
-
-      if (error) {
-        throw error;
-      }
-
-      // Enrich with client and facility information
-      const enrichedTrips = await Promise.all(
-        (tripsData || []).map(async (trip) => {
-          let clientInfo = null;
-          let facilityInfo = null;
-
-          if (trip.user_id) {
-            try {
-              const { data: clientData } = await supabase
-                .from('profiles')
-                .select('first_name, last_name, phone_number, email')
-                .eq('id', trip.user_id)
-                .single();
-              
-              if (clientData) {
-                clientInfo = clientData;
-              }
-            } catch (err) {
-              console.error('Error loading client info:', err);
-            }
-          }
-
-          if (trip.facility_id) {
-            try {
-              const { data: facilityData } = await supabase
-                .from('facilities')
-                .select('name, contact_email, contact_phone')
-                .eq('id', trip.facility_id)
-                .single();
-              
-              if (facilityData) {
-                facilityInfo = facilityData;
-              }
-            } catch (err) {
-              console.error('Error loading facility info:', err);
-            }
-          }
-
-          return {
-            ...trip,
-            clientInfo,
-            facilityInfo
-          };
-        })
-      );
-
-      setCurrentTrips(enrichedTrips);
-      console.log('Current trips loaded:', enrichedTrips.map(t => ({ id: t.id.slice(0, 8), status: t.status })));
-    } catch (err) {
-      console.error('Error loading current trips:', err);
-    }
-  };
-
-  const loadPastTrips = async () => {
-    try {
-      // Get past trips by this driver (completed, cancelled)
-      const { data: tripsData, error } = await supabase
-        .from('trips')
-        .select('*')
-        .eq('driver_id', driverId)
-        .in('status', ['completed', 'cancelled'])
-        .order('pickup_time', { ascending: false })
-        .limit(20);
-
-      if (error) {
-        throw error;
-      }
-
-      // Enrich with client and facility information
-      const enrichedTrips = await Promise.all(
-        (tripsData || []).map(async (trip) => {
-          let clientInfo = null;
-          let facilityInfo = null;
-
-          if (trip.user_id) {
-            try {
-              const { data: clientData } = await supabase
-                .from('profiles')
-                .select('first_name, last_name, phone_number, email')
-                .eq('id', trip.user_id)
-                .single();
-              
-              if (clientData) {
-                clientInfo = clientData;
-              }
-            } catch (err) {
-              console.error('Error loading client info:', err);
-            }
-          }
-
-          if (trip.facility_id) {
-            try {
-              const { data: facilityData } = await supabase
-                .from('facilities')
-                .select('name, contact_email, contact_phone')
-                .eq('id', trip.facility_id)
-                .single();
-              
-              if (facilityData) {
-                facilityInfo = facilityData;
-              }
-            } catch (err) {
-              console.error('Error loading facility info:', err);
-            }
-          }
-
-          return {
-            ...trip,
-            clientInfo,
-            facilityInfo
-          };
-        })
-      );
-
-      setPastTrips(enrichedTrips);
-    } catch (err) {
-      console.error('Error loading past trips:', err);
-    }
-  };
-
-  const loadAvailableTrips = async () => {
-    setTripsLoading(true);
-    try {
-      // Get upcoming trips that don't have a driver assigned
-      const { data: tripsData, error } = await supabase
-        .from('trips')
-        .select('*')
-        .eq('status', 'upcoming')
-        .is('driver_id', null)
-        .order('pickup_time', { ascending: true });
-
-      if (error) {
-        throw error;
-      }
-
-      // Enrich trips with client and facility information
-      const enrichedTrips = await Promise.all(
-        (tripsData || []).map(async (trip) => {
-          let clientInfo = null;
-          let facilityInfo = null;
-
-          // Get client information if user_id exists
-          if (trip.user_id) {
-            try {
-              const { data: clientData } = await supabase
-                .from('profiles')
-                .select('first_name, last_name, phone_number, email')
-                .eq('id', trip.user_id)
-                .single();
-              
-              if (clientData) {
-                clientInfo = clientData;
-              }
-            } catch (err) {
-              console.error('Error loading client info:', err);
-            }
-          }
-
-          // Get facility information if facility_id exists
-          if (trip.facility_id) {
-            try {
-              const { data: facilityData } = await supabase
-                .from('facilities')
-                .select('name, contact_email, contact_phone')
-                .eq('id', trip.facility_id)
-                .single();
-              
-              if (facilityData) {
-                facilityInfo = facilityData;
-              }
-            } catch (err) {
-              console.error('Error loading facility info:', err);
-            }
-          }
-
-          return {
-            ...trip,
-            clientInfo,
-            facilityInfo
-          };
-        })
-      );
-
-      setAvailableTrips(enrichedTrips);
-    } catch (err) {
-      setError(`Error loading available trips: ${err.message}`);
-    } finally {
-      setTripsLoading(false);
-    }
-  };
-
-  const handleAssignTrip = async (tripId) => {
-    setAssignmentLoading(true);
-    setActionMessage('');
-    
-    try {
-      const response = await fetch('/api/trips/assign-driver', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          tripId: tripId,
-          driverId: driverId
-        }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to assign trip');
-      }
-
-      setActionMessage(result.message || 'Trip assigned successfully!');
-      
-      // Refresh available trips and current trips
-      await loadAvailableTrips();
-      await loadCurrentTrips();
-      
-      // Clear message after 3 seconds
-      setTimeout(() => setActionMessage(''), 3000);
-
-    } catch (err) {
-      setActionMessage(`Error: ${err.message}`);
-      setTimeout(() => setActionMessage(''), 5000);
-    } finally {
-      setAssignmentLoading(false);
-    }
-  };
-
-  const handleCompleteTrip = async (tripId) => {
-    if (!confirm('Are you sure you want to mark this trip as completed?')) {
-      return;
-    }
-
-    setAssignmentLoading(true);
-    setActionMessage('');
-    
-    try {
-      console.log('Attempting to complete trip:', tripId);
-      
-      const response = await fetch('/api/trips/actions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          tripId: tripId,
-          action: 'complete'
-        }),
-      });
-
-      const result = await response.json();
-      console.log('Complete trip response:', result);
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to complete trip');
-      }
-
-      setActionMessage(result.message || 'Trip completed successfully!');
-      
-      // Refresh current trips and past trips
-      await loadCurrentTrips();
-      await loadPastTrips();
-      
-      // Clear message after 3 seconds
-      setTimeout(() => setActionMessage(''), 3000);
-
-    } catch (err) {
-      console.error('Error completing trip:', err);
-      setActionMessage(`Error: ${err.message}`);
-      setTimeout(() => setActionMessage(''), 5000);
-    } finally {
-      setAssignmentLoading(false);
     }
   };
 
@@ -371,29 +191,19 @@ export default function DriverDetailPage({ params }) {
       }
       
       // Load the driver data
-      await loadDriverData(session);
-      
-      // Load current trips and past trips for driver details
-      if (activeTab === 'details' || activeTab === null) {
-        await loadCurrentTrips();
-        await loadPastTrips();
-      }
-      
-      // Load available trips if on assign-trips tab
-      if (activeTab === 'assign-trips') {
-        await loadAvailableTrips();
-      }
+      await loadDriverData();
     };
     
     checkAuth();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router, supabase, driverId, activeTab]);
+  }, [router, supabase, driverId]);
   
   // Show loading if not authenticated yet
   if (!user) {
     return null;
   }
   
+  // Format date helper
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -405,56 +215,182 @@ export default function DriverDetailPage({ params }) {
     });
   };
 
-  const getClientDisplayName = (trip) => {
-    if (trip.facility_id && trip.facilityInfo) {
-      return trip.facilityInfo.name || 'Facility Trip';
-    }
-    if (trip.user_id && trip.clientInfo) {
-      const { first_name, last_name } = trip.clientInfo;
-      return `${first_name || ''} ${last_name || ''}`.trim() || 'Individual Client';
-    }
-    return trip.facility_id ? 'Facility Trip' : 'Individual Trip';
-  };
-
-  const getClientDetails = (trip) => {
-    if (trip.facility_id && trip.facilityInfo) {
-      return {
-        type: 'facility',
-        facilityName: trip.facilityInfo.name || 'Unknown Facility',
-        contactEmail: trip.facilityInfo.contact_email || 'N/A',
-        contactPhone: trip.facilityInfo.contact_phone || 'N/A'
-      };
-    }
-    if (trip.user_id && trip.clientInfo) {
-      return {
-        type: 'individual',
-        clientName: `${trip.clientInfo.first_name || ''} ${trip.clientInfo.last_name || ''}`.trim() || 'Unknown Client',
-        email: trip.clientInfo.email || 'N/A',
-        phone: trip.clientInfo.phone_number || 'N/A'
-      };
-    }
-    return {
-      type: 'unknown',
-      clientName: 'Unknown Client',
-      email: 'N/A',
-      phone: 'N/A'
-    };
-  };
-
+  // Status badge helper
   const getStatusBadge = (status) => {
-    const configs = {
-      'upcoming': { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Upcoming' },
-      'in_progress': { bg: 'bg-orange-100', text: 'text-orange-800', label: 'In Progress' },
-      'completed': { bg: 'bg-green-100', text: 'text-green-800', label: 'Completed' },
-      'cancelled': { bg: 'bg-red-100', text: 'text-red-800', label: 'Cancelled' }
+    const statusConfig = {
+      upcoming: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Upcoming' },
+      pending: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Pending' },
+      in_progress: { bg: 'bg-green-100', text: 'text-green-800', label: 'In Progress' },
+      completed: { bg: 'bg-gray-100', text: 'text-gray-700', label: 'Completed' },
+      cancelled: { bg: 'bg-red-100', text: 'text-red-800', label: 'Cancelled' },
+      rejected: { bg: 'bg-red-100', text: 'text-red-800', label: 'Rejected' },
+      awaiting_driver_acceptance: { bg: 'bg-orange-100', text: 'text-orange-800', label: 'Awaiting Acceptance' }
     };
     
-    const config = configs[status] || { bg: 'bg-gray-100', text: 'text-gray-800', label: status };
+    const config = statusConfig[status] || { bg: 'bg-gray-100', text: 'text-gray-700', label: status || 'Unknown' };
     
     return (
       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
         {config.label}
       </span>
+    );
+  };
+
+  // Render trip table helper
+  const renderTripTable = (trips, title, showAssignButton = false, showCompleteButton = false) => {
+    const subtitle = title === 'ASSIGNED TRIPS' 
+      ? 'Trips currently assigned to this driver that can be marked as completed' 
+      : title === 'WAITING ACCEPTANCE'
+      ? 'Trips assigned to this driver awaiting driver acceptance'
+      : title === 'REJECTED TRIPS'
+      ? 'Trips that have been rejected by this driver'
+      : title === 'COMPLETED TRIPS'
+      ? 'Recently completed trips by this driver'
+      : 'Driver trip history and management';
+
+    return (
+      <div className="mb-8">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-medium text-gray-900">{title}</h3>
+                <p className="text-sm text-gray-500 mt-1">{subtitle} • {trips.length} trip(s)</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+                    Trip ID
+                  </th>
+                  <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Client Information
+                  </th>
+                  <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Trip Route
+                  </th>
+                  <th scope="col" className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+                    Status
+                  </th>
+                  <th scope="col" className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
+                    Pickup Date & Time
+                  </th>
+                  <th scope="col" className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {trips.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="px-6 py-12 text-center">
+                      <div className="flex flex-col items-center max-w-md mx-auto">
+                        <svg className="w-16 h-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">No trips found</h3>
+                        <p className="text-sm text-gray-500">No trips in this category yet.</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  trips.map((trip) => (
+                    <tr key={trip.id} className="hover:bg-gray-50">
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        <div className="text-xs font-mono text-gray-900" title={trip.id}>
+                          {trip.id.substring(0, 8)}...
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 max-w-sm">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-8 w-8">
+                            <div className="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center">
+                              {trip.facility ? (
+                                <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                </svg>
+                              ) : (
+                                <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                </svg>
+                              )}
+                            </div>
+                          </div>
+                          <div className="ml-3 min-w-0 flex-1">
+                            {trip.facility ? (
+                              <>
+                                <div className="text-xs font-medium text-blue-600 truncate">
+                                  {trip.facility.name}
+                                </div>
+                                <div className="text-xs font-medium text-gray-900 truncate">
+                                  {trip.profiles?.full_name || 
+                                   `${trip.profiles?.first_name || ''} ${trip.profiles?.last_name || ''}`.trim() || 
+                                   trip.client_name ||
+                                   'Unknown Client'}
+                                </div>
+                                <div className="text-xs text-gray-500 truncate">
+                                  {trip.profiles?.email || trip.client_email || 'No email'}
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="text-xs font-medium text-gray-900 truncate">
+                                  {trip.profiles?.full_name || 
+                                   `${trip.profiles?.first_name || ''} ${trip.profiles?.last_name || ''}`.trim() || 
+                                   trip.client_name ||
+                                   'Unknown Client'}
+                                </div>
+                                <div className="text-xs text-gray-500 truncate">
+                                  {trip.profiles?.email || trip.client_email || 'No email'}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 max-w-xs">
+                        <div className="text-xs text-gray-900">
+                          <div className="font-medium truncate" title={trip.pickup_address}>
+                            From: {trip.pickup_address?.substring(0, 30) || 'Not specified'}{trip.pickup_address?.length > 30 ? '...' : ''}
+                          </div>
+                          <div className="text-gray-500 truncate" title={trip.destination_address}>
+                            To: {trip.destination_address?.substring(0, 30) || 'Not specified'}{trip.destination_address?.length > 30 ? '...' : ''}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap text-center">
+                        {getStatusBadge(trip.status)}
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap text-center text-xs text-gray-500">
+                        <div>{formatDate(trip.pickup_time || trip.created_at)}</div>
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap text-center text-sm font-medium">
+                        <div className="flex justify-center space-x-1">
+                          <button
+                            onClick={() => router.push(`/trips/${trip.id}`)}
+                            className="inline-flex items-center px-2 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded border transition-colors"
+                            title="View trip details"
+                          >
+                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                            View
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     );
   };
 
@@ -465,35 +401,30 @@ export default function DriverDetailPage({ params }) {
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">
-                {driver ? `${driver.first_name || ''} ${driver.last_name || ''}`.trim() || 'Driver Details' : 'Driver Details'}
-              </h1>
+              <h1 className="text-3xl font-bold text-gray-900">Driver Management</h1>
               <p className="mt-2 text-sm text-gray-600">
-                Manage driver information and assign trips
+                Comprehensive driver profile and trip management
               </p>
             </div>
-            <button
-              onClick={() => router.push('/drivers')}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-            >
-              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-              Back to Drivers
-            </button>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => router.push('/drivers')}
+                className="inline-flex items-center px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-medium rounded-lg shadow-sm transition-colors"
+              >
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                Back to Drivers
+              </button>
+              <button
+                onClick={() => router.push(`/drivers/${driverId}/assign-trip`)}
+                className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm transition-colors"
+              >
+                Assign Trip
+              </button>
+            </div>
           </div>
         </div>
-
-        {/* Action Message */}
-        {actionMessage && (
-          <div className={`mb-6 p-4 rounded-lg ${
-            actionMessage.includes('Error') 
-              ? 'bg-red-100 border border-red-400 text-red-700'
-              : 'bg-green-100 border border-green-400 text-green-700'
-          }`}>
-            <p className="font-semibold">{actionMessage}</p>
-          </div>
-        )}
 
         {/* Error Display */}
         {error && (
@@ -512,419 +443,148 @@ export default function DriverDetailPage({ params }) {
 
         {/* Driver Content */}
         {driver && !loading && (
-          <div>
-            {/* Tab Navigation */}
-            <div className="border-b border-gray-200 mb-6">
-              <nav className="-mb-px flex space-x-8">
-                <button
-                  onClick={() => router.push(`/drivers/${driverId}?tab=details`)}
-                  className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                    activeTab === 'details' || activeTab === null
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  Driver Details
-                </button>
-                <button
-                  onClick={() => router.push(`/drivers/${driverId}?tab=assign-trips`)}
-                  className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                    activeTab === 'assign-trips'
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  Assign Trips
-                  {availableTrips.length > 0 && (
-                    <span className="ml-2 bg-blue-100 text-blue-600 py-0.5 px-2 rounded-full text-xs">
-                      {availableTrips.length}
-                    </span>
-                  )}
-                </button>
-              </nav>
+          <>
+            {/* Driver Info Card - Match assign-trip page style */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0 h-12 w-12">
+                    <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
+                      <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div className="ml-4">
+                    <h3 className="text-lg font-medium text-gray-900">
+                      {driver.full_name || `${driver.first_name || ''} ${driver.last_name || ''}`.trim() || 'Unnamed Driver'}
+                    </h3>
+                    <p className="text-sm text-gray-500">{driver.email}</p>
+                    <p className="text-xs text-blue-600 font-medium mt-1">🚗 Available for Assignment</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 8 8">
+                      <circle cx={4} cy={4} r={3} />
+                    </svg>
+                    {driver.status === 'active' ? 'Active' : driver.status || 'Active'}
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {/* Tab Content */}
-            {(activeTab === 'details' || activeTab === null) && (
-              <div className="space-y-6">
-                {/* Driver Info Card */}
-                <div className="bg-white shadow-lg rounded-xl p-8 border border-gray-200">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    {/* Personal Information */}
-                    <div className="md:col-span-2 space-y-6">
-                      <h2 className="text-xl font-bold text-gray-900 pb-3 border-b-2 border-gray-300 mb-6">
-                        Personal Information
-                      </h2>
-                      
-                      <div className="grid grid-cols-2 gap-6">
-                        <div>
-                          <p className="text-sm font-medium text-gray-700 mb-2">First Name</p>
-                          <p className="text-lg font-semibold text-gray-900 bg-gray-50 px-4 py-3 rounded-lg border">{driver.first_name || 'Not specified'}</p>
-                        </div>
-                        
-                        <div>
-                          <p className="text-sm font-medium text-gray-700 mb-2">Last Name</p>
-                          <p className="text-lg font-semibold text-gray-900 bg-gray-50 px-4 py-3 rounded-lg border">{driver.last_name || 'Not specified'}</p>
-                        </div>
-                        
-                        <div>
-                          <p className="text-sm font-medium text-gray-700 mb-2">Phone Number</p>
-                          <p className="text-lg font-semibold text-gray-900 bg-gray-50 px-4 py-3 rounded-lg border">{driver.phone_number || 'Not specified'}</p>
-                        </div>
-                        
-                        <div>
-                          <p className="text-sm font-medium text-gray-700 mb-2">Email</p>
-                          <p className="text-lg font-semibold text-gray-900 bg-gray-50 px-4 py-3 rounded-lg border">{driver.email || 'Not specified'}</p>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Status Information */}
-                    <div className="space-y-6">
-                      <h2 className="text-xl font-bold text-gray-900 pb-3 border-b-2 border-gray-300 mb-6">
-                        Status
-                      </h2>
-                      
-                      <div className="p-6 bg-blue-50 rounded-lg border border-blue-200">
-                        <p className="text-sm font-medium text-gray-700 mb-3">Current Status</p>
-                        <div className="flex items-center">
-                          <span className={`inline-flex rounded-full h-5 w-5 mr-4 ${
-                            driver.status === 'available' ? 'bg-green-500' : 
-                            driver.status === 'on_trip' ? 'bg-orange-500' : 
-                            driver.status === 'offline' ? 'bg-red-500' : 'bg-gray-500'
-                          }`}></span>
-                          <p className="text-xl font-bold text-gray-900 capitalize">{driver.status?.replace('_', ' ') || 'Available'}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Vehicle Information */}
-                  <div className="mt-10 space-y-6">
-                    <h2 className="text-xl font-bold text-gray-900 pb-3 border-b-2 border-gray-300 mb-6">
-                      Vehicle Information
-                    </h2>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <p className="text-sm font-medium text-gray-700 mb-2">Vehicle Model</p>
-                        <p className="text-lg font-semibold text-gray-900 bg-gray-50 px-4 py-3 rounded-lg border">{driver.vehicle_model || 'Not specified'}</p>
-                      </div>
-                      
-                      <div>
-                        <p className="text-sm font-medium text-gray-700 mb-2">License Plate</p>
-                        <p className="text-lg font-semibold text-gray-900 bg-gray-50 px-4 py-3 rounded-lg border">{driver.vehicle_license || 'Not specified'}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Current Trips Section */}
-                <div className="bg-white shadow rounded-lg overflow-hidden">
-                  <div className="px-6 py-4 border-b border-gray-200">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900">
-                      Current Trips
-                    </h3>
-                    <p className="mt-1 text-sm text-gray-500">
-                      Active trips assigned to this driver
-                    </p>
-                  </div>
-
-                  {currentTrips.length === 0 ? (
-                    <div className="p-8 text-center">
-                      <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v11a2 2 0 002 2h6a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                      </svg>
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">No Current Trips</h3>
-                      <p className="text-gray-500">
-                        This driver has no active trips assigned.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Trip Details
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Route
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Status
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Pickup Time
-                            </th>
-                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Actions
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {currentTrips.map((trip) => (
-                            <tr key={trip.id} className="hover:bg-gray-50">
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm font-medium text-gray-900">
-                                  #{trip.id.slice(0, 8)}
-                                </div>
-                                <div className="text-sm text-gray-500">
-                                  {getClientDisplayName(trip)}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4">
-                                <div className="text-sm text-gray-900">
-                                  <div className="font-medium">From: {trip.pickup_address || 'Not specified'}</div>
-                                  <div className="text-gray-500">To: {trip.destination_address || 'Not specified'}</div>
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                {getStatusBadge(trip.status)}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {formatDate(trip.pickup_time)}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                {(trip.status === 'in_progress' || trip.status === 'upcoming') && (
-                                  <button
-                                    onClick={() => handleCompleteTrip(trip.id)}
-                                    disabled={assignmentLoading}
-                                    className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
-                                  >
-                                    {assignmentLoading ? 'Completing...' : 'Complete Trip'}
-                                  </button>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-
-                {/* Past Trips Section */}
-                <div className="bg-white shadow rounded-lg overflow-hidden">
-                  <div className="px-6 py-4 border-b border-gray-200">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900">
-                      Past Trips
-                    </h3>
-                    <p className="mt-1 text-sm text-gray-500">
-                      Recent completed and cancelled trips by this driver
-                    </p>
-                  </div>
-
-                  {pastTrips.length === 0 ? (
-                    <div className="p-8 text-center">
-                      <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">No Past Trips</h3>
-                      <p className="text-gray-500">
-                        This driver has no completed or cancelled trips yet.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Trip Details
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Route
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Status
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Pickup Time
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Price
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {pastTrips.map((trip) => (
-                            <tr key={trip.id} className="hover:bg-gray-50">
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm font-medium text-gray-900">
-                                  #{trip.id.slice(0, 8)}
-                                </div>
-                                <div className="text-sm text-gray-500">
-                                  {getClientDisplayName(trip)}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4">
-                                <div className="text-sm text-gray-900">
-                                  <div className="font-medium">From: {trip.pickup_address || 'Not specified'}</div>
-                                  <div className="text-gray-500">To: {trip.destination_address || 'Not specified'}</div>
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                {getStatusBadge(trip.status)}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {formatDate(trip.pickup_time)}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {trip.price ? `$${parseFloat(trip.price).toFixed(2)}` : 'N/A'}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Assign Trips Tab */}
-            {activeTab === 'assign-trips' && (
-              <div className="bg-white shadow rounded-lg overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-200">
-                  <h3 className="text-lg leading-6 font-medium text-gray-900">
-                    Available Trips for Assignment
-                  </h3>
-                  <p className="mt-1 text-sm text-gray-500">
-                    Select trips to assign to {driver.first_name} {driver.last_name}
-                  </p>
-                </div>
-
-                {tripsLoading ? (
-                  <div className="p-8 text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                    <p className="text-gray-600">Loading available trips...</p>
-                  </div>
-                ) : availableTrips.length === 0 ? (
-                  <div className="p-8 text-center">
-                    <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            {/* Stats */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+              <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0 p-3 bg-blue-100 rounded-lg">
+                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v11a2 2 0 002 2h6a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                     </svg>
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Available Trips</h3>
-                    <p className="text-gray-500">
-                      There are currently no upcoming trips available for assignment.
-                    </p>
                   </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Trip ID
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Client Details
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Trip Route
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Pickup Time
-                          </th>
-                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {availableTrips.map((trip) => {
-                          const clientDetails = getClientDetails(trip);
-                          return (
-                            <tr key={trip.id} className="hover:bg-gray-50">
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm font-mono text-gray-900">
-                                  #{trip.id.slice(0, 8)}
-                                </div>
-                                <div className="text-xs text-gray-500">
-                                  {trip.id.slice(8, 16)}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4">
-                                <div className="flex items-start">
-                                  <div className="flex-shrink-0 h-10 w-10 mr-3">
-                                    <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
-                                      {trip.facility_id ? (
-                                        <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                                        </svg>
-                                      ) : (
-                                        <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                        </svg>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    {clientDetails.type === 'facility' ? (
-                                      <>
-                                        <div className="text-sm font-medium text-gray-900">
-                                          {clientDetails.facilityName}
-                                        </div>
-                                        <div className="text-sm text-gray-500">
-                                          Facility Trip
-                                        </div>
-                                        <div className="text-xs text-gray-400 mt-1">
-                                          <div>📧 {clientDetails.contactEmail}</div>
-                                          <div>📞 {clientDetails.contactPhone}</div>
-                                        </div>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <div className="text-sm font-medium text-gray-900">
-                                          {clientDetails.clientName}
-                                        </div>
-                                        <div className="text-sm text-gray-500">
-                                          Individual Trip
-                                        </div>
-                                        <div className="text-xs text-gray-400 mt-1">
-                                          <div>📧 {clientDetails.email}</div>
-                                          <div>📞 {clientDetails.phone}</div>
-                                        </div>
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="px-6 py-4">
-                                <div className="text-sm text-gray-900">
-                                  <div className="font-medium mb-1">
-                                    📍 <span className="text-green-600">From:</span> {trip.pickup_address || 'Not specified'}
-                                  </div>
-                                  <div className="text-gray-600">
-                                    🎯 <span className="text-red-600">To:</span> {trip.destination_address || 'Not specified'}
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                <div className="font-medium">
-                                  {formatDate(trip.pickup_time)}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                <button
-                                  onClick={() => handleAssignTrip(trip.id)}
-                                  disabled={assignmentLoading}
-                                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-                                >
-                                  {assignmentLoading ? 'Assigning...' : 'Assign Trip'}
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-500">Total Trips</p>
+                    <p className="text-2xl font-semibold text-gray-900">{tripStats?.total_trips || allTrips.length}</p>
                   </div>
-                )}
+                </div>
               </div>
+
+              <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0 p-3 bg-green-100 rounded-lg">
+                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-500">Completed</p>
+                    <p className="text-2xl font-semibold text-gray-900">{tripStats?.completed_trips || completedTrips.length}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0 p-3 bg-yellow-100 rounded-lg">
+                    <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-500">Assigned</p>
+                    <p className="text-2xl font-semibold text-gray-900">{assignedTrips.length}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0 p-3 bg-orange-100 rounded-lg">
+                    <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.232 13.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-500">Waiting Acceptance</p>
+                    <p className="text-2xl font-semibold text-gray-900">{waitingTrips.length}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0 p-3 bg-red-100 rounded-lg">
+                    <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-500">Rejected</p>
+                    <p className="text-2xl font-semibold text-gray-900">{rejectedTrips.length}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Page Header */}
+            <div className="mb-8">
+              <h2 className="text-2xl font-bold text-gray-900">Trip Management for {driver.full_name || `${driver.first_name} ${driver.last_name}`}</h2>
+              <p className="text-sm text-gray-600 mt-1">Complete driver profile and trip history</p>
+            </div>
+
+            {/* ASSIGNED TRIPS Section */}
+            {renderTripTable(
+              assignedTrips || [], 
+              "ASSIGNED TRIPS", 
+              false,  // No assign button for assigned trips
+              true    // Show complete button for assigned trips
             )}
-          </div>
+
+            {/* WAITING ACCEPTANCE Section */}
+            {renderTripTable(
+              waitingTrips || [], 
+              "WAITING ACCEPTANCE", 
+              false,  // No assign button for waiting trips
+              false   // No complete button for waiting trips
+            )}
+
+            {/* REJECTED TRIPS Section */}
+            {renderTripTable(
+              rejectedTrips || [], 
+              "REJECTED TRIPS", 
+              false,  // No assign button for rejected trips
+              false   // No complete button for rejected trips
+            )}
+
+            {/* COMPLETED TRIPS Section */}
+            {renderTripTable(
+              completedTrips || [], 
+              "COMPLETED TRIPS", 
+              false,  // No assign button for completed trips
+              false   // No complete button for completed trips
+            )}
+          </>
         )}
       </div>
     </div>
