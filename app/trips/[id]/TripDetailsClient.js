@@ -439,6 +439,85 @@ export default function TripDetailsClient({ trip, user }) {
                   </div>
                 </div>
               </div>
+
+              {/* Driver Information Section */}
+              <div className="bg-white shadow-sm rounded-xl overflow-hidden mb-6 border border-gray-200">
+                <div className="px-6 py-5 border-b border-gray-200">
+                  <h3 className="text-lg font-semibold text-gray-900">Driver Information</h3>
+                </div>
+                <div className="p-6">
+                  {currentTrip.driver ? (
+                    <div>
+                      <h4 className="text-md font-medium text-gray-800 mb-3 flex items-center">
+                        🚗 Assigned Driver
+                      </h4>
+                      <dl className="space-y-3 pl-4 border-l-2 border-blue-200">
+                        <div>
+                          <dt className="text-sm font-medium text-gray-600">Driver Name</dt>
+                          <dd className="mt-1 text-sm text-gray-900 font-medium">
+                            {currentTrip.driver.full_name || `${currentTrip.driver.first_name || ''} ${currentTrip.driver.last_name || ''}`.trim() || 'Unnamed Driver'}
+                          </dd>
+                        </div>
+                        {currentTrip.driver.email && (
+                          <div>
+                            <dt className="text-sm font-medium text-gray-600">Email</dt>
+                            <dd className="mt-1 text-sm text-gray-900">{currentTrip.driver.email}</dd>
+                          </div>
+                        )}
+                        {currentTrip.driver.phone_number && (
+                          <div>
+                            <dt className="text-sm font-medium text-gray-600">Phone</dt>
+                            <dd className="mt-1 text-sm text-gray-900">{currentTrip.driver.phone_number}</dd>
+                          </div>
+                        )}
+                        {currentTrip.driver.vehicle_model && (
+                          <div>
+                            <dt className="text-sm font-medium text-gray-600">Vehicle</dt>
+                            <dd className="mt-1 text-sm text-gray-900">{currentTrip.driver.vehicle_model}</dd>
+                          </div>
+                        )}
+                        {currentTrip.driver.vehicle_license && (
+                          <div>
+                            <dt className="text-sm font-medium text-gray-600">License Plate</dt>
+                            <dd className="mt-1 text-sm text-gray-900">{currentTrip.driver.vehicle_license}</dd>
+                          </div>
+                        )}
+                        <div>
+                          <dt className="text-sm font-medium text-gray-600">Status</dt>
+                          <dd className="mt-1">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              currentTrip.driver.status === 'available' ? 'bg-green-100 text-green-800' : 
+                              currentTrip.driver.status === 'on_trip' ? 'bg-orange-100 text-orange-800' : 
+                              currentTrip.driver.status === 'offline' ? 'bg-red-100 text-red-800' : 
+                              'bg-blue-100 text-blue-800'
+                            }`}>
+                              {currentTrip.driver.status?.replace('_', ' ') || 'Available'}
+                            </span>
+                          </dd>
+                        </div>
+                      </dl>
+                    </div>
+                  ) : (
+                    <div>
+                      <h4 className="text-md font-medium text-gray-800 mb-3 flex items-center">
+                        🚫 No Driver Assigned
+                      </h4>
+                      <div className="pl-4 border-l-2 border-gray-200">
+                        <p className="text-sm text-gray-600 mb-4">No driver assigned to this trip</p>
+                        <button
+                          onClick={() => router.push('/drivers')}
+                          className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm transition-colors text-sm"
+                        >
+                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                          </svg>
+                          Assign Driver
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}

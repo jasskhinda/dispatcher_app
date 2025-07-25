@@ -140,6 +140,20 @@ export default async function TripDetailsPage({ params }) {
       }
     }
 
+    // Fetch driver information if trip has a driver assigned
+    if (trip.driver_id) {
+      const { data: driverData } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, full_name, email, phone_number, vehicle_model, vehicle_license, status')
+        .eq('id', trip.driver_id)
+        .eq('role', 'driver')
+        .single();
+        
+      if (driverData) {
+        trip.driver = driverData;
+      }
+    }
+
     return <TripDetailsClient trip={trip} user={session.user} />;
   } catch (error) {
     console.error('Error in trip details page:', error);
