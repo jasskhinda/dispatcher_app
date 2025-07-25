@@ -2,38 +2,23 @@
 
 import { DriversView } from '@/app/components/DriversView';
 import { useState, useEffect } from 'react';
-import { createClient } from '@/utils/supabase/client';
+import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/lib/supabase';
 
 export default function DispatcherDriversPage() {
     const [drivers, setDrivers] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [user, setUser] = useState(null);
-    const [userProfile, setUserProfile] = useState(null);
+    const { user, userProfile } = useAuth();
 
     useEffect(() => {
-        async function loadData() {
+        async function loadDrivers() {
             try {
-                const supabase = createClient();
-                
-                // Get current user
-                const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
-                
-                if (userError || !currentUser) {
-                    window.location.href = '/login';
+                // Check if user is authenticated through context
+                if (!user || !userProfile) {
+                    setLoading(false);
                     return;
                 }
-                
-                setUser(currentUser);
-                
-                // Get user profile
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', currentUser.id)
-                    .single();
-                
-                setUserProfile(profile);
-                
+
                 // Fetch drivers
                 const { data: driverProfiles, error: driversError } = await supabase
                     .from('profiles')
@@ -120,8 +105,8 @@ export default function DispatcherDriversPage() {
             }
         }
         
-        loadData();
-    }, []);
+        loadDrivers();
+    }, [user, userProfile]);
 
     if (loading) {
         return (
