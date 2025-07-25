@@ -17,6 +17,23 @@ export default function AssignTripView({ user, userProfile, driver, availableTri
       facility: availableTrips[0].facility
     } : null
   });
+
+  // Debug: Show all trip statuses
+  if (availableTrips?.length > 0) {
+    const statusCounts = availableTrips.reduce((acc, trip) => {
+      acc[trip.status] = (acc[trip.status] || 0) + 1;
+      return acc;
+    }, {});
+    console.log('🔍 All trip statuses in data:', statusCounts);
+    
+    // Show trips without drivers
+    const tripsWithoutDrivers = availableTrips.filter(trip => !trip.driver_id);
+    console.log(`🚗 Trips without drivers: ${tripsWithoutDrivers.length}`, 
+      tripsWithoutDrivers.reduce((acc, trip) => {
+        acc[trip.status] = (acc[trip.status] || 0) + 1;
+        return acc;
+      }, {}));
+  }
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [sortBy, setSortBy] = useState('created_at');
@@ -44,10 +61,16 @@ export default function AssignTripView({ user, userProfile, driver, availableTri
   });
 
   // Filter trips for the two sections
-  // RECENT TRIPS: Only upcoming trips (approved by dispatcher) that need driver assignment
-  const recentTrips = availableTrips.filter(trip => 
-    trip.status === 'upcoming' && !trip.driver_id
-  );
+  // RECENT TRIPS: Trips that can be assigned to this driver (various assignable statuses without a driver)
+  const recentTrips = availableTrips.filter(trip => {
+    const assignableStatuses = ['pending', 'approved', 'upcoming', 'confirmed', 'scheduled', 'created'];
+    const isAssignable = assignableStatuses.includes(trip.status) && !trip.driver_id;
+    // Debug logging
+    if (assignableStatuses.includes(trip.status)) {
+      console.log(`Trip ${trip.id.substring(0, 8)}: status=${trip.status}, driver_id=${trip.driver_id}, assignable=${isAssignable}`);
+    }
+    return isAssignable;
+  });
   
   // COMPLETED TRIPS: Only trips that THIS SPECIFIC driver has completed/cancelled
   const completedTrips = availableTrips.filter(trip => 
@@ -530,7 +553,7 @@ export default function AssignTripView({ user, userProfile, driver, availableTri
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-500">Assignable Trips</p>
-                <p className="text-2xl font-semibold text-gray-900">{availableTrips.filter(trip => (trip.status === 'approved' || trip.status === 'upcoming') && !trip.driver_id).length}</p>
+                <p className="text-2xl font-semibold text-gray-900">{recentTrips.length}</p>
               </div>
             </div>
           </div>
