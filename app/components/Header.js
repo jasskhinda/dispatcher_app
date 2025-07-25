@@ -105,14 +105,6 @@ export default function Header() {
             CALENDAR
           </Link>
           <Link 
-            href="/drivers" 
-            className={`text-sm font-bold text-black hover:text-[#7CCFD0] transition-colors pb-1 ${
-              activeRoute.includes('/drivers') ? 'text-[#7CCFD0] border-b-2 border-[#7CCFD0]' : ''
-            }`}
-          >
-            DRIVERS
-          </Link>
-          <Link 
             href="/clients" 
             className={`text-sm font-bold text-black hover:text-[#7CCFD0] transition-colors pb-1 ${
               activeRoute.includes('/clients') ? 'text-[#7CCFD0] border-b-2 border-[#7CCFD0]' : ''
