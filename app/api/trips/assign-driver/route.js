@@ -127,50 +127,12 @@ export async function POST(request) {
       }, { status: 404 });
     }
 
-    // Check driver availability status
-    if (driver.status === 'on_trip') {
-      console.error(`❌ Driver unavailable [${requestId}]: ${driver.first_name} ${driver.last_name} is currently on another trip`);
-      return NextResponse.json({
-        error: 'Driver is currently on another trip',
-        details: `${driver.first_name} ${driver.last_name} is currently assigned to another trip and cannot be assigned to new trips until they complete their current trip.`,
-        driverStatus: driver.status,
-        requestId
-      }, { status: 400 });
-    }
+    // Log driver status for information but don't block assignment
+    console.log(`ℹ️ Driver status [${requestId}]: ${driver.first_name} ${driver.last_name} is currently ${driver.status || 'available'}`);
+    
+    // Note: Removed status restrictions - drivers can be assigned trips regardless of current status
 
-    if (driver.status === 'offline') {
-      console.error(`❌ Driver offline [${requestId}]: ${driver.first_name} ${driver.last_name} is offline`);
-      return NextResponse.json({
-        error: 'Driver is offline',
-        details: `${driver.first_name} ${driver.last_name} is currently offline and unavailable for trip assignments.`,
-        driverStatus: driver.status,
-        requestId
-      }, { status: 400 });
-    }
-
-    // Check for conflicting trips (optional - basic time conflict check)
-    if (trip.pickup_time) {
-      const { data: conflictingTrips, error: conflictError } = await supabase
-        .from('trips')
-        .select('id')
-        .eq('driver_id', driverId)
-        .in('status', ['confirmed', 'in_progress', 'upcoming'])
-        .gte('pickup_time', new Date(trip.pickup_time).toISOString())
-        .lte('pickup_time', new Date(new Date(trip.pickup_time).getTime() + 4 * 60 * 60 * 1000).toISOString()); // 4 hour window
-
-      if (conflictError) {
-        console.warn(`⚠️ Conflict check failed [${requestId}]:`, conflictError);
-        // Continue with assignment despite conflict check failure
-      } else if (conflictingTrips && conflictingTrips.length > 0) {
-        console.warn(`⚠️ Driver has conflicting trips [${requestId}]:`, conflictingTrips);
-        return NextResponse.json({ 
-          error: 'Driver has conflicting trips at this time',
-          details: `Driver ${driver.first_name} ${driver.last_name} has ${conflictingTrips.length} conflicting trip(s)`,
-          conflictingTrips,
-          requestId 
-        }, { status: 400 });
-      }
-    }
+    // Note: Time conflict checking removed - drivers can be assigned multiple trips regardless of timing
 
     console.log(`🔄 Assigning trip [${requestId}]: ${tripId} to driver ${driverId}`);
     
