@@ -222,37 +222,9 @@ export async function POST(request) {
 
     console.log(`✅ Successfully assigned trip [${requestId}]: ${tripId} to driver ${driverId}`);
     
-    // Send email notification to driver
-    try {
-      const { sendDriverAssignmentEmail, generateAssignmentToken } = await import('@/lib/emailService');
-      
-      // Generate secure token for accept/reject links
-      const assignmentToken = generateAssignmentToken(tripId, driverId);
-      
-      // Prepare trip info for email
-      const tripInfo = {
-        pickup_time: updatedTrip.pickup_time,
-        pickup_location: updatedTrip.pickup_location,
-        dropoff_location: updatedTrip.dropoff_location,
-        client_name: updatedTrip.client_name,
-        client_phone: updatedTrip.client_phone,
-        special_instructions: updatedTrip.special_instructions,
-        total_cost: updatedTrip.total_cost,
-        is_emergency: updatedTrip.is_emergency
-      };
-      
-      // Send the email
-      const emailResult = await sendDriverAssignmentEmail(driver, tripInfo, assignmentToken);
-      console.log(`📧 Email sent successfully [${requestId}]:`, emailResult.messageId);
-      
-    } catch (emailError) {
-      console.error(`⚠️ Failed to send email notification [${requestId}]:`, emailError);
-      // Don't fail the assignment if email fails - just log the error
-    }
-    
     return NextResponse.json({ 
       success: true,
-      message: `Trip successfully assigned to ${driver.first_name} ${driver.last_name}. Email notification sent.`,
+      message: `Trip successfully assigned to ${driver.first_name} ${driver.last_name}`,
       data: {
         tripId,
         driverId,
