@@ -19,12 +19,23 @@ export default function DispatcherDriversPage() {
                     return;
                 }
 
+                // First, let's check what profiles exist
+                const { data: allProfiles } = await supabase
+                    .from('profiles')
+                    .select('id, role, email, full_name')
+                    .limit(20);
+                
+                console.log('Sample profiles in database:', allProfiles?.map(p => ({ role: p.role, email: p.email })));
+                
                 // Fetch drivers
+                console.log('Fetching drivers from profiles table...');
                 const { data: driverProfiles, error: driversError } = await supabase
                     .from('profiles')
                     .select('*')
                     .eq('role', 'driver')
                     .order('created_at', { ascending: false });
+                
+                console.log('Driver query result:', { driverProfiles, driversError });
                 
                 if (driversError) {
                     console.error('Error fetching drivers:', driversError);
@@ -33,6 +44,7 @@ export default function DispatcherDriversPage() {
                 }
                 
                 const driversData = driverProfiles || [];
+                console.log(`Found ${driversData.length} drivers`);
                 
                 // Get trip statistics for all drivers
                 let driversWithTrips = driversData.map(driver => ({
