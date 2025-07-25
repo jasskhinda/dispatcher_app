@@ -1,9 +1,9 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 
-export default function TripResponsePage() {
+function TripResponseContent() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [result, setResult] = useState(null);
@@ -163,4 +163,19 @@ export default function TripResponsePage() {
   }
 
   return null;
+}
+
+export default function TripResponsePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#5fbfc0] mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    }>
+      <TripResponseContent />
+    </Suspense>
+  );
 }
