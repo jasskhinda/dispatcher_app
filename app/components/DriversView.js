@@ -368,7 +368,7 @@ export function DriversView({ user, userProfile, drivers: initialDrivers }) {
                               View
                             </button>
                             <button
-                              onClick={() => router.push(`/drivers/${driver.id}?tab=assign-trips`)}
+                              onClick={() => router.push(`/drivers/${driver.id}/assign-trip`)}
                               className="inline-flex items-center px-3 py-1 border border-transparent rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                             >
                               <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
