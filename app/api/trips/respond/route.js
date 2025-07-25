@@ -89,7 +89,7 @@ export async function POST(request) {
     }
 
     // Check if trip is in a state that allows response
-    if (!['confirmed', 'upcoming', 'in_progress'].includes(trip.status)) {
+    if (!['confirmed', 'upcoming', 'in_progress', 'awaiting_driver_acceptance'].includes(trip.status)) {
       console.error(`❌ Invalid trip status [${requestId}]:`, trip.status);
       return NextResponse.json({
         error: 'Trip cannot be modified',
@@ -118,11 +118,11 @@ export async function POST(request) {
       // Driver accepts the trip
       console.log(`✅ Driver accepting trip [${requestId}]`);
       
-      // Update trip status to confirmed/in_progress
+      // Update trip status to in_progress when driver accepts
       const { error: updateError } = await supabase
         .from('trips')
         .update({
-          status: 'confirmed', // or 'in_progress' depending on timing
+          status: 'in_progress',
           driver_response: 'accepted',
           driver_response_time: new Date().toISOString(),
           updated_at: new Date().toISOString()
@@ -171,13 +171,14 @@ export async function POST(request) {
       // Driver rejects the trip
       console.log(`❌ Driver rejecting trip [${requestId}]`);
       
-      // Remove driver assignment and set trip back to pending
+      // Remove driver assignment and set trip back to upcoming for reassignment
       const { error: updateError } = await supabase
         .from('trips')
         .update({
           driver_id: null,
-          status: 'pending',
+          status: 'upcoming',
           driver_response: 'rejected',
+          rejected_by_driver_id: driverId,
           driver_response_time: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })

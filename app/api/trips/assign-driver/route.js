@@ -139,13 +139,9 @@ export async function POST(request) {
     // Assign the trip to the driver
     const updateData = {
       driver_id: driverId,
+      status: 'awaiting_driver_acceptance',
       updated_at: new Date().toISOString()
     };
-
-    // Update trip status to in_progress if it's upcoming
-    if (trip.status === 'upcoming') {
-      updateData.status = 'in_progress';
-    }
 
     const { data: updatedTrip, error: updateError } = await supabase
       .from('trips')
@@ -164,23 +160,7 @@ export async function POST(request) {
       }, { status: 500 });
     }
 
-    // Update driver status to indicate they're on a trip
-    try {
-      const { error: driverUpdateError } = await supabase
-        .from('profiles')
-        .update({ 
-          status: 'on_trip',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', driverId);
-
-      if (driverUpdateError) {
-        console.warn(`⚠️ Driver status update failed [${requestId}]:`, driverUpdateError);
-        // Continue even if driver status update fails
-      }
-    } catch (driverUpdateErr) {
-      console.warn(`⚠️ Driver status update error [${requestId}]:`, driverUpdateErr);
-    }
+    // Note: Driver status will be updated to 'on_trip' when they accept the trip
 
     console.log(`✅ Successfully assigned trip [${requestId}]: ${tripId} to driver ${driverId}`);
     
