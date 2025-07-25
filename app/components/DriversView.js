@@ -5,6 +5,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 export function DriversView({ user, userProfile, drivers }) {
+  // Calculate statistics from drivers data
+  const stats = {
+    total: drivers.length,
+    available: drivers.filter(d => d.status === 'active').length,
+    on_trip: drivers.filter(d => d.status === 'on_trip').length,
+    offline: drivers.filter(d => d.status === 'inactive').length
+  };
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [sortBy, setSortBy] = useState('name');
@@ -263,8 +270,8 @@ export function DriversView({ user, userProfile, drivers }) {
               <div className="mt-4 sm:mt-0 sm:ml-4">
                 <select
                   className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
                 >
                   <option value="all">All Status</option>
                   <option value="available">Available</option>
@@ -302,12 +309,12 @@ export function DriversView({ user, userProfile, drivers }) {
               </svg>
               <h3 className="text-lg font-medium text-gray-900 mb-2">No drivers found</h3>
               <p className="text-gray-500 mb-4">
-                {searchTerm || statusFilter !== 'all' 
+                {searchTerm || filterStatus !== 'all' 
                   ? 'Try adjusting your search criteria or filters.'
                   : 'Get started by adding your first driver to the system.'
                 }
               </p>
-              {(!searchTerm && statusFilter === 'all') && (
+              {(!searchTerm && filterStatus === 'all') && (
                 <button
                   onClick={() => router.push('/drivers/add')}
                   className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
@@ -346,7 +353,6 @@ export function DriversView({ user, userProfile, drivers }) {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredDrivers.map((driver) => {
-                    const statusConfig = getStatusConfig(driver.status);
                     return (
                       <tr key={driver.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -377,10 +383,7 @@ export function DriversView({ user, userProfile, drivers }) {
                           <div className="text-sm text-gray-500">{driver.vehicle_license || 'No license plate'}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusConfig.bg} ${statusConfig.text}`}>
-                            <span className="mr-1">{statusConfig.icon}</span>
-                            {statusConfig.label}
-                          </span>
+                          {getStatusBadge(driver.status)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {formatDate(driver.created_at)}
