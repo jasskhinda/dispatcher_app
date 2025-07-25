@@ -1,50 +1,139 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
-export function DriversView({ user, userProfile, drivers: initialDrivers }) {
-  const router = useRouter();
-  const [drivers, setDrivers] = useState(initialDrivers || []);
-  const [loading, setLoading] = useState(false);
+export function DriversView({ user, userProfile, drivers, loading = false }) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [filteredDrivers, setFilteredDrivers] = useState(initialDrivers || []);
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [sortBy, setSortBy] = useState('name');
+  const [sortOrder, setSortOrder] = useState('asc');
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, driver: null, loading: false });
+  const [deleteError, setDeleteError] = useState('');
+  const router = useRouter();
 
-  // Filter drivers based on search and status
-  useEffect(() => {
-    let filtered = drivers;
-
-    // Apply search filter
-    if (searchTerm) {
-      filtered = filtered.filter(driver => 
-        driver.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        driver.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        driver.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        driver.phone_number?.includes(searchTerm) ||
-        driver.vehicle_model?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    // Apply status filter
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(driver => driver.status === statusFilter);
-    }
-
-    setFilteredDrivers(filtered);
-  }, [drivers, searchTerm, statusFilter]);
-
-  // Calculate statistics
+  // Calculate statistics from drivers data
   const stats = {
     total: drivers.length,
-    available: drivers.filter(d => d.status === 'available' || !d.status).length,
+    available: drivers.filter(d => d.status === 'active').length,
     on_trip: drivers.filter(d => d.status === 'on_trip').length,
-    offline: drivers.filter(d => d.status === 'offline').length,
-    active: drivers.filter(d => d.status !== 'inactive').length
+    offline: drivers.filter(d => d.status === 'inactive').length
+  };
+
+  // Filtering and sorting logic
+  const filteredDrivers = drivers.filter(driver => {
+    const matchesSearch = 
+      searchTerm === '' || 
+      driver.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      driver.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      driver.phone_number?.includes(searchTerm) ||
+      driver.vehicle?.make?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      driver.vehicle?.model?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      driver.vehicle?.license_plate?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesStatus = 
+      filterStatus === 'all' || 
+      (filterStatus === 'active' && driver.status === 'active') ||
+      (filterStatus === 'inactive' && driver.status === 'inactive') ||
+      (filterStatus === 'on_trip' && driver.status === 'on_trip') ||
+      (filterStatus === 'pending_verification' && driver.status === 'pending_verification') ||
+      (filterStatus === 'with_vehicle' && driver.vehicle);
+    
+    return matchesSearch && matchesStatus;
+  });
+
+  // Sort the filtered drivers
+  const sortedDrivers = [...filteredDrivers].sort((a, b) => {
+    if (sortBy === 'name') {
+      return sortOrder === 'asc' 
+        ? (a.full_name || '').localeCompare(b.full_name || '')
+        : (b.full_name || '').localeCompare(a.full_name || '');
+    } else if (sortBy === 'email') {
+      return sortOrder === 'asc' 
+        ? (a.email || '').localeCompare(b.email || '')
+        : (b.email || '').localeCompare(a.email || '');
+    } else if (sortBy === 'trips') {
+      return sortOrder === 'asc' 
+        ? (a.trip_count || 0) - (b.trip_count || 0)
+        : (b.trip_count || 0) - (a.trip_count || 0);
+    } else if (sortBy === 'completed_trips') {
+      return sortOrder === 'asc' 
+        ? (a.completed_trips || 0) - (b.completed_trips || 0)
+        : (b.completed_trips || 0) - (a.completed_trips || 0);
+    } else if (sortBy === 'last_trip') {
+      const dateA = a.last_trip ? new Date(a.last_trip.created_at) : new Date(0);
+      const dateB = b.last_trip ? new Date(b.last_trip.created_at) : new Date(0);
+      return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+    }
+    return 0;
+  });
+
+  const getStatusBadge = (status) => {
+    if (!status) status = 'inactive';
+    
+    const statusConfig = {
+      active: { bg: 'bg-green-100', text: 'text-green-800', label: 'Active' },
+      inactive: { bg: 'bg-gray-100', text: 'text-gray-800', label: 'Inactive' },
+      on_trip: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'On Trip' },
+      pending_verification: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Pending Verification' },
+    };
+    
+    const config = statusConfig[status] || statusConfig.inactive;
+    
+    return (
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
+        {config.label}
+      </span>
+    );
+  };
+
+  const handleAssignTrip = (driverId) => {
+    router.push(`/drivers/${driverId}/assign-trip`);
+  };
+
+  const handleDeleteDriver = (driver) => {
+    setDeleteModal({ isOpen: true, driver, loading: false });
+    setDeleteError('');
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteModal.driver) return;
+    
+    setDeleteModal(prev => ({ ...prev, loading: true }));
+    setDeleteError('');
+    
+    try {
+      const response = await fetch(`/api/dispatcher/delete-driver?driverId=${deleteModal.driver.id}`, {
+        method: 'DELETE',
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        setDeleteError(result.error || 'Deletion failed');
+        setDeleteModal(prev => ({ ...prev, loading: false }));
+        return;
+      }
+      
+      // Success - refresh the page
+      setDeleteModal({ isOpen: false, driver: null, loading: false });
+      router.refresh();
+      
+    } catch (error) {
+      console.error('Delete error:', error);
+      setDeleteError('An unexpected error occurred');
+      setDeleteModal(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  const cancelDelete = () => {
+    setDeleteModal({ isOpen: false, driver: null, loading: false });
+    setDeleteError('');
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'Unknown';
+    if (!dateString) return 'Never';
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
@@ -52,78 +141,27 @@ export function DriversView({ user, userProfile, drivers: initialDrivers }) {
     });
   };
 
-  const getStatusConfig = (status) => {
-    switch (status) {
-      case 'available':
-        return { 
-          bg: 'bg-green-100', 
-          text: 'text-green-800', 
-          icon: '✅',
-          label: 'Available'
-        };
-      case 'on_trip':
-        return { 
-          bg: 'bg-orange-100', 
-          text: 'text-orange-800', 
-          icon: '🚗',
-          label: 'On Trip'
-        };
-      case 'offline':
-        return { 
-          bg: 'bg-red-100', 
-          text: 'text-red-800', 
-          icon: '🔴',
-          label: 'Offline'
-        };
-      case 'inactive':
-        return { 
-          bg: 'bg-gray-100', 
-          text: 'text-gray-800', 
-          icon: '⏸️',
-          label: 'Inactive'
-        };
-      default:
-        return { 
-          bg: 'bg-blue-100', 
-          text: 'text-blue-800', 
-          icon: '✅',
-          label: 'Available'
-        };
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Driver Management</h1>
               <p className="mt-2 text-sm text-gray-600">
-                Manage your transportation team and track driver availability
+                Manage all drivers, vehicles, and trip assignments
               </p>
             </div>
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => router.push('/dashboard')}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-                Back to Dashboard
-              </button>
-              <button
-                onClick={() => router.push('/drivers/add')}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                Add New Driver
-              </button>
-            </div>
+            <Link
+              href="/drivers/add"
+              className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm transition-colors"
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              Add New Driver
+            </Link>
           </div>
         </div>
 
@@ -233,14 +271,13 @@ export function DriversView({ user, userProfile, drivers: initialDrivers }) {
               <div className="mt-4 sm:mt-0 sm:ml-4">
                 <select
                   className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
                 >
                   <option value="all">All Status</option>
-                  <option value="available">Available</option>
+                  <option value="active">Available</option>
                   <option value="on_trip">On Trip</option>
-                  <option value="offline">Offline</option>
-                  <option value="inactive">Inactive</option>
+                  <option value="inactive">Offline</option>
                 </select>
               </div>
             </div>
@@ -272,12 +309,12 @@ export function DriversView({ user, userProfile, drivers: initialDrivers }) {
               </svg>
               <h3 className="text-lg font-medium text-gray-900 mb-2">No drivers found</h3>
               <p className="text-gray-500 mb-4">
-                {searchTerm || statusFilter !== 'all' 
+                {searchTerm || filterStatus !== 'all' 
                   ? 'Try adjusting your search criteria or filters.'
                   : 'Get started by adding your first driver to the system.'
                 }
               </p>
-              {(!searchTerm && statusFilter === 'all') && (
+              {(!searchTerm && filterStatus === 'all') && (
                 <button
                   onClick={() => router.push('/drivers/add')}
                   className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
@@ -316,7 +353,6 @@ export function DriversView({ user, userProfile, drivers: initialDrivers }) {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredDrivers.map((driver) => {
-                    const statusConfig = getStatusConfig(driver.status);
                     return (
                       <tr key={driver.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -347,10 +383,7 @@ export function DriversView({ user, userProfile, drivers: initialDrivers }) {
                           <div className="text-sm text-gray-500">{driver.vehicle_license || 'No license plate'}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusConfig.bg} ${statusConfig.text}`}>
-                            <span className="mr-1">{statusConfig.icon}</span>
-                            {statusConfig.label}
-                          </span>
+                          {getStatusBadge(driver.status)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {formatDate(driver.created_at)}
