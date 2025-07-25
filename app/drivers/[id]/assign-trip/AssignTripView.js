@@ -61,15 +61,12 @@ export default function AssignTripView({ user, userProfile, driver, availableTri
   });
 
   // Filter trips for the two sections
-  // RECENT TRIPS: Trips that can be assigned to this driver (various assignable statuses without a driver)
+  // RECENT TRIPS: Only upcoming trips that are approved by dispatcher and need driver assignment
   const recentTrips = availableTrips.filter(trip => {
-    const assignableStatuses = ['pending', 'approved', 'upcoming', 'confirmed', 'scheduled', 'created'];
-    const isAssignable = assignableStatuses.includes(trip.status) && !trip.driver_id;
+    const isUpcoming = trip.status === 'upcoming' && !trip.driver_id;
     // Debug logging
-    if (assignableStatuses.includes(trip.status)) {
-      console.log(`Trip ${trip.id.substring(0, 8)}: status=${trip.status}, driver_id=${trip.driver_id}, assignable=${isAssignable}`);
-    }
-    return isAssignable;
+    console.log(`Trip ${trip.id.substring(0, 8)}: status=${trip.status}, driver_id=${trip.driver_id}, isUpcoming=${isUpcoming}`);
+    return isUpcoming;
   });
   
   // COMPLETED TRIPS: Only trips that THIS SPECIFIC driver has completed/cancelled
