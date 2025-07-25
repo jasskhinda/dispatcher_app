@@ -133,20 +133,20 @@ export default function AddDriver() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-gray-50">
       <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-semibold">Add New Driver</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Add New Driver</h1>
           <button
             onClick={() => router.push('/drivers')}
-            className="px-4 py-2 border border-brand-border rounded-md text-sm hover:bg-brand-border/10"
+            className="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50"
           >
             Back to Drivers
           </button>
         </div>
         
-        <div className="bg-brand-card shadow rounded-lg p-6 border border-brand-border">
-          <h2 className="text-lg font-medium mb-6">Driver Information</h2>
+        <div className="bg-white shadow rounded-lg p-6 border border-gray-200">
+          <h2 className="text-lg font-medium text-gray-900 mb-6">Driver Information</h2>
           
           {error && (
             <div className="mb-6 p-4 border-l-4 border-red-500 bg-red-50 text-red-700 rounded">
@@ -177,67 +177,67 @@ export default function AddDriver() {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Personal Information */}
-            <div className="bg-brand-border/5 p-4 rounded-md">
-              <h3 className="text-md font-medium mb-4">Personal Information</h3>
+            <div className="bg-gray-50 p-4 rounded-md">
+              <h3 className="text-md font-medium text-gray-900 mb-4">Personal Information</h3>
               
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label htmlFor="firstName" className="block text-sm font-medium mb-1">First Name</label>
+                  <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
                   <input
                     id="firstName"
                     type="text"
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
                     required
-                    className="w-full p-2 border border-brand-border rounded-md bg-brand-background"
+                    className="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
                 
                 <div>
-                  <label htmlFor="lastName" className="block text-sm font-medium mb-1">Last Name</label>
+                  <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
                   <input
                     id="lastName"
                     type="text"
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
                     required
-                    className="w-full p-2 border border-brand-border rounded-md bg-brand-background"
+                    className="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
               </div>
 
               <div className="mt-4">
-                <label htmlFor="email" className="block text-sm font-medium mb-1">Email</label>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                 <input
                   id="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="w-full p-2 border border-brand-border rounded-md bg-brand-background"
+                  className="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
 
               <div className="mt-4">
-                <label htmlFor="phoneNumber" className="block text-sm font-medium mb-1">Phone Number</label>
+                <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
                 <input
                   id="phoneNumber"
                   type="tel"
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
                   required
-                  className="w-full p-2 border border-brand-border rounded-md bg-brand-background"
+                  className="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
             </div>
 
-            {/* Driver Specific Information */}
-            <div className="bg-brand-border/5 p-4 rounded-md">
-              <h3 className="text-md font-medium mb-4">Vehicle Information</h3>
+            {/* Vehicle Information */}
+            <div className="bg-gray-50 p-4 rounded-md">
+              <h3 className="text-md font-medium text-gray-900 mb-4">Vehicle Information</h3>
               
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label htmlFor="vehicleModel" className="block text-sm font-medium mb-1">Vehicle Model</label>
+                  <label htmlFor="vehicleModel" className="block text-sm font-medium text-gray-700 mb-1">Vehicle Model</label>
                   <input
                     id="vehicleModel"
                     type="text"
@@ -245,31 +245,30 @@ export default function AddDriver() {
                     onChange={(e) => setVehicleModel(e.target.value)}
                     required
                     placeholder="Make, Model, Year"
-                    className="w-full p-2 border border-brand-border rounded-md bg-brand-background"
+                    className="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
                 
                 <div>
-                  <label htmlFor="vehicleLicense" className="block text-sm font-medium mb-1">License Plate</label>
+                  <label htmlFor="vehicleLicense" className="block text-sm font-medium text-gray-700 mb-1">License Plate</label>
                   <input
                     id="vehicleLicense"
                     type="text"
                     value={vehicleLicense}
                     onChange={(e) => setVehicleLicense(e.target.value)}
                     required
-                    className="w-full p-2 border border-brand-border rounded-md bg-brand-background"
+                    className="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
               </div>
               
               <div className="mt-4">
-                <label htmlFor="status" className="block text-sm font-medium mb-1">Initial Status</label>
+                <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">Initial Status</label>
                 <select
                   id="status"
                   value={status}
                   onChange={(e) => setStatus(e.target.value)}
-                  className="w-full p-2 border border-brand-border rounded-md bg-brand-background appearance-none pr-8 relative"
-                  style={{ backgroundImage: 'url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3E%3Cpath stroke=\'%236b7280\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'m6 8 4 4 4-4\' /%3E%3C/svg%3E")', backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em' }}
+                  className="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="available">Available</option>
                   <option value="offline">Offline</option>
@@ -282,14 +281,14 @@ export default function AddDriver() {
               <button
                 type="button"
                 onClick={() => router.push('/drivers')}
-                className="px-4 py-2 border border-brand-border rounded-md mr-3 hover:bg-brand-border/10"
+                className="px-4 py-2 border border-gray-300 rounded-md mr-3 text-gray-700 hover:bg-gray-50"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="px-4 py-2 bg-brand-accent text-brand-buttonText rounded-md hover:opacity-90 transition-opacity disabled:opacity-70"
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
               >
                 {loading ? 'Creating...' : 'Create Driver'}
               </button>
