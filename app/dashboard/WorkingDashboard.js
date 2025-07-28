@@ -27,6 +27,7 @@ export default function WorkingDashboard() {
     const [assigningTripId, setAssigningTripId] = useState(null);
     const [selectedDriverId, setSelectedDriverId] = useState('');
     const [assignmentLoading, setAssignmentLoading] = useState(false);
+    const [showDriverOnTripConfirm, setShowDriverOnTripConfirm] = useState(false);
     
     const router = useRouter();
     const supabase = createClientComponentClient();
@@ -428,9 +429,9 @@ export default function WorkingDashboard() {
             return;
         }
 
-        if (selectedDriver.status === 'on_trip') {
-            setActionMessage('Error: This driver is currently on another trip. Please wait for them to complete their current trip.');
-            setTimeout(() => setActionMessage(''), 5000);
+        // If driver is on trip, show confirmation dialog
+        if (selectedDriver.status === 'on_trip' && !showDriverOnTripConfirm) {
+            setShowDriverOnTripConfirm(true);
             return;
         }
 
@@ -474,6 +475,7 @@ export default function WorkingDashboard() {
             setShowDriverAssignModal(false);
             setAssigningTripId(null);
             setSelectedDriverId('');
+            setShowDriverOnTripConfirm(false);
             
             // Clear message after 3 seconds
             setTimeout(() => setActionMessage(''), 3000);
@@ -494,6 +496,7 @@ export default function WorkingDashboard() {
         setShowDriverAssignModal(false);
         setAssigningTripId(null);
         setSelectedDriverId('');
+        setShowDriverOnTripConfirm(false);
     }
 
     async function handleCreateInvoice(trip) {
@@ -1565,17 +1568,17 @@ export default function WorkingDashboard() {
                             >
                                 <option value="">Select a driver...</option>
                                 {availableDrivers.map((driver) => {
-                                    const isAvailable = driver.status !== 'on_trip' && driver.status !== 'offline';
+                                    const isOffline = driver.status === 'offline';
                                     return (
                                         <option 
                                             key={driver.id} 
                                             value={driver.id}
-                                            disabled={!isAvailable}
-                                            className={!isAvailable ? 'text-gray-400' : ''}
+                                            disabled={isOffline}
+                                            className={isOffline ? 'text-gray-400' : ''}
                                         >
                                             {driver.first_name} {driver.last_name} 
                                             {driver.vehicle_model && ` - ${driver.vehicle_model}`}
-                                            {driver.status === 'on_trip' && ' 🚗 (Currently on Trip - Unavailable)'}
+                                            {driver.status === 'on_trip' && ' 🚗 (Currently on Trip)'}
                                             {driver.status === 'offline' && ' 🔴 (Offline - Unavailable)'}
                                             {driver.status === 'available' && ' ✅ (Available)'}
                                             {!driver.status && ' ✅ (Available)'}
@@ -1600,8 +1603,8 @@ export default function WorkingDashboard() {
                                                 {onTripCount > 0 && <p>🚗 On trip: {onTripCount}</p>}
                                                 {offlineCount > 0 && <p>🔴 Offline: {offlineCount}</p>}
                                                 {onTripCount > 0 && (
-                                                    <p className="text-amber-600 font-medium">
-                                                        ⚠️ Drivers on trip must complete their current trip before being assigned to new ones.
+                                                    <p className="text-blue-600 font-medium">
+                                                        ℹ️ Drivers currently on trips can be assigned to new trips with confirmation.
                                                     </p>
                                                 )}
                                             </div>
@@ -1623,11 +1626,46 @@ export default function WorkingDashboard() {
                                 onClick={confirmDriverAssignment}
                                 disabled={!selectedDriverId || assignmentLoading || (() => {
                                     const selectedDriver = availableDrivers.find(d => d.id === selectedDriverId);
-                                    return selectedDriver && (selectedDriver.status === 'on_trip' || selectedDriver.status === 'offline');
+                                    return selectedDriver && selectedDriver.status === 'offline';
                                 })()}
                                 className="px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
                             >
                                 {assignmentLoading ? 'Assigning...' : 'Assign Driver'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Driver On Trip Confirmation Modal */}
+            {showDriverOnTripConfirm && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                            ⚠️ Driver Currently on Trip
+                        </h3>
+                        <p className="text-gray-600 mb-6">
+                            {(() => {
+                                const driver = availableDrivers.find(d => d.id === selectedDriverId);
+                                return `${driver?.first_name} ${driver?.last_name} is currently on another trip. Are you sure you want to assign them to this new trip?`;
+                            })()}
+                        </p>
+                        
+                        <div className="flex justify-end space-x-3">
+                            <button
+                                onClick={() => setShowDriverOnTripConfirm(false)}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors duration-200"
+                            >
+                                No, Cancel
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowDriverOnTripConfirm(false);
+                                    confirmDriverAssignment();
+                                }}
+                                className="px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-md transition-colors duration-200"
+                            >
+                                Yes, Assign Driver
                             </button>
                         </div>
                     </div>
