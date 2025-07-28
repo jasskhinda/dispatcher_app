@@ -1556,17 +1556,18 @@ export default function WorkingDashboard() {
                         </p>
                         
                         <div className="mb-6">
-                            <label htmlFor="driverSelect" className="block text-sm font-medium text-gray-700 mb-2">
+                            <label htmlFor="driverSelect" className="block text-base font-semibold text-gray-900 mb-2">
                                 Available Drivers *
                             </label>
                             <select
                                 id="driverSelect"
                                 value={selectedDriverId}
                                 onChange={(e) => setSelectedDriverId(e.target.value)}
-                                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                className="w-full p-3 border-2 border-gray-400 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-900 font-medium bg-white"
+                                style={{ color: '#111827', fontSize: '16px', fontWeight: '500' }}
                                 required
                             >
-                                <option value="">Select a driver...</option>
+                                <option value="" className="text-gray-900 font-medium" style={{ color: '#111827' }}>Select a driver...</option>
                                 {availableDrivers.map((driver) => {
                                     const isOffline = driver.status === 'offline';
                                     return (
@@ -1574,7 +1575,8 @@ export default function WorkingDashboard() {
                                             key={driver.id} 
                                             value={driver.id}
                                             disabled={isOffline}
-                                            className={isOffline ? 'text-gray-400' : ''}
+                                            className={isOffline ? 'text-gray-400' : 'text-gray-900 font-medium'}
+                                            style={{ color: isOffline ? '#9CA3AF' : '#111827', fontWeight: '500' }}
                                         >
                                             {driver.first_name} {driver.last_name} 
                                             {driver.vehicle_model && ` - ${driver.vehicle_model}`}
@@ -1591,7 +1593,7 @@ export default function WorkingDashboard() {
                                     No drivers available. Please create driver accounts first.
                                 </p>
                             ) : (
-                                <div className="mt-2 text-xs text-gray-600">
+                                <div className="mt-3 text-sm text-gray-700">
                                     {(() => {
                                         const availableCount = availableDrivers.filter(d => d.status !== 'on_trip' && d.status !== 'offline').length;
                                         const onTripCount = availableDrivers.filter(d => d.status === 'on_trip').length;
@@ -1599,11 +1601,11 @@ export default function WorkingDashboard() {
                                         
                                         return (
                                             <div className="space-y-1">
-                                                <p>✅ Available drivers: {availableCount}</p>
-                                                {onTripCount > 0 && <p>🚗 On trip: {onTripCount}</p>}
-                                                {offlineCount > 0 && <p>🔴 Offline: {offlineCount}</p>}
+                                                <p className="font-semibold">✅ Available drivers: {availableCount}</p>
+                                                {onTripCount > 0 && <p className="font-semibold">🚗 On trip: {onTripCount}</p>}
+                                                {offlineCount > 0 && <p className="font-semibold">🔴 Offline: {offlineCount}</p>}
                                                 {onTripCount > 0 && (
-                                                    <p className="text-blue-600 font-medium">
+                                                    <p className="text-blue-700 font-semibold mt-2">
                                                         ℹ️ Drivers currently on trips can be assigned to new trips with confirmation.
                                                     </p>
                                                 )}
