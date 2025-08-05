@@ -2455,7 +2455,7 @@ export default function FacilityMonthlyInvoicePage() {
                                         Recent trip bookings requiring dispatcher approval, cancellation, or rejection.
                                     </p>
                                     <div className="space-y-3">
-                                        {processedTrips.filter(trip => ['pending', 'upcoming'].includes(trip.status)).slice(0, 10).map((trip) => (
+                                        {processedTrips.filter(trip => trip.status === 'pending').slice(0, 10).map((trip) => (
                                             <div key={trip.id} className="bg-white rounded border border-blue-200 shadow-sm overflow-hidden">
                                                 <div className="p-4">
                                                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
