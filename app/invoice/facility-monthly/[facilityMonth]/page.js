@@ -37,6 +37,7 @@ export default function FacilityMonthlyInvoicePage() {
     const [completedTripsAmount, setCompletedTripsAmount] = useState(0);
     const [billableTrips, setBillableTrips] = useState([]);
     const [pendingTrips, setPendingTrips] = useState([]);
+    const [upcomingTrips, setUpcomingTrips] = useState([]);
     
     const router = useRouter();
     const params = useParams();
@@ -649,7 +650,8 @@ export default function FacilityMonthlyInvoicePage() {
                 // Simple monthly billing: all completed trips for the month
                 const allTrips = tripsForBilling.filter(trip => trip.price > 0);
                 const completedTrips = allTrips.filter(trip => trip.status === 'completed');
-                const pendingTrips = allTrips.filter(trip => ['upcoming', 'pending', 'confirmed'].includes(trip.status));
+                const pendingTrips = allTrips.filter(trip => trip.status === 'pending');
+                const upcomingTrips = allTrips.filter(trip => ['upcoming', 'confirmed', 'approved'].includes(trip.status));
                 
                 // Debug logging for trip categorization
                 console.log('🔍 TRIP CATEGORIZATION DEBUG:', {
@@ -657,6 +659,7 @@ export default function FacilityMonthlyInvoicePage() {
                     tripsWithPrice: allTrips.length,
                     completedTrips: completedTrips.length,
                     pendingTrips: pendingTrips.length,
+                    upcomingTrips: upcomingTrips.length,
                     completedTripStatuses: completedTrips.map(t => ({ id: t.id?.substring(0, 8), status: t.status, price: t.price })),
                     allTripStatuses: tripsForBilling.map(t => ({ id: t.id?.substring(0, 8), status: t.status, price: t.price }))
                 });
@@ -664,7 +667,8 @@ export default function FacilityMonthlyInvoicePage() {
                 // Calculate monthly totals
                 const monthlyCompletedAmount = completedTrips.reduce((sum, trip) => sum + parseFloat(trip.price || 0), 0);
                 const pendingTripsAmount = pendingTrips.reduce((sum, trip) => sum + parseFloat(trip.price || 0), 0);
-                const totalMonthlyRevenue = monthlyCompletedAmount + pendingTripsAmount;
+                const upcomingTripsAmount = upcomingTrips.reduce((sum, trip) => sum + parseFloat(trip.price || 0), 0);
+                const totalMonthlyRevenue = monthlyCompletedAmount + pendingTripsAmount + upcomingTripsAmount;
                 
                 // Check if this month has been paid (with month-end validation)
                 const now = new Date();
@@ -695,12 +699,14 @@ export default function FacilityMonthlyInvoicePage() {
                 console.log('🔍 CompletedTrips count before processing:', completedTrips.length);
                 const processedCompletedTrips = processTripsWithFacilityInfo(completedTrips);
                 const processedPendingTrips = processTripsWithFacilityInfo(pendingTrips);
+                const processedUpcomingTrips = processTripsWithFacilityInfo(upcomingTrips);
                 console.log('🔍 ProcessedCompletedTrips count after processing:', processedCompletedTrips.length);
                 
                 // Debug the processed trips
                 console.log('🔍 PROCESSED TRIPS DEBUG:', {
                     processedCompletedCount: processedCompletedTrips.length,
                     processedPendingCount: processedPendingTrips.length,
+                    processedUpcomingCount: processedUpcomingTrips.length,
                     sampleProcessedCompleted: processedCompletedTrips.slice(0, 3).map(t => ({ 
                         id: t.id?.substring(0, 8), 
                         status: t.status, 
@@ -713,6 +719,7 @@ export default function FacilityMonthlyInvoicePage() {
                 console.log('🔄 About to set billable trips. Count:', processedCompletedTrips.length);
                 setBillableTrips(processedCompletedTrips); // Always show completed trips, regardless of payment status
                 setPendingTrips(processedPendingTrips);
+                setUpcomingTrips(processedUpcomingTrips);
                 console.log('✅ State updated - billable trips set to:', processedCompletedTrips.length, 'items');
                 
                 // Cache the successfully loaded data
@@ -1099,26 +1106,30 @@ export default function FacilityMonthlyInvoicePage() {
                 
                 // Recalculate totals and update trip categorization after status change
                 setTimeout(() => {
-                    // Separate completed and pending trips
+                    // Separate trips by status
                     const completedTrips = updatedTrips.filter(trip => trip.status === 'completed' && trip.price > 0);
-                    const pendingTripsFiltered = updatedTrips.filter(trip => ['upcoming', 'pending', 'confirmed'].includes(trip.status) && trip.price > 0);
+                    const pendingTripsFiltered = updatedTrips.filter(trip => trip.status === 'pending' && trip.price > 0);
+                    const upcomingTripsFiltered = updatedTrips.filter(trip => ['upcoming', 'confirmed', 'approved'].includes(trip.status) && trip.price > 0);
                     
                     // Calculate amounts
                     const billableAmount = completedTrips.reduce((sum, trip) => sum + parseFloat(trip.price || 0), 0);
                     const pendingTripsAmount = pendingTripsFiltered.reduce((sum, trip) => sum + parseFloat(trip.price || 0), 0);
+                    const upcomingTripsAmount = upcomingTripsFiltered.reduce((sum, trip) => sum + parseFloat(trip.price || 0), 0);
                     
                     // Process trips with facility info for proper display
                     const processedCompletedTrips = processTripsWithFacilityInfo(completedTrips);
                     const processedPendingTrips = processTripsWithFacilityInfo(pendingTripsFiltered);
+                    const processedUpcomingTrips = processTripsWithFacilityInfo(upcomingTripsFiltered);
                     
                     // Update all related states
                     setTotalAmount(billableAmount);
-                    setPendingAmount(pendingTripsAmount);
+                    setPendingAmount(pendingTripsAmount + upcomingTripsAmount); // Include upcoming in pending amount for invoice summary
                     setBillableTrips(processedCompletedTrips);
                     setPendingTrips(processedPendingTrips);
+                    setUpcomingTrips(processedUpcomingTrips);
                     
-                    console.log(`🔄 Updated after trip action - Completed: ${processedCompletedTrips.length}, Pending: ${processedPendingTrips.length}`);
-                    console.log(`🔄 Updated totals - Billable: $${billableAmount.toFixed(2)}, Pending: $${pendingTripsAmount.toFixed(2)}`);
+                    console.log(`🔄 Updated after trip action - Completed: ${processedCompletedTrips.length}, Pending: ${processedPendingTrips.length}, Upcoming: ${processedUpcomingTrips.length}`);
+                    console.log(`🔄 Updated totals - Billable: $${billableAmount.toFixed(2)}, Pending: $${pendingTripsAmount.toFixed(2)}, Upcoming: $${upcomingTripsAmount.toFixed(2)}`);
                     
                     // Invalidate cache when trip status changes
                     const cacheKey = `facility_invoice_${facilityMonth}`;
@@ -2544,7 +2555,8 @@ export default function FacilityMonthlyInvoicePage() {
                                                                 {trip.status.toUpperCase()}
                                                             </span>
                                                             <div className="flex space-x-1">
-                                                                {['pending', 'upcoming', 'confirmed', 'approved', 'in_process'].includes(trip.status) && (
+                                                                {/* PENDING TRIPS: Only EDIT, APPROVE, REJECT, CANCEL */}
+                                                                {trip.status === 'pending' && (
                                                                     <>
                                                                         <button
                                                                             onClick={() => handleEditTrip(trip)}
@@ -2552,42 +2564,29 @@ export default function FacilityMonthlyInvoicePage() {
                                                                         >
                                                                             ✏️ EDIT
                                                                         </button>
-                                                                        {trip.status !== 'completed' && (
-                                                                            <>
-                                                                                <button
-                                                                                    onClick={() => handleTripAction(trip.id, 'approve')}
-                                                                                    disabled={processingTripAction === trip.id}
-                                                                                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors disabled:opacity-50"
-                                                                                >
-                                                                                    {processingTripAction === trip.id ? '⏳' : '✅'} APPROVE
-                                                                                </button>
-                                                                                <button
-                                                                                    onClick={() => handleTripAction(trip.id, 'reject')}
-                                                                                    disabled={processingTripAction === trip.id}
-                                                                                    className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors disabled:opacity-50"
-                                                                                >
-                                                                                    {processingTripAction === trip.id ? '⏳' : '❌'} REJECT
-                                                                                </button>
-                                                                            </>
-                                                                        )}
+                                                                        <button
+                                                                            onClick={() => handleTripAction(trip.id, 'approve')}
+                                                                            disabled={processingTripAction === trip.id}
+                                                                            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors disabled:opacity-50"
+                                                                        >
+                                                                            {processingTripAction === trip.id ? '⏳' : '✅'} APPROVE
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => handleTripAction(trip.id, 'reject')}
+                                                                            disabled={processingTripAction === trip.id}
+                                                                            className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors disabled:opacity-50"
+                                                                        >
+                                                                            {processingTripAction === trip.id ? '⏳' : '❌'} REJECT
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => handleTripAction(trip.id, 'cancel')}
+                                                                            disabled={processingTripAction === trip.id}
+                                                                            className="bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors disabled:opacity-50"
+                                                                        >
+                                                                            {processingTripAction === trip.id ? '⏳' : '🚫'} CANCEL
+                                                                        </button>
                                                                     </>
                                                                 )}
-                                                                {['upcoming', 'confirmed', 'approved', 'in_process'].includes(trip.status) && (
-                                                                    <button
-                                                                        onClick={() => handleTripAction(trip.id, 'complete')}
-                                                                        disabled={processingTripAction === trip.id}
-                                                                        className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors disabled:opacity-50"
-                                                                    >
-                                                                        {processingTripAction === trip.id ? '⏳' : '✅'} COMPLETE
-                                                                    </button>
-                                                                )}
-                                                                <button
-                                                                    onClick={() => handleTripAction(trip.id, 'cancel')}
-                                                                    disabled={processingTripAction === trip.id}
-                                                                    className="bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors disabled:opacity-50"
-                                                                >
-                                                                    {processingTripAction === trip.id ? '⏳' : '🚫'} CANCEL
-                                                                </button>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -2598,6 +2597,85 @@ export default function FacilityMonthlyInvoicePage() {
                                 </div>
                             </div>
                         </div>
+
+                        {/* Upcoming Trips Section */}
+                        {upcomingTrips.length > 0 && (
+                            <div className="mb-8">
+                                <h4 className="text-md font-medium text-blue-700 mb-3">🚀 UPCOMING TRIPS (Not Yet Billable Until Completed)</h4>
+                                <div className="bg-blue-50 border border-blue-300 rounded-lg p-4">
+                                    <p className="text-sm text-blue-800 mb-4 font-medium">
+                                        These trips have been approved and are scheduled. They will move to billing once completed.
+                                    </p>
+                                    <div className="space-y-3">
+                                        {upcomingTrips.slice(0, 10).map((trip) => (
+                                            <div key={trip.id} className="flex justify-between items-center p-3 bg-white rounded border border-blue-200 shadow-sm">
+                                                <div className="flex-1">
+                                                    <div className="text-sm font-bold text-gray-900">
+                                                        {trip.clientName}
+                                                    </div>
+                                                    <div className="text-xs font-medium text-gray-800 mt-1">
+                                                        {new Date(trip.pickup_time).toLocaleDateString('en-US', {
+                                                            weekday: 'short',
+                                                            month: 'short',
+                                                            day: 'numeric',
+                                                            year: 'numeric'
+                                                        })} at {new Date(trip.pickup_time).toLocaleTimeString('en-US', {
+                                                            hour: '2-digit',
+                                                            minute: '2-digit'
+                                                        })}
+                                                    </div>
+                                                </div>
+                                                <div className="text-center mx-4">
+                                                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                                        trip.status === 'upcoming' ? 'bg-blue-100 text-blue-800 border border-blue-300' :
+                                                        trip.status === 'confirmed' ? 'bg-green-100 text-green-800 border border-green-300' :
+                                                        trip.status === 'approved' ? 'bg-purple-100 text-purple-800 border border-purple-300' :
+                                                        'bg-gray-100 text-gray-700 border border-gray-300'
+                                                    }`}>
+                                                        {trip.status.toUpperCase()}
+                                                    </span>
+                                                </div>
+                                                <div className="text-right mx-4">
+                                                    <div className="text-sm font-bold text-blue-700">
+                                                        ${(trip.displayPrice || trip.price || 0).toFixed(2)}
+                                                    </div>
+                                                </div>
+                                                <div className="flex space-x-1">
+                                                    {/* UPCOMING TRIPS: EDIT, COMPLETE, CANCEL, ASSIGN DRIVER */}
+                                                    <button
+                                                        onClick={() => handleEditTrip(trip)}
+                                                        className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-xs font-medium transition-colors"
+                                                    >
+                                                        ✏️ EDIT
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleTripAction(trip.id, 'complete')}
+                                                        disabled={processingTripAction === trip.id}
+                                                        className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs font-medium transition-colors disabled:opacity-50"
+                                                    >
+                                                        {processingTripAction === trip.id ? '⏳' : '✅'} COMPLETE
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleTripAction(trip.id, 'cancel')}
+                                                        disabled={processingTripAction === trip.id}
+                                                        className="bg-gray-600 hover:bg-gray-700 text-white px-2 py-1 rounded text-xs font-medium transition-colors disabled:opacity-50"
+                                                    >
+                                                        {processingTripAction === trip.id ? '⏳' : '🚫'} CANCEL
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {upcomingTrips.length > 10 && (
+                                            <div className="text-center pt-2">
+                                                <p className="text-xs text-blue-600">
+                                                    ...and {upcomingTrips.length - 10} more upcoming trips
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Payment Instructions */}
                         <div className="bg-gray-50 p-6 rounded-lg">
