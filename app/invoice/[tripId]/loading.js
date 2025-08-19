@@ -3,7 +3,7 @@ export default function InvoiceLoading() {
         <div className="min-h-screen bg-gray-50">
             {/* Header Skeleton */}
             <div className="bg-white shadow-sm border-b">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="w-full px-6 lg:px-8">
                     <div className="flex justify-between items-center py-6">
                         <div className="flex items-center space-x-4">
                             <div className="w-6 h-6 bg-gray-200 rounded animate-pulse"></div>
@@ -21,7 +21,7 @@ export default function InvoiceLoading() {
             </div>
 
             {/* Main Content Skeleton */}
-            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="w-full px-6 lg:px-8 py-8">
                 <div className="bg-white shadow-lg rounded-lg overflow-hidden">
                     {/* Invoice Header Skeleton */}
                     <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-8">

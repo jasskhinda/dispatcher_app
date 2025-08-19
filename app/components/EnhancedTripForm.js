@@ -370,7 +370,7 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto p-6">
+      <div className="w-full px-6 lg:px-8 py-6">
         <div className="bg-white rounded-lg shadow-sm border p-8">
           <h1 className="text-2xl font-bold text-gray-900 mb-6">Book Transportation</h1>
           
