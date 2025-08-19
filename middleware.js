@@ -19,6 +19,7 @@ export async function middleware(req) {
   const isPublicRoute = req.nextUrl.pathname === '/' || 
                         req.nextUrl.pathname.startsWith('/_next') || 
                         req.nextUrl.pathname.match(/\.(ico|png|jpg|svg|css|js)$/);
+  const isLogout = req.nextUrl.searchParams.get('logout') === 'true';
   
   // If accessing a protected API route without being authenticated
   if (!session && isApiRoute && !isPublicRoute) {
@@ -42,11 +43,17 @@ export async function middleware(req) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  // If accessing auth routes while authenticated
-  if (session && isAuthRoute) {
+  // If accessing auth routes while authenticated (but not during logout)
+  if (session && isAuthRoute && !isLogout) {
     console.log("MIDDLEWARE: Redirecting to dashboard - authenticated on auth route");
     const redirectUrl = new URL('/dashboard', req.url);
     return NextResponse.redirect(redirectUrl);
+  }
+  
+  // If accessing login page with logout parameter, allow it even if session exists
+  if (isAuthRoute && isLogout) {
+    console.log("MIDDLEWARE: Allowing access to login page during logout");
+    return res;
   }
 
   // If authenticated, check if user has dispatcher role

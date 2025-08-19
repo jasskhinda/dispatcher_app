@@ -28,6 +28,12 @@ export default function Login() {
     if (successParam) {
       setSuccessMessage(decodeURIComponent(successParam));
     }
+    
+    // Check for logout parameter
+    const logoutParam = searchParams.get('logout');
+    if (logoutParam === 'true') {
+      setSuccessMessage('You have been successfully signed out.');
+    }
   }, [searchParams]);
   
   const handleLogin = async (e) => {

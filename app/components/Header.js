@@ -29,8 +29,43 @@ export default function Header() {
   }, [supabase.auth]);
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    router.push('/login');
+    try {
+      console.log('🔄 Starting sign out process...');
+      
+      // Sign out from Supabase with scope 'local' to clear all local storage
+      const { error } = await supabase.auth.signOut({ scope: 'local' });
+      
+      if (error) {
+        console.error('❌ Sign out error:', error);
+      } else {
+        console.log('✅ Successfully signed out from Supabase');
+      }
+      
+      // Clear user state immediately
+      setUser(null);
+      
+      // Clear any local storage or session storage related to auth
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('supabase.auth.token');
+        sessionStorage.removeItem('supabase.auth.token');
+        
+        // Clear all items that start with 'sb-'
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith('sb-')) {
+            localStorage.removeItem(key);
+          }
+        });
+      }
+      
+      // Force a full page reload to clear all session data with logout param
+      console.log('🔄 Redirecting to login with logout param...');
+      window.location.href = '/login?logout=true';
+      
+    } catch (err) {
+      console.error('❌ Sign out exception:', err);
+      // Even if there's an error, redirect to login
+      window.location.href = '/login?logout=true';
+    }
   };
 
   const [activeRoute, setActiveRoute] = useState('/dashboard');
