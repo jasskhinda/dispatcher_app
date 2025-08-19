@@ -137,7 +137,8 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
       const pickupDateTime = new Date(`${formData.pickupDate}T${formData.pickupTime}`);
       
       // Determine client type for pricing
-      const clientType = selectedClient?.client_type === 'individual' ? 'individual' : 'facility';
+      // Managed clients are facility clients
+      const clientType = (selectedClient?.client_type === 'individual') ? 'individual' : 'facility';
       
       const result = await getPricingEstimate({
         pickupAddress: formData.pickupAddress,
@@ -860,7 +861,8 @@ function WheelchairSelectionFlow({ onSelectionChange, selectedType, needsProvide
   const [requirements, setRequirements] = useState('');
 
   const handleTypeChange = (type) => {
-    const wheelchairFee = selectedClient?.client_type === 'facility' ? 0 : 25;
+    // Managed clients are facility clients (no wheelchair fee)
+    const wheelchairFee = (selectedClient?.client_type === 'managed') ? 0 : 25;
     onSelectionChange({
       type,
       needsProvided: false,
@@ -871,7 +873,8 @@ function WheelchairSelectionFlow({ onSelectionChange, selectedType, needsProvide
   };
 
   const handleProvidedChange = (provided) => {
-    const wheelchairFee = selectedClient?.client_type === 'facility' ? 0 : 25;
+    // Managed clients are facility clients (no wheelchair fee)
+    const wheelchairFee = (selectedClient?.client_type === 'managed') ? 0 : 25;
     onSelectionChange({
       type: 'none',
       needsProvided: provided,
@@ -883,7 +886,8 @@ function WheelchairSelectionFlow({ onSelectionChange, selectedType, needsProvide
 
   const handleRequirementsChange = (newRequirements) => {
     setRequirements(newRequirements);
-    const wheelchairFee = selectedClient?.client_type === 'facility' ? 0 : 25;
+    // Managed clients are facility clients (no wheelchair fee)
+    const wheelchairFee = (selectedClient?.client_type === 'managed') ? 0 : 25;
     onSelectionChange({
       type: 'none',
       needsProvided: true,
@@ -979,7 +983,7 @@ function WheelchairSelectionFlow({ onSelectionChange, selectedType, needsProvide
                     <div className="font-medium text-gray-900">Yes, please provide a wheelchair</div>
                     <div className="text-sm text-gray-600">We will provide a suitable wheelchair for the client's trip</div>
                     <div className="text-sm text-blue-600 font-medium">
-                      +${(selectedClient?.client_type === 'facility') ? '0' : '25'} wheelchair rental fee
+                      +${(selectedClient?.client_type === 'managed') ? '0' : '25'} wheelchair rental fee
                     </div>
                   </div>
                 </label>
