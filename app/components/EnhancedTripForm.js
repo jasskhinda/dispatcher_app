@@ -687,6 +687,7 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
               onSelectionChange={handleWheelchairChange}
               selectedType={wheelchairData.type}
               needsProvided={wheelchairData.needsProvided}
+              selectedClient={selectedClient}
             />
 
             {/* Additional Passengers */}
@@ -854,7 +855,7 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
 }
 
 // Simple Wheelchair Selection Component
-function WheelchairSelectionFlow({ onSelectionChange, selectedType, needsProvided }) {
+function WheelchairSelectionFlow({ onSelectionChange, selectedType, needsProvided, selectedClient }) {
   const [showDetails, setShowDetails] = useState(false);
   const [requirements, setRequirements] = useState('');
 
