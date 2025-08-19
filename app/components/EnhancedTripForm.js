@@ -860,32 +860,35 @@ function WheelchairSelectionFlow({ onSelectionChange, selectedType, needsProvide
   const [requirements, setRequirements] = useState('');
 
   const handleTypeChange = (type) => {
+    const wheelchairFee = selectedClient?.client_type === 'facility' ? 0 : 25;
     onSelectionChange({
       type,
       needsProvided: false,
       hasWheelchairFee: type === 'provided',
-      fee: type === 'provided' ? 25 : 0,
+      fee: type === 'provided' ? wheelchairFee : 0,
       requirements: ''
     });
   };
 
   const handleProvidedChange = (provided) => {
+    const wheelchairFee = selectedClient?.client_type === 'facility' ? 0 : 25;
     onSelectionChange({
       type: 'none',
       needsProvided: provided,
       hasWheelchairFee: provided,
-      fee: provided ? 25 : 0,
+      fee: provided ? wheelchairFee : 0,
       requirements: provided ? requirements : ''
     });
   };
 
   const handleRequirementsChange = (newRequirements) => {
     setRequirements(newRequirements);
+    const wheelchairFee = selectedClient?.client_type === 'facility' ? 0 : 25;
     onSelectionChange({
       type: 'none',
       needsProvided: true,
       hasWheelchairFee: true,
-      fee: 25,
+      fee: wheelchairFee,
       requirements: newRequirements
     });
   };
