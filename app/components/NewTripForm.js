@@ -146,7 +146,12 @@ export function NewTripForm({ user, userProfile, individualClients, managedClien
     
     // Wheelchair rental fee - only for rental wheelchair
     if (data.wheelchair_required && data.wheelchair_type === 'rental') {
-      newPriceInfo.wheelchairPrice = 25; // Rental fee
+      // Check if client is from managed clients (facility) or individual clients
+      const isInManagedClients = managedClients?.some(client => client.id === data.client_id);
+      const isFacilityClient = isInManagedClients || (!individualClients?.some(client => client.id === data.client_id) && newClientFormData.client_type === 'managed');
+      
+      // Facility clients get $0 wheelchair fee, individual clients get $25
+      newPriceInfo.wheelchairPrice = isFacilityClient ? 0 : 25;
     }
     
     // Weekend and after hours surcharge
@@ -1454,7 +1459,13 @@ export function NewTripForm({ user, userProfile, individualClients, managedClien
                       <div className="ml-3">
                         <div className="font-medium">Yes, please provide a wheelchair</div>
                         <div className="text-sm text-gray-600">We will provide a suitable wheelchair for your trip</div>
-                        <div className="text-sm text-orange-600 font-medium">+$25 wheelchair rental fee</div>
+                        <div className="text-sm text-orange-600 font-medium">
+                          +${(() => {
+                            const isInManagedClients = managedClients?.some(client => client.id === formData.client_id);
+                            const isFacilityClient = isInManagedClients || (!individualClients?.some(client => client.id === formData.client_id) && newClientFormData.client_type === 'managed');
+                            return isFacilityClient ? '0' : '25';
+                          })()} wheelchair rental fee
+                        </div>
                       </div>
                     </label>
                     

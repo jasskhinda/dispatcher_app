@@ -167,7 +167,7 @@ export default function PricingDisplay({
             </summary>
             
             <div className="mt-3 space-y-2">
-              {createPricingBreakdown(pricing.pricing).map((item, index) => (
+              {createPricingBreakdown(pricing.pricing, pricing.countyInfo).map((item, index) => (
                 <div 
                   key={index} 
                   className={`flex justify-between items-center py-1 ${

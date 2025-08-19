@@ -773,7 +773,7 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
                       <div className="mt-3 space-y-2">
                         {(() => {
                           const { createPricingBreakdown } = require('@/lib/pricing');
-                          return createPricingBreakdown(currentPricing.pricing).map((item, index) => (
+                          return createPricingBreakdown(currentPricing.pricing, currentPricing.countyInfo).map((item, index) => (
                             <div 
                               key={index} 
                               className={`flex justify-between items-center py-1 ${
@@ -974,7 +974,9 @@ function WheelchairSelectionFlow({ onSelectionChange, selectedType, needsProvide
                   <div className="ml-3">
                     <div className="font-medium text-gray-900">Yes, please provide a wheelchair</div>
                     <div className="text-sm text-gray-600">We will provide a suitable wheelchair for the client's trip</div>
-                    <div className="text-sm text-blue-600 font-medium">+$25 wheelchair rental fee</div>
+                    <div className="text-sm text-blue-600 font-medium">
+                      +${selectedClient?.client_type === 'facility' ? '0' : '25'} wheelchair rental fee
+                    </div>
                   </div>
                 </label>
 

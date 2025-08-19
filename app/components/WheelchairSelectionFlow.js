@@ -6,7 +6,8 @@ import { useState, useEffect } from 'react';
 export default function WheelchairSelectionFlow({ 
   onWheelchairChange, 
   initialValue = 'none',
-  className = '' 
+  className = '',
+  clientType = 'individual' // 'individual' or 'facility'
 }) {
   const [wheelchairType, setWheelchairType] = useState(initialValue);
   const [needsWheelchair, setNeedsWheelchair] = useState(false);
@@ -14,8 +15,8 @@ export default function WheelchairSelectionFlow({
   const [showProvideOption, setShowProvideOption] = useState(false);
   const [showCustomInput, setShowCustomInput] = useState(false);
 
-  // Wheelchair pricing
-  const WHEELCHAIR_PRICE = 25;
+  // Wheelchair pricing - varies by client type
+  const WHEELCHAIR_PRICE = clientType === 'facility' ? 0 : 25;
 
   useEffect(() => {
     // Reset states when wheelchair type changes

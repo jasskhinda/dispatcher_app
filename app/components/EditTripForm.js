@@ -469,6 +469,7 @@ export default function EditTripForm({ trip, onSave, onCancel }) {
                 initialValue={wheelchairData.type}
                 className="mt-2"
                 disabled={loading}
+                clientType={selectedClient?.client_type === 'individual' ? 'individual' : 'facility'}
               />
             </div>
 
