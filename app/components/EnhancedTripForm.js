@@ -472,12 +472,12 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
               {selectedClient && (
                 <div className="mt-3 p-3 bg-blue-50 rounded-lg">
                   <div className="text-sm">
-                    {selectedClient.medical_notes && (
+                    {selectedClient?.medical_notes && (
                       <p className="text-gray-700 mb-1">
                         <strong>Medical notes:</strong> {selectedClient.medical_notes}
                       </p>
                     )}
-                    {selectedClient.accessibility_needs && (
+                    {selectedClient?.accessibility_needs && (
                       <p className="text-gray-700">
                         <strong>Accessibility:</strong> {selectedClient.accessibility_needs}
                       </p>
@@ -975,7 +975,7 @@ function WheelchairSelectionFlow({ onSelectionChange, selectedType, needsProvide
                     <div className="font-medium text-gray-900">Yes, please provide a wheelchair</div>
                     <div className="text-sm text-gray-600">We will provide a suitable wheelchair for the client's trip</div>
                     <div className="text-sm text-blue-600 font-medium">
-                      +${(selectedClient && selectedClient.client_type === 'facility') ? '0' : '25'} wheelchair rental fee
+                      +${(selectedClient?.client_type === 'facility') ? '0' : '25'} wheelchair rental fee
                     </div>
                   </div>
                 </label>
