@@ -1234,25 +1234,25 @@ export default function WorkingDashboard() {
                             </div>
                         </div>
                     </div>
-                    <div className="p-6">
+                    <div className="p-2 sm:p-4 lg:p-6">
                         {filteredTrips.length > 0 ? (
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full divide-y divide-gray-200">
+                            <div className="overflow-x-auto shadow-sm rounded-lg border border-gray-200">
+                                <table className="min-w-full divide-y divide-gray-200 table-fixed">
                                     <thead className="bg-gray-50">
                                         <tr>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th className="px-2 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4">
                                                 Trip Details
                                             </th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th className="px-2 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4">
                                                 Client
                                             </th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th className="px-2 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">
                                                 Status
                                             </th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th className="px-2 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">
                                                 Pickup Time
                                             </th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th className="px-2 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">
                                                 Actions
                                             </th>
                                         </tr>
@@ -1262,26 +1262,26 @@ export default function WorkingDashboard() {
                                             const clientInfo = getClientDisplayInfo(trip);
                                             return (
                                             <tr key={trip.id} className="hover:bg-gray-50">
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <div className="text-sm font-medium text-gray-900">
+                                                <td className="px-2 sm:px-4 lg:px-6 py-4">
+                                                    <div className="text-sm font-medium text-gray-900 truncate">
                                                         {trip.id.slice(0, 8)}...
                                                     </div>
-                                                    <div className="text-sm text-gray-500">
-                                                        {trip.pickup_location || trip.pickup_address || 'Pickup location'} 
-                                                        <br />→ {trip.dropoff_location || trip.destination_address || 'Destination'}
+                                                    <div className="text-xs sm:text-sm text-gray-500 break-words">
+                                                        <div className="truncate">{trip.pickup_location || trip.pickup_address || 'Pickup location'}</div>
+                                                        <div className="truncate">→ {trip.dropoff_location || trip.destination_address || 'Destination'}</div>
                                                     </div>
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                <td className="px-2 sm:px-4 lg:px-6 py-4">
                                                     {/* Client Information Section */}
                                                     <div className="space-y-2">
                                                         {/* Client Name */}
-                                                        <div className="text-sm font-medium text-gray-900">
+                                                        <div className="text-xs sm:text-sm font-medium text-gray-900 truncate">
                                                             {clientInfo.clientName}
                                                         </div>
                                                         
                                                         {/* Client Phone */}
                                                         {clientInfo.clientPhone && (
-                                                            <div className="text-sm text-gray-500">
+                                                            <div className="text-xs sm:text-sm text-gray-500 truncate">
                                                                 📞 {clientInfo.clientPhone}
                                                             </div>
                                                         )}
@@ -1311,8 +1311,8 @@ export default function WorkingDashboard() {
                                                         )}
                                                     </div>
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                                <td className="px-2 sm:px-4 lg:px-6 py-4">
+                                                    <span className={`px-1 sm:px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                                                         trip.status === 'completed' ? 'bg-green-100 text-green-800' :
                                                         trip.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                                                         trip.status === 'upcoming' ? 'bg-blue-100 text-blue-800' :
@@ -1320,34 +1320,43 @@ export default function WorkingDashboard() {
                                                         trip.status === 'cancelled' ? 'bg-red-100 text-red-800' :
                                                         'bg-gray-100 text-gray-800'
                                                     }`}>
-                                                        {trip.status}
+                                                        <span className="hidden sm:inline">{trip.status}</span>
+                                                        <span className="sm:hidden">
+                                                            {trip.status === 'completed' ? '✓' :
+                                                             trip.status === 'pending' ? '⏳' :
+                                                             trip.status === 'upcoming' ? '📅' :
+                                                             trip.status === 'in_progress' ? '🚗' :
+                                                             trip.status === 'cancelled' ? '❌' : '?'}
+                                                        </span>
                                                     </span>
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                    {formatDate(trip.pickup_time)}
+                                                <td className="px-2 sm:px-4 lg:px-6 py-4 text-xs sm:text-sm text-gray-900">
+                                                    <div className="truncate">{formatDate(trip.pickup_time)}</div>
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                    <div className="flex flex-col space-y-2">
+                                                <td className="px-2 sm:px-4 lg:px-6 py-4 text-xs sm:text-sm font-medium">
+                                                    <div className="flex flex-col space-y-1 sm:space-y-2">
                                                         {/* Facility Management Button for facility trips */}
                                                         {trip.facility_id && (
                                                             <a
                                                                 href={`/invoice/facility-monthly/${trip.facility_id}-${new Date(trip.pickup_time).getFullYear()}-${String(new Date(trip.pickup_time).getMonth() + 1).padStart(2, '0')}`}
-                                                                className="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-md text-xs font-medium transition-colors duration-200 shadow-sm"
+                                                                className="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-1 sm:px-3 py-1 rounded-md text-xs font-medium transition-colors duration-200 shadow-sm"
                                                             >
-                                                                🏥 Manage Facility
+                                                                <span className="hidden sm:inline">🏥 Manage Facility</span>
+                                                                <span className="sm:hidden">🏥</span>
                                                             </a>
                                                         )}
                                                         
                                                         {/* Trip Action Buttons */}
-                                                        <div className="flex space-x-1">
+                                                        <div className="flex flex-wrap gap-1">
                                                             {/* Edit Button - Only available for non-completed trips */}
                                                             {trip.status !== 'completed' && (
                                                                 <a
                                                                     href={`/trips/${trip.id}`}
-                                                                    className="inline-flex items-center bg-gray-600 hover:bg-gray-700 text-white px-2 py-1 rounded text-xs font-medium transition-colors duration-200 shadow-sm"
+                                                                    className="inline-flex items-center bg-gray-600 hover:bg-gray-700 text-white px-1 sm:px-2 py-1 rounded text-xs font-medium transition-colors duration-200 shadow-sm"
                                                                     title="View & Edit Trip"
                                                                 >
-                                                                    ✏️ EDIT
+                                                                    <span className="hidden sm:inline">✏️ EDIT</span>
+                                                                    <span className="sm:hidden">✏️</span>
                                                                 </a>
                                                             )}
                                                             
@@ -1356,18 +1365,28 @@ export default function WorkingDashboard() {
                                                                     <button 
                                                                         onClick={() => handleTripAction(trip.id, 'approve')}
                                                                         disabled={actionLoading[trip.id]}
-                                                                        className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
+                                                                        className="bg-green-600 hover:bg-green-700 text-white px-1 sm:px-2 py-1 rounded text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
                                                                         title="Approve Trip"
                                                                     >
-                                                                        {actionLoading[trip.id] ? '...' : '✅ APPROVE'}
+                                                                        {actionLoading[trip.id] ? '...' : (
+                                                                            <>
+                                                                                <span className="hidden sm:inline">✅ APPROVE</span>
+                                                                                <span className="sm:hidden">✅</span>
+                                                                            </>
+                                                                        )}
                                                                     </button>
                                                                     <button 
                                                                         onClick={() => handleTripAction(trip.id, 'reject')}
                                                                         disabled={actionLoading[trip.id]}
-                                                                        className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
+                                                                        className="bg-red-600 hover:bg-red-700 text-white px-1 sm:px-2 py-1 rounded text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm"
                                                                         title="Reject Trip"
                                                                     >
-                                                                        {actionLoading[trip.id] ? '...' : '❌ REJECT'}
+                                                                        {actionLoading[trip.id] ? '...' : (
+                                                                            <>
+                                                                                <span className="hidden sm:inline">❌ REJECT</span>
+                                                                                <span className="sm:hidden">❌</span>
+                                                                            </>
+                                                                        )}
                                                                     </button>
                                                                 </>
                                                             )}
