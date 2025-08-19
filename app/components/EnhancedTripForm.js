@@ -260,9 +260,9 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
       
       // Create trip data
       const tripData = {
-        user_id: isIndividualClient ? selectedClient.id : null,
-        managed_client_id: !isIndividualClient ? selectedClient.id : null,
-        facility_id: !isIndividualClient ? selectedClient.facility_id : null,
+        user_id: isIndividualClient ? selectedClient?.id : null,
+        managed_client_id: !isIndividualClient ? selectedClient?.id : null,
+        facility_id: !isIndividualClient ? selectedClient?.facility_id : null,
         pickup_address: formData.pickupAddress,
         pickup_details: formData.pickupDetails,
         destination_address: formData.destinationAddress,
@@ -975,7 +975,7 @@ function WheelchairSelectionFlow({ onSelectionChange, selectedType, needsProvide
                     <div className="font-medium text-gray-900">Yes, please provide a wheelchair</div>
                     <div className="text-sm text-gray-600">We will provide a suitable wheelchair for the client's trip</div>
                     <div className="text-sm text-blue-600 font-medium">
-                      +${selectedClient?.client_type === 'facility' ? '0' : '25'} wheelchair rental fee
+                      +${(selectedClient && selectedClient.client_type === 'facility') ? '0' : '25'} wheelchair rental fee
                     </div>
                   </div>
                 </label>
