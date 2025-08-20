@@ -330,10 +330,43 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
         origin: formData.pickupAddress,
         destination: formData.destinationAddress,
         travelMode: window.google.maps.TravelMode.DRIVING,
+        provideRouteAlternatives: true, // Request alternative routes
+        optimizeWaypoints: false,
+        avoidHighways: false,
+        avoidTolls: false,
+        drivingOptions: {
+          departureTime: new Date(), // Use current time for traffic-aware routing
+          trafficModel: window.google.maps.TrafficModel.BEST_GUESS
+        },
+        unitSystem: window.google.maps.UnitSystem.IMPERIAL
       }, (result, status) => {
-        if (status === 'OK') {
-          const route = result.routes[0];
-          const leg = route.legs[0];
+        if (status === 'OK' && result.routes && result.routes.length > 0) {
+          console.log(`EnhancedTripForm: Found ${result.routes.length} routes`);
+          
+          // Log all routes for debugging
+          result.routes.forEach((route, index) => {
+            const leg = route.legs[0];
+            console.log(`Route ${index + 1}: ${leg.distance.text} (${(leg.distance.value * 0.000621371).toFixed(2)} mi), ${leg.duration.text} (${leg.duration.value} seconds)`);
+            // Log route summary for comparison with Google Maps
+            if (route.summary) {
+              console.log(`   📍 Route ${index + 1} Summary: ${route.summary}`);
+            }
+          });
+          
+          // Find the fastest route (shortest duration)
+          let fastestRoute = result.routes[0];
+          let shortestDuration = result.routes[0].legs[0].duration.value;
+          
+          for (let i = 1; i < result.routes.length; i++) {
+            const routeDuration = result.routes[i].legs[0].duration.value;
+            if (routeDuration < shortestDuration) {
+              shortestDuration = routeDuration;
+              fastestRoute = result.routes[i];
+            }
+          }
+          
+          console.log('EnhancedTripForm: Selected fastest route (shortest duration)');
+          const leg = fastestRoute.legs[0];
           
           const routeData = {
             distance: {

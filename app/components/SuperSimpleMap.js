@@ -99,23 +99,56 @@ export default function SuperSimpleMap({
         directionsRenderer.setMap(map);
         console.log('SuperSimpleMap: Directions renderer ready');
 
-        // Calculate route
+        // Calculate route with alternative routes to find fastest
         const request = {
           origin: origin,
           destination: destination,
           travelMode: window.google.maps.TravelMode.DRIVING,
+          provideRouteAlternatives: true, // Request alternative routes
+          optimizeWaypoints: false,
+          avoidHighways: false,
+          avoidTolls: false,
+          drivingOptions: {
+            departureTime: new Date(), // Use current time for traffic-aware routing
+            trafficModel: window.google.maps.TrafficModel.BEST_GUESS
+          },
+          unitSystem: window.google.maps.UnitSystem.IMPERIAL
         };
 
         console.log('SuperSimpleMap: Calculating route...');
         directionsService.route(request, (result, status) => {
           console.log('SuperSimpleMap: Route calculation result:', status);
           
-          if (status === 'OK') {
-            directionsRenderer.setDirections(result);
+          if (status === 'OK' && result.routes && result.routes.length > 0) {
+            console.log(`SuperSimpleMap: Found ${result.routes.length} routes`);
             
-            // Extract route info
-            const route = result.routes[0];
-            const leg = route.legs[0];
+            // Log all routes for debugging
+            result.routes.forEach((route, index) => {
+              const leg = route.legs[0];
+              console.log(`Route ${index + 1}: ${leg.distance.text} (${(leg.distance.value * 0.000621371).toFixed(2)} mi), ${leg.duration.text} (${leg.duration.value} seconds)`);
+              // Log route summary for comparison with Google Maps
+              if (route.summary) {
+                console.log(`   📍 Route ${index + 1} Summary: ${route.summary}`);
+              }
+            });
+            
+            // Find the fastest route (shortest duration)
+            let fastestRoute = result.routes[0];
+            let shortestDuration = result.routes[0].legs[0].duration.value;
+            
+            for (let i = 1; i < result.routes.length; i++) {
+              const routeDuration = result.routes[i].legs[0].duration.value;
+              if (routeDuration < shortestDuration) {
+                shortestDuration = routeDuration;
+                fastestRoute = result.routes[i];
+              }
+            }
+            
+            console.log('SuperSimpleMap: Selected fastest route (shortest duration)');
+            directionsRenderer.setDirections({...result, routes: [fastestRoute]});
+            
+            // Extract route info from fastest route
+            const leg = fastestRoute.legs[0];
             
             const info = {
               distance: {
