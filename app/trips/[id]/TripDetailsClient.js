@@ -490,15 +490,32 @@ export default function TripDetailsClient({ trip, user }) {
                           <dt className="text-sm font-medium text-gray-600">Status</dt>
                           <dd className="mt-1">
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              currentTrip.driver.status === 'available' ? 'bg-green-100 text-green-800' : 
-                              currentTrip.driver.status === 'on_trip' ? 'bg-orange-100 text-orange-800' : 
-                              currentTrip.driver.status === 'offline' ? 'bg-red-100 text-red-800' : 
+                              currentTrip.driver.status === 'available' ? 'bg-green-100 text-green-800' :
+                              currentTrip.driver.status === 'on_trip' ? 'bg-orange-100 text-orange-800' :
+                              currentTrip.driver.status === 'offline' ? 'bg-red-100 text-red-800' :
                               'bg-blue-100 text-blue-800'
                             }`}>
                               {currentTrip.driver.status?.replace('_', ' ') || 'Available'}
                             </span>
                           </dd>
                         </div>
+                        {currentTrip.driver_acceptance_status && (
+                          <div>
+                            <dt className="text-sm font-medium text-gray-600">Driver Response</dt>
+                            <dd className="mt-1">
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                currentTrip.driver_acceptance_status === 'accepted' ? 'bg-green-100 text-green-800' :
+                                currentTrip.driver_acceptance_status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                'bg-yellow-100 text-yellow-800'
+                              }`}>
+                                {currentTrip.driver_acceptance_status === 'pending' ? '⏳ Awaiting Driver Response' :
+                                 currentTrip.driver_acceptance_status === 'accepted' ? '✅ Driver Accepted' :
+                                 currentTrip.driver_acceptance_status === 'rejected' ? '❌ Driver Rejected' :
+                                 currentTrip.driver_acceptance_status}
+                              </span>
+                            </dd>
+                          </div>
+                        )}
                       </dl>
                     </div>
                   ) : (
