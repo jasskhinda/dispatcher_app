@@ -349,7 +349,8 @@ export default function FacilityMonthlyInvoicePage() {
                             user_id,
                             last_edited_by,
                             last_edited_at,
-                            edited_by_role
+                            edited_by_role,
+                            driver_acceptance_status
                         `)
                         .eq('facility_id', facilityId)
                         .gte('pickup_time', startISO)
@@ -404,7 +405,8 @@ export default function FacilityMonthlyInvoicePage() {
                                 user_id,
                                 last_edited_by,
                                 last_edited_at,
-                                edited_by_role
+                                edited_by_role,
+                                driver_acceptance_status
                             `)
                             .eq('facility_id', facilityId)
                             .gte('pickup_time', startISO)
@@ -2324,6 +2326,18 @@ export default function FacilityMonthlyInvoicePage() {
                                                             <div className="text-sm font-bold text-gray-900">{trip.clientName}</div>
                                                             {trip.clientPhone && (
                                                                 <div className="text-xs font-medium text-gray-700">📞 {trip.clientPhone}</div>
+                                                            )}
+                                                            {trip.driver_acceptance_status && (
+                                                                <div className={`text-xs px-2 py-0.5 rounded mt-1 inline-block ${
+                                                                    trip.driver_acceptance_status === 'accepted' ? 'bg-green-50 text-green-700' :
+                                                                    trip.driver_acceptance_status === 'rejected' ? 'bg-red-50 text-red-700' :
+                                                                    'bg-yellow-50 text-yellow-700'
+                                                                }`}>
+                                                                    {trip.driver_acceptance_status === 'pending' ? '⏳ Awaiting Driver' :
+                                                                     trip.driver_acceptance_status === 'accepted' ? '✅ Driver Accepted' :
+                                                                     trip.driver_acceptance_status === 'rejected' ? '❌ Driver Rejected' :
+                                                                     trip.driver_acceptance_status}
+                                                                </div>
                                                             )}
                                                         </td>
                                                         <td className="px-4 py-3 border-b">
