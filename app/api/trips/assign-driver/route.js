@@ -137,9 +137,11 @@ export async function POST(request) {
     console.log(`🔄 Assigning trip [${requestId}]: ${tripId} to driver ${driverId}`);
 
     // Assign the trip to the driver
-    // Note: Status remains unchanged - driver assignment is optional and doesn't affect trip status
+    // Note: Trip status remains unchanged - driver assignment is optional
+    // driver_acceptance_status tracks whether driver accepted/rejected (separate from trip status)
     const updateData = {
       driver_id: driverId,
+      driver_acceptance_status: 'pending', // Awaiting driver response
       updated_at: new Date().toISOString()
     };
 
