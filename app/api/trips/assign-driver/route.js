@@ -135,11 +135,11 @@ export async function POST(request) {
     // Note: Time conflict checking removed - drivers can be assigned multiple trips regardless of timing
 
     console.log(`🔄 Assigning trip [${requestId}]: ${tripId} to driver ${driverId}`);
-    
+
     // Assign the trip to the driver
+    // Note: Status remains unchanged - driver assignment is optional and doesn't affect trip status
     const updateData = {
       driver_id: driverId,
-      status: 'awaiting_driver_acceptance',
       updated_at: new Date().toISOString()
     };
 
