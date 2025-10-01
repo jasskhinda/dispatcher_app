@@ -1309,6 +1309,20 @@ export default function WorkingDashboard() {
                                                                 👤 {clientInfo.tripSource} Booking
                                                             </div>
                                                         )}
+
+                                                        {/* Driver Acceptance Status */}
+                                                        {trip.driver_acceptance_status && (
+                                                            <div className={`text-xs px-2 py-1 rounded ${
+                                                                trip.driver_acceptance_status === 'accepted' ? 'bg-green-50 text-green-700' :
+                                                                trip.driver_acceptance_status === 'rejected' ? 'bg-red-50 text-red-700' :
+                                                                'bg-yellow-50 text-yellow-700'
+                                                            }`}>
+                                                                {trip.driver_acceptance_status === 'pending' ? '⏳ Awaiting Driver' :
+                                                                 trip.driver_acceptance_status === 'accepted' ? '✅ Driver Accepted' :
+                                                                 trip.driver_acceptance_status === 'rejected' ? '❌ Driver Rejected' :
+                                                                 trip.driver_acceptance_status}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </td>
                                                 <td className="px-2 sm:px-4 lg:px-6 py-4">
