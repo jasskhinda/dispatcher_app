@@ -465,7 +465,7 @@ export default function DashboardClientView({ user, userProfile, trips: initialT
                         <div className="text-xs text-gray-400 mt-1">
                           {getTripSource(trip)} Booking
                         </div>
-                        {trip.driver_acceptance_status && (
+                        {trip.driver_acceptance_status && trip.status !== 'completed' && (
                           <div className={`text-xs px-2 py-1 rounded mt-1 inline-block ${
                             trip.driver_acceptance_status === 'accepted' ? 'bg-green-50 text-green-700' :
                             trip.driver_acceptance_status === 'rejected' ? 'bg-red-50 text-red-700' :

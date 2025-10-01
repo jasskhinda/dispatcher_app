@@ -2327,7 +2327,7 @@ export default function FacilityMonthlyInvoicePage() {
                                                             {trip.clientPhone && (
                                                                 <div className="text-xs font-medium text-gray-700">📞 {trip.clientPhone}</div>
                                                             )}
-                                                            {trip.driver_acceptance_status && (
+                                                            {trip.driver_acceptance_status && trip.status !== 'completed' && (
                                                                 <div className={`text-xs px-2 py-0.5 rounded mt-1 inline-block ${
                                                                     trip.driver_acceptance_status === 'accepted' ? 'bg-green-50 text-green-700' :
                                                                     trip.driver_acceptance_status === 'rejected' ? 'bg-red-50 text-red-700' :

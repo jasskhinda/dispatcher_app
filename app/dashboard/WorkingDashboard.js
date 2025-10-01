@@ -1310,8 +1310,8 @@ export default function WorkingDashboard() {
                                                             </div>
                                                         )}
 
-                                                        {/* Driver Acceptance Status */}
-                                                        {trip.driver_acceptance_status && (
+                                                        {/* Driver Acceptance Status - Only show for non-completed trips */}
+                                                        {trip.driver_acceptance_status && trip.status !== 'completed' && (
                                                             <div className={`text-xs px-2 py-1 rounded ${
                                                                 trip.driver_acceptance_status === 'accepted' ? 'bg-green-50 text-green-700' :
                                                                 trip.driver_acceptance_status === 'rejected' ? 'bg-red-50 text-red-700' :

@@ -499,7 +499,7 @@ export default function TripDetailsClient({ trip, user }) {
                             </span>
                           </dd>
                         </div>
-                        {currentTrip.driver_acceptance_status && (
+                        {currentTrip.driver_acceptance_status && currentTrip.status !== 'completed' && (
                           <div>
                             <dt className="text-sm font-medium text-gray-600">Driver Response</dt>
                             <dd className="mt-1">
