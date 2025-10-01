@@ -1362,6 +1362,16 @@ export default function WorkingDashboard() {
                                                         
                                                         {/* Trip Action Buttons */}
                                                         <div className="flex flex-wrap gap-1">
+                                                            {/* Trip Details Button - Always available */}
+                                                            <a
+                                                                href={`/trips/${trip.id}`}
+                                                                className="inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white px-1 sm:px-2 py-1 rounded text-xs font-medium transition-colors duration-200 shadow-sm"
+                                                                title="View Trip Details"
+                                                            >
+                                                                <span className="hidden sm:inline">📋 TRIP DETAILS</span>
+                                                                <span className="sm:hidden">📋</span>
+                                                            </a>
+
                                                             {/* Edit Button - Only available for non-completed trips */}
                                                             {trip.status !== 'completed' && (
                                                                 <a
