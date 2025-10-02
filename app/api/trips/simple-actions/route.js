@@ -1,6 +1,44 @@
 import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
+const { notifyTripApproved, notifyTripCompleted, notifyTripCancelled } = require('@/lib/notifications');
+
+// Helper function to enrich trip data with client and facility info
+async function enrichTripData(trip, supabase) {
+  const enrichedTrip = { ...trip };
+
+  try {
+    // Fetch client data if it's a managed client
+    if (trip.managed_client_id) {
+      const { data: clientData } = await supabase
+        .from('facility_managed_clients')
+        .select('first_name, last_name, email')
+        .eq('id', trip.managed_client_id)
+        .single();
+
+      if (clientData) {
+        enrichedTrip.client_info = clientData;
+      }
+    }
+
+    // Fetch facility data if there's a facility_id
+    if (trip.facility_id) {
+      const { data: facilityData } = await supabase
+        .from('facilities')
+        .select('contact_email, name')
+        .eq('id', trip.facility_id)
+        .single();
+
+      if (facilityData) {
+        enrichedTrip.facility_info = facilityData;
+      }
+    }
+  } catch (error) {
+    console.log('Could not enrich trip data:', error.message);
+  }
+
+  return enrichedTrip;
+}
 
 export async function POST(request) {
   console.log('🚀 Simple trip actions API called');
@@ -61,13 +99,20 @@ export async function POST(request) {
 
       if (updateError) {
         console.error('❌ Update error:', updateError);
-        return NextResponse.json({ 
+        return NextResponse.json({
           error: 'Failed to update trip',
-          details: updateError.message 
+          details: updateError.message
         }, { status: 500 });
       }
 
       console.log('✅ Trip completed:', updatedTrip.id);
+
+      // Enrich trip data and send notifications
+      const enrichedTrip = await enrichTripData(updatedTrip, supabase);
+      notifyTripCompleted(updatedTrip, enrichedTrip).catch(err =>
+        console.error('Error sending completion notifications:', err)
+      );
+
       return NextResponse.json({
         success: true,
         trip: updatedTrip,
@@ -88,17 +133,59 @@ export async function POST(request) {
 
       if (updateError) {
         console.error('❌ Update error:', updateError);
-        return NextResponse.json({ 
+        return NextResponse.json({
           error: 'Failed to update trip',
-          details: updateError.message 
+          details: updateError.message
         }, { status: 500 });
       }
 
       console.log('✅ Trip approved:', updatedTrip.id);
+
+      // Enrich trip data and send notifications
+      const enrichedTrip = await enrichTripData(updatedTrip, supabase);
+      notifyTripApproved(updatedTrip, enrichedTrip).catch(err =>
+        console.error('Error sending approval notifications:', err)
+      );
+
       return NextResponse.json({
         success: true,
         trip: updatedTrip,
         message: 'Trip approved successfully'
+      });
+    }
+
+    if (action === 'cancel') {
+      const { reason } = body;
+      const { data: updatedTrip, error: updateError } = await supabase
+        .from('trips')
+        .update({
+          status: 'cancelled',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', tripId)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('❌ Update error:', updateError);
+        return NextResponse.json({
+          error: 'Failed to update trip',
+          details: updateError.message
+        }, { status: 500 });
+      }
+
+      console.log('✅ Trip cancelled:', updatedTrip.id);
+
+      // Enrich trip data and send notifications
+      const enrichedTrip = await enrichTripData(updatedTrip, supabase);
+      notifyTripCancelled(updatedTrip, enrichedTrip, reason).catch(err =>
+        console.error('Error sending cancellation notifications:', err)
+      );
+
+      return NextResponse.json({
+        success: true,
+        trip: updatedTrip,
+        message: 'Trip cancelled successfully'
       });
     }
 
