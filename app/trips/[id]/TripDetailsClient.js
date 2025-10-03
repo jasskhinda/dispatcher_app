@@ -103,6 +103,9 @@ export default function TripDetailsClient({ trip, user }) {
 
   // Handle marking trip as complete
   const handleMarkComplete = async () => {
+    const confirmComplete = confirm('Mark this trip as completed? This will make it ready for billing.');
+    if (!confirmComplete) return; // User cancelled
+
     if (!currentTrip.id) return;
 
     setIsMarkingComplete(true);
@@ -126,7 +129,7 @@ export default function TripDetailsClient({ trip, user }) {
         console.error('Error marking trip complete:', result);
         setError(result.details || result.error || 'Failed to mark trip as complete. Please try again.');
       } else {
-        alert('Trip completed successfully! Page will refresh.');
+        alert('Trip marked as completed! Page will refresh to show updated status.');
         window.location.reload();
       }
     } catch (error) {
@@ -197,14 +200,14 @@ export default function TripDetailsClient({ trip, user }) {
               </button>
             )}
 
-            {/* Complete button - for in_progress or upcoming trips */}
-            {(currentTrip.status === 'in_progress' || currentTrip.status === 'upcoming') && (
+            {/* Complete button - for in_progress, in_process, or upcoming trips */}
+            {(currentTrip.status === 'in_progress' || currentTrip.status === 'in_process' || currentTrip.status === 'upcoming') && (
               <button
                 onClick={handleMarkComplete}
                 disabled={isMarkingComplete}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 shadow-sm transition-colors"
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 disabled:bg-green-400 shadow-sm transition-colors"
               >
-                {isMarkingComplete ? 'Completing...' : '✅ Complete'}
+                {isMarkingComplete ? 'Completing...' : '✅ Complete Trip'}
               </button>
             )}
 
