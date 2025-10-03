@@ -125,7 +125,6 @@ export default function TripDetailsClient({ trip, user }) {
         .from('trips')
         .update({
           status: 'completed',
-          completed_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
         .eq('id', currentTrip.id)
