@@ -123,9 +123,7 @@ export default function TripDetailsClient({ trip, user }) {
       const { data, error } = await supabase
         .from('trips')
         .update({
-          status: 'completed',
-          completed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          status: 'completed'
         })
         .eq('id', currentTrip.id)
         .select();
