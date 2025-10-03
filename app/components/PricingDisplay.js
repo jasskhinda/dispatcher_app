@@ -8,7 +8,10 @@ export default function PricingDisplay({
   selectedClient,
   routeInfo = null,
   isVisible = true,
-  onPricingCalculated = null 
+  onPricingCalculated = null,
+  wheelchairData = null,
+  clientInfoData = null,
+  holidayData = null
 }) {
   const [pricing, setPricing] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -34,7 +37,10 @@ export default function PricingDisplay({
     formData.isEmergency,
     selectedClient?.client_type,
     routeInfo,
-    isVisible
+    isVisible,
+    wheelchairData,
+    clientInfoData,
+    holidayData
   ]);
 
   const calculatePricing = async () => {
@@ -63,7 +69,10 @@ export default function PricingDisplay({
           distance: routeInfo.distance?.miles || 0, // Use the already converted miles
           text: routeInfo.distance?.text || '',
           duration: routeInfo.duration?.text || ''
-        } : null
+        } : null,
+        clientWeight: clientInfoData?.weight ? parseFloat(clientInfoData.weight) : null,
+        holidayData: holidayData,
+        calculateDeadMileageEnabled: true
       });
 
       if (result.success) {
@@ -97,7 +106,7 @@ export default function PricingDisplay({
   return (
     <div className="bg-gradient-to-br from-[#7CCFD0]/10 to-[#60BFC0]/5 dark:from-[#7CCFD0]/20 dark:to-[#60BFC0]/10 rounded-lg border border-[#7CCFD0]/20 dark:border-[#7CCFD0]/30 p-4">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-lg font-semibold text-[#2E4F54] dark:text-[#E0F4F5] flex items-center">
+        <h3 className="text-lg font-semibold text-[#2E4F54] text-gray-900 flex items-center">
           <svg className="w-5 h-5 mr-2 text-[#7CCFD0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
           </svg>
@@ -105,7 +114,7 @@ export default function PricingDisplay({
         </h3>
         
         {loading && (
-          <div className="flex items-center text-sm text-[#2E4F54]/60 dark:text-[#E0F4F5]/60">
+          <div className="flex items-center text-sm text-[#2E4F54]/60 text-gray-900/60">
             <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-[#7CCFD0]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -129,9 +138,9 @@ export default function PricingDisplay({
       {pricing && (
         <div className="space-y-3">
           {/* Quick Summary */}
-          <div className="flex justify-between items-center p-3 bg-white/60 dark:bg-[#1C2C2F]/60 rounded-lg">
+          <div className="flex justify-between items-center p-3 bg-white/60 /60 rounded-lg">
             <div>
-              <p className="text-sm text-[#2E4F54]/80 dark:text-[#E0F4F5]/80">
+              <p className="text-sm text-[#2E4F54]/80 text-gray-900/80">
                 {pricing.summary.tripType} • {pricing.summary.distance}
                 {pricing.distance?.isEstimated && (
                   <span className="ml-1 text-xs text-orange-600 dark:text-orange-400">
@@ -140,13 +149,13 @@ export default function PricingDisplay({
                 )}
               </p>
               {pricing.distance?.duration && (
-                <p className="text-xs text-[#2E4F54]/60 dark:text-[#E0F4F5]/60">
+                <p className="text-xs text-[#2E4F54]/60 text-gray-900/60">
                   Est. travel time: {pricing.distance.duration}
                 </p>
               )}
             </div>
             <div className="text-right">
-              <p className="text-2xl font-bold text-[#2E4F54] dark:text-[#E0F4F5]">
+              <p className="text-2xl font-bold text-[#2E4F54] text-gray-900">
                 {pricing.summary.estimatedTotal}
               </p>
               {pricing.pricing.discount > 0 && (
@@ -171,23 +180,23 @@ export default function PricingDisplay({
                 <div 
                   key={index} 
                   className={`flex justify-between items-center py-1 ${
-                    item.type === 'total' ? 'border-t border-[#DDE5E7] dark:border-[#3F5E63] pt-2 font-semibold' :
-                    item.type === 'subtotal' ? 'border-t border-[#DDE5E7] dark:border-[#3F5E63] pt-2' : ''
+                    item.type === 'total' ? 'border-t border-[#DDE5E7] dark:border-[#E0E0E0] pt-2 font-semibold' :
+                    item.type === 'subtotal' ? 'border-t border-[#DDE5E7] dark:border-[#E0E0E0] pt-2' : ''
                   }`}
                 >
                   <span className={`text-sm ${
-                    item.type === 'total' ? 'text-[#2E4F54] dark:text-[#E0F4F5] font-semibold' :
+                    item.type === 'total' ? 'text-[#2E4F54] text-gray-900 font-semibold' :
                     item.type === 'discount' ? 'text-green-600 dark:text-green-400' :
                     item.type === 'premium' ? 'text-orange-600 dark:text-orange-400' :
-                    'text-[#2E4F54]/80 dark:text-[#E0F4F5]/80'
+                    'text-[#2E4F54]/80 text-gray-900/80'
                   }`}>
                     {item.label}
                   </span>
                   <span className={`text-sm ${
-                    item.type === 'total' ? 'text-[#2E4F54] dark:text-[#E0F4F5] font-semibold' :
+                    item.type === 'total' ? 'text-[#2E4F54] text-gray-900 font-semibold' :
                     item.type === 'discount' ? 'text-green-600 dark:text-green-400' :
                     item.type === 'premium' ? 'text-orange-600 dark:text-orange-400' :
-                    'text-[#2E4F54]/80 dark:text-[#E0F4F5]/80'
+                    'text-[#2E4F54]/80 text-gray-900/80'
                   }`}>
                     {formatCurrency(Math.abs(item.amount))}
                   </span>
@@ -197,7 +206,16 @@ export default function PricingDisplay({
           </details>
 
           {/* Pricing Notes */}
-          <div className="text-xs text-[#2E4F54]/60 dark:text-[#E0F4F5]/60 space-y-1">
+          <div className="text-xs text-[#2E4F54]/60 text-gray-900/60 space-y-1">
+            {pricing.summary?.isBariatric && (
+              <p>• Enhanced bariatric rate ($150 vs $50) applied based on client weight</p>
+            )}
+            {pricing.summary?.hasHolidaySurcharge && (
+              <p>• Holiday surcharge (+$100) applied for special holiday dates</p>
+            )}
+            {pricing.summary?.hasDeadMileage && (
+              <p>• Dead mileage fee ($4/mile from office to pickup) for trips 2+ counties out</p>
+            )}
             {pricing.distance?.isEstimated && (
               <p>• Distance is estimated - actual fare may vary based on route</p>
             )}
@@ -214,10 +232,10 @@ export default function PricingDisplay({
 
       {!loading && !pricing && !error && (
         <div className="text-center py-6">
-          <svg className="mx-auto h-8 w-8 text-[#2E4F54]/40 dark:text-[#E0F4F5]/40 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="mx-auto h-8 w-8 text-[#2E4F54]/40 text-gray-900/40 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
           </svg>
-          <p className="text-sm text-[#2E4F54]/60 dark:text-[#E0F4F5]/60">
+          <p className="text-sm text-[#2E4F54]/60 text-gray-900/60">
             Enter pickup location, destination, date and time to see fare estimate
           </p>
         </div>

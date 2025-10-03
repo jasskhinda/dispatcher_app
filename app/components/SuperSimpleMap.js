@@ -126,10 +126,6 @@ export default function SuperSimpleMap({
             result.routes.forEach((route, index) => {
               const leg = route.legs[0];
               console.log(`Route ${index + 1}: ${leg.distance.text} (${(leg.distance.value * 0.000621371).toFixed(2)} mi), ${leg.duration.text} (${leg.duration.value} seconds)`);
-              // Log route summary for comparison with Google Maps
-              if (route.summary) {
-                console.log(`   📍 Route ${index + 1} Summary: ${route.summary}`);
-              }
             });
             
             // Find the fastest route (shortest duration)

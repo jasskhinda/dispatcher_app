@@ -4,6 +4,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter, useSearchParams } from 'next/navigation';
 import GoogleMapsAutocomplete from './GoogleMapsAutocomplete';
+import EnhancedClientInfoForm from './EnhancedClientInfoForm';
+import HolidayPricingChecker from './HolidayPricingChecker';
 
 export default function EnhancedTripForm({ user, userProfile, individualClients, managedClients, facilities }) {
   const router = useRouter();
@@ -46,6 +48,24 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
     hasWheelchairFee: false,
     fee: 0,
     requirements: '' // Add requirements field
+  });
+
+  // Enhanced client information state (for facility clients)
+  const [clientInfoData, setClientInfoData] = useState({
+    weight: '',
+    height_feet: '',
+    height_inches: '',
+    date_of_birth: '',
+    email: '',
+    isBariatric: false,
+    bariatricRate: 50
+  });
+
+  // Holiday pricing state (for facility clients)
+  const [holidayData, setHolidayData] = useState({
+    isHoliday: false,
+    holidayName: '',
+    surcharge: 0
   });
 
   // Combine all clients into one list
@@ -540,6 +560,23 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
                 </div>
               )}
             </div>
+
+            {/* Enhanced Client Info Form - Only for Facility Clients */}
+            {selectedClient?.client_type === 'managed' && (
+              <EnhancedClientInfoForm
+                clientInfo={clientInfoData}
+                onClientInfoChange={setClientInfoData}
+              />
+            )}
+
+            {/* Holiday Pricing Checker - Only for Facility Clients */}
+            {selectedClient?.client_type === 'managed' && formData.pickupDate && (
+              <HolidayPricingChecker
+                pickupDate={formData.pickupDate}
+                pickupTime={formData.pickupTime}
+                onHolidayChange={setHolidayData}
+              />
+            )}
 
             {/* Date and Time */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
