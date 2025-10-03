@@ -2,12 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { supabase } from '@/lib/supabase';
 import EditTripForm from '../../components/EditTripForm';
 
 export default function TripDetailsClient({ trip, user }) {
   const router = useRouter();
-  const supabase = createClientComponentClient();
   const [error, setError] = useState('');
   const [showEditForm, setShowEditForm] = useState(false);
   const [currentTrip, setCurrentTrip] = useState(trip);
@@ -125,6 +124,7 @@ export default function TripDetailsClient({ trip, user }) {
         .from('trips')
         .update({
           status: 'completed',
+          completed_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
         .eq('id', currentTrip.id)
