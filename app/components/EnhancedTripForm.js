@@ -133,13 +133,30 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
     // Use the professional pricing calculation
     try {
       const { getPricingEstimate } = await import('@/lib/pricing');
-      
+
       const pickupDateTime = new Date(`${formData.pickupDate}T${formData.pickupTime}`);
-      
+
       // Determine client type for pricing
       // Managed clients are facility clients
       const clientType = (selectedClient?.client_type === 'individual') ? 'individual' : 'facility';
-      
+
+      // Get client weight if available (for bariatric pricing)
+      const clientWeight = selectedClient?.weight || null;
+
+      // Check for holidays (facility clients only)
+      let holidayData = null;
+      if (clientType === 'facility') {
+        const { checkHoliday } = await import('@/lib/pricing');
+        const holidayCheck = checkHoliday(pickupDateTime.toISOString());
+        if (holidayCheck.isHoliday) {
+          holidayData = {
+            isHoliday: true,
+            holidayName: holidayCheck.holidayName,
+            surcharge: holidayCheck.surcharge
+          };
+        }
+      }
+
       const result = await getPricingEstimate({
         pickupAddress: formData.pickupAddress,
         destinationAddress: formData.destinationAddress,
@@ -149,6 +166,9 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
         clientType,
         additionalPassengers: formData.additionalPassengers || 0,
         isEmergency: formData.isEmergency || false,
+        clientWeight: clientWeight,
+        holidayData: holidayData,
+        calculateDeadMileageEnabled: clientType === 'facility',
         preCalculatedDistance: routeInfo ? {
           miles: routeInfo.distance?.miles || 0,
           distance: routeInfo.distance?.miles || 0,
