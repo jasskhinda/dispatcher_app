@@ -27,15 +27,14 @@ export default function TripDetailsClient({ trip, user }) {
     setShowEditForm(false);
   };
 
-  // Handle approving trip
+  // Handle approving trip - EXACT COPY from dashboard
   const handleApproveTrip = async () => {
-    if (!currentTrip.id) return;
-
     setIsApproving(true);
-    setError('');
-
     try {
-      const response = await fetch('/api/trips/simple-actions', {
+      console.log('🔄 Starting trip approval process...');
+      console.log('Trip ID:', currentTrip.id);
+
+      const response = await fetch('/api/trips/actions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -49,92 +48,104 @@ export default function TripDetailsClient({ trip, user }) {
       const result = await response.json();
 
       if (!response.ok) {
-        console.error('Error approving trip:', result);
-        setError(result.details || result.error || 'Failed to approve trip. Please try again.');
-      } else {
-        alert('Trip approved successfully! Page will refresh.');
-        window.location.reload();
+        throw new Error(result.error || 'Failed to approve trip');
       }
+
+      console.log('✅ Trip approval result:', result);
+
+      // Show appropriate success message based on payment status
+      let message = 'Trip approved successfully!';
+      if (result.payment?.charged) {
+        message += ` Payment of $${result.payment.amount} charged successfully.`;
+      } else if (result.payment?.status === 'failed') {
+        message += ` Warning: ${result.warning}`;
+      }
+
+      alert(message + ' Page will refresh to show updated status.');
+      window.location.reload();
+
     } catch (error) {
       console.error('Error approving trip:', error);
-      setError('Failed to approve trip. Please try again.');
+      alert(`Failed to approve trip: ${error.message || 'Please try again.'}`);
     } finally {
       setIsApproving(false);
     }
   };
 
-  // Handle rejecting trip
+  // Handle rejecting trip - EXACT COPY from dashboard
   const handleRejectTrip = async () => {
     const reason = prompt('Please provide a reason for rejecting this trip:');
     if (!reason) return; // User cancelled
 
     setIsRejecting(true);
-    setError('');
-
     try {
-      const response = await fetch('/api/trips/simple-actions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          tripId: currentTrip.id,
-          action: 'cancel',
-          reason: reason
-        }),
-      });
+      console.log('🔄 Starting trip rejection process...');
+      console.log('Trip ID:', currentTrip.id);
+      console.log('Reason:', reason);
 
-      const result = await response.json();
+      // Perform the rejection update
+      const { data, error } = await supabase
+        .from('trips')
+        .update({
+          status: 'cancelled',
+          cancellation_reason: `Rejected by dispatcher: ${reason}`,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', currentTrip.id)
+        .select();
 
-      if (!response.ok) {
-        console.error('Error rejecting trip:', result);
-        setError(result.details || result.error || 'Failed to reject trip. Please try again.');
-      } else {
-        alert('Trip rejected successfully! Page will refresh.');
-        window.location.reload();
+      if (error) {
+        console.error('❌ Supabase update error:', error);
+        throw new Error(`Database update failed: ${error.message}`);
       }
+
+      console.log('✅ Trip rejection successful:', data);
+
+      alert('Trip rejected successfully! Page will refresh to show updated status.');
+      window.location.reload();
+
     } catch (error) {
       console.error('Error rejecting trip:', error);
-      setError('Failed to reject trip. Please try again.');
+      alert(`Failed to reject trip: ${error.message || 'Please try again.'}`);
     } finally {
       setIsRejecting(false);
     }
   };
 
-  // Handle marking trip as complete
+  // Handle marking trip as complete - EXACT COPY from dashboard
   const handleMarkComplete = async () => {
     const confirmComplete = confirm('Mark this trip as completed? This will make it ready for billing.');
     if (!confirmComplete) return; // User cancelled
 
-    if (!currentTrip.id) return;
-
     setIsMarkingComplete(true);
-    setError('');
-
     try {
-      const response = await fetch('/api/trips/simple-actions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          tripId: currentTrip.id,
-          action: 'complete'
-        }),
-      });
+      console.log('Completing trip:', currentTrip.id);
 
-      const result = await response.json();
+      const { data, error } = await supabase
+        .from('trips')
+        .update({
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', currentTrip.id)
+        .select();
 
-      if (!response.ok) {
-        console.error('Error marking trip complete:', result);
-        setError(result.details || result.error || 'Failed to mark trip as complete. Please try again.');
-      } else {
-        alert('Trip marked as completed! Page will refresh to show updated status.');
-        window.location.reload();
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
       }
+
+      console.log('Trip completed successfully:', data);
+
+      // Force a complete page refresh to ensure we get fresh data
+      alert('Trip marked as completed! Page will refresh to show updated status.');
+      window.location.reload();
+
     } catch (error) {
-      console.error('Error marking trip complete:', error);
-      setError('Failed to mark trip as complete. Please try again.');
+      console.error('Error completing trip:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      alert(`Failed to complete trip: ${error.message || 'Please try again.'}`);
     } finally {
       setIsMarkingComplete(false);
     }
