@@ -161,19 +161,30 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
       const clientType = (selectedClient?.client_type === 'individual') ? 'individual' : 'facility';
 
       // Get client weight if available (for bariatric pricing)
-      const clientWeight = selectedClient?.weight || null;
+      // For facility clients, use the weight from clientInfoData form
+      // For individual clients, use weight from their profile if available
+      const clientWeight = clientType === 'facility'
+        ? (clientInfoData.weight ? parseFloat(clientInfoData.weight) : null)
+        : (selectedClient?.weight || null);
 
       // Check for holidays (facility clients only)
-      let holidayData = null;
+      // Use the holidayData from state if available, otherwise check programmatically
+      let holidayInfo = null;
       if (clientType === 'facility') {
-        const { checkHoliday } = await import('@/lib/pricing');
-        const holidayCheck = checkHoliday(pickupDateTime.toISOString());
-        if (holidayCheck.isHoliday) {
-          holidayData = {
-            isHoliday: true,
-            holidayName: holidayCheck.holidayName,
-            surcharge: holidayCheck.surcharge
-          };
+        if (holidayData.isHoliday) {
+          // Use the holiday data from the HolidayPricingChecker component
+          holidayInfo = holidayData;
+        } else {
+          // Fallback: check programmatically
+          const { checkHoliday } = await import('@/lib/pricing');
+          const holidayCheck = checkHoliday(pickupDateTime.toISOString());
+          if (holidayCheck.isHoliday) {
+            holidayInfo = {
+              isHoliday: true,
+              holidayName: holidayCheck.holidayName,
+              surcharge: holidayCheck.surcharge
+            };
+          }
         }
       }
 
@@ -187,7 +198,7 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
         additionalPassengers: formData.additionalPassengers || 0,
         isEmergency: formData.isEmergency || false,
         clientWeight: clientWeight,
-        holidayData: holidayData,
+        holidayData: holidayInfo,
         calculateDeadMileageEnabled: clientType === 'facility',
         preCalculatedDistance: routeInfo ? {
           miles: routeInfo.distance?.miles || 0,
@@ -249,7 +260,9 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
     formData.wheelchairType,
     formData.isEmergency,
     selectedClient?.client_type,
-    routeInfo
+    routeInfo,
+    clientInfoData.weight, // Recalculate when weight changes (bariatric pricing)
+    holidayData.isHoliday  // Recalculate when holiday status changes
   ]);
 
   const handleSubmit = async (e) => {
