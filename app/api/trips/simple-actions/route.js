@@ -89,9 +89,7 @@ export async function POST(request) {
       const { data: updatedTrip, error: updateError } = await supabase
         .from('trips')
         .update({
-          status: 'completed',
-          completed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          status: 'completed'
         })
         .eq('id', tripId)
         .select()

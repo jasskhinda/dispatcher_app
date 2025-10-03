@@ -120,20 +120,22 @@ export default function TripDetailsClient({ trip, user }) {
     try {
       console.log('Completing trip:', currentTrip.id);
 
-      const { data, error } = await supabase
-        .from('trips')
-        .update({
-          status: 'completed'
-        })
-        .eq('id', currentTrip.id)
-        .select();
+      const response = await fetch('/api/trips/simple-actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tripId: currentTrip.id,
+          action: 'complete'
+        }),
+      });
 
-      if (error) {
-        console.error('Supabase error:', error);
-        throw error;
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to complete trip');
       }
 
-      console.log('Trip completed successfully:', data);
+      console.log('Trip completed successfully:', result);
 
       // Force a complete page refresh to ensure we get fresh data
       alert('Trip marked as completed! Page will refresh to show updated status.');
@@ -141,7 +143,6 @@ export default function TripDetailsClient({ trip, user }) {
 
     } catch (error) {
       console.error('Error completing trip:', error);
-      console.error('Error details:', JSON.stringify(error, null, 2));
       alert(`Failed to complete trip: ${error.message || 'Please try again.'}`);
     } finally {
       setIsMarkingComplete(false);
