@@ -12,6 +12,8 @@ export default function TripDetailsClient({ trip, user }) {
   const [showEditForm, setShowEditForm] = useState(false);
   const [currentTrip, setCurrentTrip] = useState(trip);
   const [isMarkingComplete, setIsMarkingComplete] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
+  const [isRejecting, setIsRejecting] = useState(false);
 
 
   // Handle trip edit save
@@ -25,15 +27,89 @@ export default function TripDetailsClient({ trip, user }) {
     setShowEditForm(false);
   };
 
+  // Handle approving trip
+  const handleApproveTrip = async () => {
+    if (!currentTrip.id) return;
+
+    setIsApproving(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/trips/simple-actions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tripId: currentTrip.id,
+          action: 'approve'
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        console.error('Error approving trip:', result);
+        setError(result.details || result.error || 'Failed to approve trip. Please try again.');
+      } else {
+        alert('Trip approved successfully! Page will refresh.');
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error('Error approving trip:', error);
+      setError('Failed to approve trip. Please try again.');
+    } finally {
+      setIsApproving(false);
+    }
+  };
+
+  // Handle rejecting trip
+  const handleRejectTrip = async () => {
+    const reason = prompt('Please provide a reason for rejecting this trip:');
+    if (!reason) return; // User cancelled
+
+    setIsRejecting(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/trips/simple-actions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tripId: currentTrip.id,
+          action: 'cancel',
+          reason: reason
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        console.error('Error rejecting trip:', result);
+        setError(result.details || result.error || 'Failed to reject trip. Please try again.');
+      } else {
+        alert('Trip rejected successfully! Page will refresh.');
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error('Error rejecting trip:', error);
+      setError('Failed to reject trip. Please try again.');
+    } finally {
+      setIsRejecting(false);
+    }
+  };
+
   // Handle marking trip as complete
   const handleMarkComplete = async () => {
     if (!currentTrip.id) return;
-    
+
     setIsMarkingComplete(true);
     setError('');
-    
+
     try {
-      const response = await fetch('/api/trips/actions', {
+      const response = await fetch('/api/trips/simple-actions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -45,18 +121,13 @@ export default function TripDetailsClient({ trip, user }) {
       });
 
       const result = await response.json();
-      
+
       if (!response.ok) {
         console.error('Error marking trip complete:', result);
         setError(result.details || result.error || 'Failed to mark trip as complete. Please try again.');
       } else {
-        // Update the current trip state with the returned data
-        setCurrentTrip({
-          ...currentTrip,
-          status: 'completed',
-          completed_at: new Date().toISOString(),
-          updated_at: result.trip.updated_at
-        });
+        alert('Trip completed successfully! Page will refresh.');
+        window.location.reload();
       }
     } catch (error) {
       console.error('Error marking trip complete:', error);
@@ -104,31 +175,44 @@ export default function TripDetailsClient({ trip, user }) {
             <p className="text-sm text-gray-600 mt-1">Trip ID: {currentTrip.id.slice(0, 8)}...</p>
           </div>
           <div className="flex items-center space-x-3">
-            {currentTrip.status === 'in_progress' && (
+            {/* Approve button - for pending trips */}
+            {currentTrip.status === 'pending' && (
+              <button
+                onClick={handleApproveTrip}
+                disabled={isApproving}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 disabled:bg-green-400 shadow-sm transition-colors"
+              >
+                {isApproving ? 'Approving...' : '✅ Approve'}
+              </button>
+            )}
+
+            {/* Reject button - for pending trips */}
+            {currentTrip.status === 'pending' && (
+              <button
+                onClick={handleRejectTrip}
+                disabled={isRejecting}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-red-600 hover:bg-red-700 disabled:bg-red-400 shadow-sm transition-colors"
+              >
+                {isRejecting ? 'Rejecting...' : '❌ Reject'}
+              </button>
+            )}
+
+            {/* Complete button - for in_progress or upcoming trips */}
+            {(currentTrip.status === 'in_progress' || currentTrip.status === 'upcoming') && (
               <button
                 onClick={handleMarkComplete}
                 disabled={isMarkingComplete}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 disabled:bg-green-400 shadow-sm transition-colors"
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 shadow-sm transition-colors"
               >
-                {isMarkingComplete ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Completing...
-                  </>
-                ) : (
-                  <>
-                    ✅ Mark Complete
-                  </>
-                )}
+                {isMarkingComplete ? 'Completing...' : '✅ Complete'}
               </button>
             )}
-            {(currentTrip.status === 'pending' || currentTrip.status === 'upcoming' || currentTrip.status === 'approved') && currentTrip.status !== 'completed' && (
+
+            {/* Edit button - for non-completed trips */}
+            {currentTrip.status !== 'completed' && currentTrip.status !== 'cancelled' && (
               <button
                 onClick={() => setShowEditForm(true)}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-colors"
+                className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 shadow-sm transition-colors"
               >
                 ✏️ Edit Trip
               </button>
