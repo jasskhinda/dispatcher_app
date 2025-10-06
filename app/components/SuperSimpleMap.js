@@ -128,23 +128,23 @@ export default function SuperSimpleMap({
               console.log(`Route ${index + 1}: ${leg.distance.text} (${(leg.distance.value * 0.000621371).toFixed(2)} mi), ${leg.duration.text} (${leg.duration.value} seconds)`);
             });
             
-            // Find the fastest route (shortest duration)
-            let fastestRoute = result.routes[0];
-            let shortestDuration = result.routes[0].legs[0].duration.value;
-            
+            // Find the shortest distance route for consistent billing
+            let shortestRoute = result.routes[0];
+            let shortestDistance = result.routes[0].legs[0].distance.value;
+
             for (let i = 1; i < result.routes.length; i++) {
-              const routeDuration = result.routes[i].legs[0].duration.value;
-              if (routeDuration < shortestDuration) {
-                shortestDuration = routeDuration;
-                fastestRoute = result.routes[i];
+              const routeDistance = result.routes[i].legs[0].distance.value;
+              if (routeDistance < shortestDistance) {
+                shortestDistance = routeDistance;
+                shortestRoute = result.routes[i];
               }
             }
-            
-            console.log('SuperSimpleMap: Selected fastest route (shortest duration)');
-            directionsRenderer.setDirections({...result, routes: [fastestRoute]});
-            
-            // Extract route info from fastest route
-            const leg = fastestRoute.legs[0];
+
+            console.log('SuperSimpleMap: Selected shortest distance route for billing consistency');
+            directionsRenderer.setDirections({...result, routes: [shortestRoute]});
+
+            // Extract route info from shortest distance route
+            const leg = shortestRoute.legs[0];
             
             const info = {
               distance: {
