@@ -129,6 +129,7 @@ export default function SuperSimpleMap({
             });
             
             // Find the shortest distance route for consistent billing
+            let shortestRouteIndex = 0;
             let shortestRoute = result.routes[0];
             let shortestDistance = result.routes[0].legs[0].distance.value;
 
@@ -137,10 +138,12 @@ export default function SuperSimpleMap({
               if (routeDistance < shortestDistance) {
                 shortestDistance = routeDistance;
                 shortestRoute = result.routes[i];
+                shortestRouteIndex = i;
               }
             }
 
-            console.log('SuperSimpleMap: Selected shortest distance route for billing consistency');
+            const selectedLeg = shortestRoute.legs[0];
+            console.log(`SuperSimpleMap: Selected route ${shortestRouteIndex + 1} (shortest distance): ${selectedLeg.distance.text} (${(selectedLeg.distance.value * 0.000621371).toFixed(2)} mi), ${selectedLeg.duration.text}`);
             directionsRenderer.setDirections({...result, routes: [shortestRoute]});
 
             // Extract route info from shortest distance route
