@@ -128,8 +128,7 @@ export default function SuperSimpleMap({
               console.log(`Route ${index + 1}: ${leg.distance.text} (${(leg.distance.value * 0.000621371).toFixed(2)} mi), ${leg.duration.text} (${leg.duration.value} seconds)`);
             });
             
-            // Find the fastest route (shortest duration) - matches facility app
-            let fastestRouteIndex = 0;
+            // Find the fastest route (shortest duration)
             let fastestRoute = result.routes[0];
             let shortestDuration = result.routes[0].legs[0].duration.value;
 
@@ -138,12 +137,10 @@ export default function SuperSimpleMap({
               if (routeDuration < shortestDuration) {
                 shortestDuration = routeDuration;
                 fastestRoute = result.routes[i];
-                fastestRouteIndex = i;
               }
             }
 
-            const selectedLeg = fastestRoute.legs[0];
-            console.log(`SuperSimpleMap: Selected route ${fastestRouteIndex + 1} (fastest route): ${selectedLeg.distance.text} (${(selectedLeg.distance.value * 0.000621371).toFixed(2)} mi), ${selectedLeg.duration.text}`);
+            console.log('SuperSimpleMap: Selected fastest route (shortest duration)');
             directionsRenderer.setDirections({...result, routes: [fastestRoute]});
 
             // Extract route info from fastest route
