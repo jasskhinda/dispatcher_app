@@ -128,26 +128,26 @@ export default function SuperSimpleMap({
               console.log(`Route ${index + 1}: ${leg.distance.text} (${(leg.distance.value * 0.000621371).toFixed(2)} mi), ${leg.duration.text} (${leg.duration.value} seconds)`);
             });
             
-            // Find the shortest distance route for consistent billing
-            let shortestRouteIndex = 0;
-            let shortestRoute = result.routes[0];
-            let shortestDistance = result.routes[0].legs[0].distance.value;
+            // Find the fastest route (shortest duration) - matches facility app
+            let fastestRouteIndex = 0;
+            let fastestRoute = result.routes[0];
+            let shortestDuration = result.routes[0].legs[0].duration.value;
 
             for (let i = 1; i < result.routes.length; i++) {
-              const routeDistance = result.routes[i].legs[0].distance.value;
-              if (routeDistance < shortestDistance) {
-                shortestDistance = routeDistance;
-                shortestRoute = result.routes[i];
-                shortestRouteIndex = i;
+              const routeDuration = result.routes[i].legs[0].duration.value;
+              if (routeDuration < shortestDuration) {
+                shortestDuration = routeDuration;
+                fastestRoute = result.routes[i];
+                fastestRouteIndex = i;
               }
             }
 
-            const selectedLeg = shortestRoute.legs[0];
-            console.log(`SuperSimpleMap: Selected route ${shortestRouteIndex + 1} (shortest distance): ${selectedLeg.distance.text} (${(selectedLeg.distance.value * 0.000621371).toFixed(2)} mi), ${selectedLeg.duration.text}`);
-            directionsRenderer.setDirections({...result, routes: [shortestRoute]});
+            const selectedLeg = fastestRoute.legs[0];
+            console.log(`SuperSimpleMap: Selected route ${fastestRouteIndex + 1} (fastest route): ${selectedLeg.distance.text} (${(selectedLeg.distance.value * 0.000621371).toFixed(2)} mi), ${selectedLeg.duration.text}`);
+            directionsRenderer.setDirections({...result, routes: [fastestRoute]});
 
-            // Extract route info from shortest distance route
-            const leg = shortestRoute.legs[0];
+            // Extract route info from fastest route
+            const leg = fastestRoute.legs[0];
             
             const info = {
               distance: {
