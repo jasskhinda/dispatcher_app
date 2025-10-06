@@ -107,7 +107,7 @@ export async function POST(request) {
 
       // Enrich trip data and send notifications
       const enrichedTrip = await enrichTripData(updatedTrip, supabase);
-      notifyTripCompleted(updatedTrip, enrichedTrip).catch(err =>
+      await notifyTripCompleted(updatedTrip, enrichedTrip).catch(err =>
         console.error('Error sending completion notifications:', err)
       );
 
@@ -141,7 +141,7 @@ export async function POST(request) {
 
       // Enrich trip data and send notifications
       const enrichedTrip = await enrichTripData(updatedTrip, supabase);
-      notifyTripApproved(updatedTrip, enrichedTrip).catch(err =>
+      await notifyTripApproved(updatedTrip, enrichedTrip).catch(err =>
         console.error('Error sending approval notifications:', err)
       );
 
@@ -176,7 +176,7 @@ export async function POST(request) {
 
       // Enrich trip data and send notifications
       const enrichedTrip = await enrichTripData(updatedTrip, supabase);
-      notifyTripCancelled(updatedTrip, enrichedTrip, reason).catch(err =>
+      await notifyTripCancelled(updatedTrip, enrichedTrip, reason).catch(err =>
         console.error('Error sending cancellation notifications:', err)
       );
 
