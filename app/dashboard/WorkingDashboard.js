@@ -1013,7 +1013,7 @@ export default function WorkingDashboard() {
                 <div className="bg-white rounded-lg shadow p-6 mb-8">
                     <div className="flex items-center justify-between">
                         <div>
-                            <h1 className="text-3xl font-bold text-gray-900">Dispatcher Dashboard - PREVIEW</h1>
+                            <h1 className="text-3xl font-bold text-gray-900">Dispatcher Dashboard - PREVIEW VERSION</h1>
                             <p className="mt-2 text-gray-600">
                                 Manage trips, create invoices, and oversee operations
                             </p>
