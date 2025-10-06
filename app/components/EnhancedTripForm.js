@@ -1,11 +1,23 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter, useSearchParams } from 'next/navigation';
 import GoogleMapsAutocomplete from './GoogleMapsAutocomplete';
 import EnhancedClientInfoForm from './EnhancedClientInfoForm';
 import HolidayPricingChecker from './HolidayPricingChecker';
+
+// Dynamically import Google Maps components to prevent SSR issues
+const SuperSimpleMap = dynamic(() => import('./SuperSimpleMap'), {
+  ssr: false,
+  loading: () => <div className="w-full h-64 bg-gray-100 rounded-lg flex items-center justify-center">
+    <div className="text-center">
+      <div className="animate-spin h-6 w-6 border-2 border-gray-400 border-t-transparent rounded-full mx-auto mb-2"></div>
+      <p className="text-gray-600 text-sm">Loading map...</p>
+    </div>
+  </div>
+});
 
 export default function EnhancedTripForm({ user, userProfile, individualClients, managedClients, facilities }) {
   const router = useRouter();
@@ -698,18 +710,6 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
               </div>
             </div>
 
-            {/* Route Overview */}
-            {routeInfo && (
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="font-medium text-gray-900 mb-2">Route Overview</h3>
-                <div className="text-sm text-gray-600">
-                  <p className="font-semibold text-lg">{routeInfo.distance?.text}</p>
-                  <p>({routeInfo.distance?.miles?.toFixed(2)} miles)</p>
-                  <p className="text-blue-600">{routeInfo.duration?.text} driving time</p>
-                </div>
-              </div>
-            )}
-
             {/* Round Trip */}
             <div className="flex items-center">
               <input
@@ -926,11 +926,17 @@ export default function EnhancedTripForm({ user, userProfile, individualClients,
               </div>
             )}
 
-            {/* Map placeholder */}
+            {/* Route Map */}
             {formData.pickupAddress && formData.destinationAddress && (
-              <div className="bg-gray-100 rounded-lg p-4 text-center">
-                <p className="text-gray-600">Map will be displayed here</p>
-                <p className="text-sm text-gray-500">Route: {formData.pickupAddress} → {formData.destinationAddress}</p>
+              <div className="mt-6">
+                <label className="block text-sm font-medium text-gray-900 mb-2">
+                  Route Overview
+                </label>
+                <SuperSimpleMap
+                  origin={formData.pickupAddress}
+                  destination={formData.destinationAddress}
+                  onRouteCalculated={setRouteInfo}
+                />
               </div>
             )}
 
