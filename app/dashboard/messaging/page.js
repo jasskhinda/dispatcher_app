@@ -82,10 +82,23 @@ export default function MessagingPage() {
       setLoading(true);
 
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        console.log('❌ No user found');
+        return;
+      }
       setUser(user);
+      console.log('✅ User authenticated:', user.email);
+
+      // Check user profile and role
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+      console.log('👤 User role:', profileData?.role);
 
       // Load all conversations with facility details
+      console.log('📋 Loading conversations...');
       const { data: conversationsData, error: convError } = await supabase
         .from('conversations')
         .select(`
@@ -101,8 +114,13 @@ export default function MessagingPage() {
         .order('last_message_at', { ascending: false });
 
       if (convError) {
-        console.error('Error loading conversations:', convError);
+        console.error('❌ Error loading conversations:', convError);
         throw convError;
+      }
+
+      console.log('✅ Conversations loaded:', conversationsData?.length || 0);
+      if (conversationsData && conversationsData.length > 0) {
+        console.log('📝 First conversation:', conversationsData[0]);
       }
 
       // Load assigned dispatcher info separately if needed
