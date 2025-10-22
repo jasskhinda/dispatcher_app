@@ -257,9 +257,10 @@ export default function MessagingPage() {
     e.preventDefault();
     if (!newMessage.trim() || !selectedConversation || sending) return;
 
-    // Auto-join if not already assigned
+    // Check if dispatcher needs to join first
     if (!selectedConversation.assigned_dispatcher_id) {
-      await handleJoinConversation();
+      alert('Please click "Join Conversation" before sending messages');
+      return;
     }
 
     try {
@@ -488,7 +489,7 @@ export default function MessagingPage() {
                       value={newMessage}
                       onChange={(e) => setNewMessage(e.target.value)}
                       placeholder="Type your message..."
-                      className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent text-gray-900 bg-white"
                       maxLength={500}
                     />
                     <button
