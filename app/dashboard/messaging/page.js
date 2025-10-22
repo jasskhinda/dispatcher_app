@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import Header from '../../components/Header';
 
 export default function MessagingPage() {
   const [loading, setLoading] = useState(true);
@@ -290,22 +289,18 @@ export default function MessagingPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <Header />
-        <div className="flex items-center justify-center h-screen">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Loading messages...</p>
-          </div>
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading messages...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
-      <div className="h-[calc(100vh-4rem)] flex">
+    <div className="h-[calc(100vh-8rem)]">
+      <div className="h-full flex">
         {/* Conversations List */}
         <div className="w-80 border-r border-gray-200 bg-white flex flex-col">
           <div className="p-4 border-b border-gray-200">
