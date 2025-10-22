@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 export default function MessagingPage() {
   const [loading, setLoading] = useState(true);
@@ -15,10 +15,7 @@ export default function MessagingPage() {
   const [user, setUser] = useState(null);
   const messagesEndRef = useRef(null);
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  );
+  const supabase = createClientComponentClient();
 
   useEffect(() => {
     loadUserAndConversations();
