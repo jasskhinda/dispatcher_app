@@ -182,6 +182,8 @@ export default function MessagingPage() {
 
       if (messagesError) throw messagesError;
 
+      console.log('📨 Messages loaded:', messagesData);
+      console.log('📨 First message with attachment:', messagesData?.find(m => m.attachment_url));
       setMessages(messagesData || []);
 
       // Mark unread messages as read
@@ -464,7 +466,70 @@ export default function MessagingPage() {
                               : 'bg-white text-gray-900 shadow-sm rounded-bl-sm'
                           }`}
                         >
-                          <p className="text-sm leading-relaxed">{message.message_text}</p>
+                          {/* Attachment Display */}
+                          {message.attachment_url && message.attachment_type === 'image' && (
+                            <div className="mb-2">
+                              <img
+                                src={message.attachment_url}
+                                alt="Attachment"
+                                className="max-w-full rounded-lg cursor-pointer hover:opacity-90 transition"
+                                style={{ maxHeight: '300px' }}
+                                onClick={() => window.open(message.attachment_url, '_blank')}
+                              />
+                              {message.attachment_name && (
+                                <p className={`text-xs mt-1 ${isDispatcher ? 'text-teal-100' : 'text-gray-500'}`}>
+                                  {message.attachment_name}
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          {message.attachment_url && message.attachment_type === 'file' && (
+                            <a
+                              href={message.attachment_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={`block mb-2 p-3 rounded-lg ${
+                                isDispatcher ? 'bg-teal-600' : 'bg-gray-100'
+                              } hover:opacity-80 transition`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="text-2xl">📄</span>
+                                <div className="flex-1 min-w-0">
+                                  <p className={`text-sm font-medium truncate ${
+                                    isDispatcher ? 'text-white' : 'text-gray-900'
+                                  }`}>
+                                    {message.attachment_name || 'Document'}
+                                  </p>
+                                  {message.attachment_size && (
+                                    <p className={`text-xs ${isDispatcher ? 'text-teal-100' : 'text-gray-500'}`}>
+                                      {(message.attachment_size / 1024).toFixed(1)} KB
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </a>
+                          )}
+
+                          {message.attachment_url && message.attachment_type === 'audio' && (
+                            <div className="mb-2">
+                              <audio controls className="w-full max-w-xs">
+                                <source src={message.attachment_url} type="audio/mpeg" />
+                                Your browser does not support audio playback.
+                              </audio>
+                              {message.attachment_name && (
+                                <p className={`text-xs mt-1 ${isDispatcher ? 'text-teal-100' : 'text-gray-500'}`}>
+                                  {message.attachment_name}
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Message Text */}
+                          {message.message_text && (
+                            <p className="text-sm leading-relaxed">{message.message_text}</p>
+                          )}
+
                           <p
                             className={`text-xs mt-1 ${
                               isDispatcher ? 'text-teal-100' : 'text-gray-500'
