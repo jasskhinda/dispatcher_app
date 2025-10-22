@@ -8,9 +8,11 @@ export default function MessagingPage() {
   const [loading, setLoading] = useState(true);
   const [conversations, setConversations] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
+  const [facilityDetails, setFacilityDetails] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [joining, setJoining] = useState(false);
   const [user, setUser] = useState(null);
   const messagesEndRef = useRef(null);
 
@@ -27,7 +29,7 @@ export default function MessagingPage() {
     if (!selectedConversation) return;
 
     // Subscribe to new messages
-    const subscription = supabase
+    const messagesSubscription = supabase
       .channel('messages-changes')
       .on(
         'postgres_changes',
@@ -42,7 +44,6 @@ export default function MessagingPage() {
           setMessages(prev => [...prev, payload.new]);
           scrollToBottom();
 
-          // Mark as read
           if (payload.new.sender_type === 'facility') {
             markMessageAsRead(payload.new.id);
           }
@@ -50,8 +51,30 @@ export default function MessagingPage() {
       )
       .subscribe();
 
+    // Subscribe to conversation updates
+    const conversationSubscription = supabase
+      .channel('conversation-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'conversations',
+          filter: `id=eq.${selectedConversation.id}`
+        },
+        (payload) => {
+          setSelectedConversation(payload.new);
+          // Update in conversations list
+          setConversations(prev =>
+            prev.map(conv => conv.id === payload.new.id ? { ...conv, ...payload.new } : conv)
+          );
+        }
+      )
+      .subscribe();
+
     return () => {
-      subscription.unsubscribe();
+      messagesSubscription.unsubscribe();
+      conversationSubscription.unsubscribe();
     };
   }, [selectedConversation]);
 
@@ -63,14 +86,21 @@ export default function MessagingPage() {
       if (!user) return;
       setUser(user);
 
-      // Load all conversations
+      // Load all conversations with facility details
       const { data: conversationsData, error: convError } = await supabase
         .from('conversations')
         .select(`
           *,
           facilities (
             id,
-            name
+            name,
+            email,
+            phone,
+            address
+          ),
+          assigned_dispatcher:assigned_dispatcher_id (
+            full_name,
+            email
           )
         `)
         .order('last_message_at', { ascending: false });
@@ -93,6 +123,7 @@ export default function MessagingPage() {
   const selectConversation = async (conversation) => {
     try {
       setSelectedConversation(conversation);
+      setFacilityDetails(conversation.facilities);
 
       // Load messages for this conversation
       const { data: messagesData, error: messagesError } = await supabase
@@ -123,6 +154,46 @@ export default function MessagingPage() {
     }
   };
 
+  const handleJoinConversation = async () => {
+    if (!selectedConversation || joining) return;
+
+    try {
+      setJoining(true);
+
+      const { error } = await supabase
+        .from('conversations')
+        .update({
+          assigned_dispatcher_id: user.id,
+          status: 'active'
+        })
+        .eq('id', selectedConversation.id);
+
+      if (error) throw error;
+
+      // Send automated join message
+      await supabase.from('messages').insert({
+        conversation_id: selectedConversation.id,
+        sender_id: user.id,
+        sender_type: 'dispatcher',
+        message_text: '👋 Hello! I\'m here to help. How can I assist you today?',
+        read_by_facility: false,
+        read_by_dispatcher: true
+      });
+
+      // Update local state
+      setSelectedConversation(prev => ({
+        ...prev,
+        assigned_dispatcher_id: user.id,
+        status: 'active'
+      }));
+    } catch (error) {
+      console.error('Error joining conversation:', error);
+      alert('Failed to join conversation');
+    } finally {
+      setJoining(false);
+    }
+  };
+
   const markMessageAsRead = async (messageId) => {
     try {
       await supabase
@@ -137,6 +208,11 @@ export default function MessagingPage() {
   const sendMessage = async (e) => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedConversation || sending) return;
+
+    // Auto-join if not already assigned
+    if (!selectedConversation.assigned_dispatcher_id) {
+      await handleJoinConversation();
+    }
 
     try {
       setSending(true);
@@ -195,6 +271,23 @@ export default function MessagingPage() {
     }
   };
 
+  const getStatusBadge = (status, rating) => {
+    if (rating) {
+      return (
+        <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600 flex items-center gap-1">
+          ⭐ {rating}/5
+        </span>
+      );
+    }
+    if (status === 'active') {
+      return <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-700">Active</span>;
+    }
+    if (status === 'resolved') {
+      return <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600">Resolved</span>;
+    }
+    return <span className="px-2 py-1 text-xs rounded-full bg-amber-100 text-amber-700">Waiting</span>;
+  };
+
   if (loading) {
     return (
       <DashboardLayout user={user} activeTab="messaging">
@@ -230,7 +323,7 @@ export default function MessagingPage() {
                   key={conv.id}
                   onClick={() => selectConversation(conv)}
                   className={`w-full p-4 border-b border-gray-100 hover:bg-gray-50 text-left transition ${
-                    selectedConversation?.id === conv.id ? 'bg-teal-50' : ''
+                    selectedConversation?.id === conv.id ? 'bg-teal-50 border-l-4 border-l-teal-500' : ''
                   }`}
                 >
                   <div className="flex justify-between items-start mb-1">
@@ -241,9 +334,14 @@ export default function MessagingPage() {
                       {formatConversationTime(conv.last_message_at)}
                     </span>
                   </div>
-                  {conv.subject && (
-                    <p className="text-sm text-gray-600 truncate">{conv.subject}</p>
-                  )}
+                  <div className="flex items-center justify-between mt-2">
+                    {getStatusBadge(conv.status, conv.rating)}
+                    {conv.assigned_dispatcher && (
+                      <span className="text-xs text-gray-500">
+                        {conv.assigned_dispatcher.full_name}
+                      </span>
+                    )}
+                  </div>
                 </button>
               ))
             )}
@@ -254,67 +352,120 @@ export default function MessagingPage() {
         <div className="flex-1 flex flex-col bg-gray-50">
           {selectedConversation ? (
             <>
-              {/* Chat Header */}
+              {/* Chat Header with Facility Details */}
               <div className="bg-white border-b border-gray-200 p-4">
-                <h2 className="font-semibold text-gray-900">
-                  {selectedConversation.facilities?.name || 'Unknown Facility'}
-                </h2>
-                <p className="text-sm text-gray-500">
-                  {selectedConversation.subject || 'General Support'}
-                </p>
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h2 className="font-semibold text-gray-900 text-lg">
+                        {facilityDetails?.name || 'Unknown Facility'}
+                      </h2>
+                      {getStatusBadge(selectedConversation.status, selectedConversation.rating)}
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                      {facilityDetails?.email && (
+                        <div className="text-gray-600">
+                          <span className="font-medium">Email:</span> {facilityDetails.email}
+                        </div>
+                      )}
+                      {facilityDetails?.phone && (
+                        <div className="text-gray-600">
+                          <span className="font-medium">Phone:</span> {facilityDetails.phone}
+                        </div>
+                      )}
+                      {facilityDetails?.address && (
+                        <div className="text-gray-600 col-span-2">
+                          <span className="font-medium">Address:</span> {facilityDetails.address}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {!selectedConversation.assigned_dispatcher_id && selectedConversation.status !== 'resolved' && (
+                    <button
+                      onClick={handleJoinConversation}
+                      disabled={joining}
+                      className="px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition font-medium"
+                    >
+                      {joining ? 'Joining...' : 'Join Conversation'}
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Messages */}
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {messages.map(message => {
-                  const isDispatcher = message.sender_type === 'dispatcher';
-                  return (
-                    <div
-                      key={message.id}
-                      className={`flex ${isDispatcher ? 'justify-end' : 'justify-start'}`}
-                    >
+                {messages.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-gray-500">
+                    <div className="text-center">
+                      <p className="text-6xl mb-4">💬</p>
+                      <p className="text-lg">No messages yet</p>
+                      <p className="text-sm">Start the conversation by joining and sending a message</p>
+                    </div>
+                  </div>
+                ) : (
+                  messages.map(message => {
+                    const isDispatcher = message.sender_type === 'dispatcher';
+                    return (
                       <div
-                        className={`max-w-[70%] rounded-2xl px-4 py-2 ${
-                          isDispatcher
-                            ? 'bg-teal-500 text-white rounded-br-sm'
-                            : 'bg-white text-gray-900 shadow-sm rounded-bl-sm'
-                        }`}
+                        key={message.id}
+                        className={`flex ${isDispatcher ? 'justify-end' : 'justify-start'}`}
                       >
-                        <p className="text-sm leading-relaxed">{message.message_text}</p>
-                        <p
-                          className={`text-xs mt-1 ${
-                            isDispatcher ? 'text-teal-100' : 'text-gray-500'
+                        <div
+                          className={`max-w-[70%] rounded-2xl px-4 py-2 ${
+                            isDispatcher
+                              ? 'bg-teal-500 text-white rounded-br-sm'
+                              : 'bg-white text-gray-900 shadow-sm rounded-bl-sm'
                           }`}
                         >
-                          {formatTime(message.created_at)}
-                        </p>
+                          <p className="text-sm leading-relaxed">{message.message_text}</p>
+                          <p
+                            className={`text-xs mt-1 ${
+                              isDispatcher ? 'text-teal-100' : 'text-gray-500'
+                            }`}
+                          >
+                            {formatTime(message.created_at)}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
                 <div ref={messagesEndRef} />
               </div>
 
               {/* Input */}
-              <form onSubmit={sendMessage} className="bg-white border-t border-gray-200 p-4">
-                <div className="flex space-x-2">
-                  <input
-                    type="text"
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    placeholder="Type your message..."
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                    maxLength={500}
-                  />
-                  <button
-                    type="submit"
-                    disabled={!newMessage.trim() || sending}
-                    className="px-6 py-2 bg-teal-500 text-white rounded-full hover:bg-teal-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition"
-                  >
-                    {sending ? 'Sending...' : 'Send'}
-                  </button>
+              {selectedConversation.status !== 'resolved' ? (
+                <form onSubmit={sendMessage} className="bg-white border-t border-gray-200 p-4">
+                  <div className="flex space-x-2">
+                    <input
+                      type="text"
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      placeholder="Type your message..."
+                      className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      maxLength={500}
+                    />
+                    <button
+                      type="submit"
+                      disabled={!newMessage.trim() || sending}
+                      className="px-6 py-2 bg-teal-500 text-white rounded-full hover:bg-teal-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition font-medium"
+                    >
+                      {sending ? 'Sending...' : 'Send'}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <div className="bg-gray-100 border-t border-gray-200 p-4 text-center text-gray-600">
+                  <p className="text-sm">
+                    This conversation has been resolved and rated by the facility.
+                    {selectedConversation.feedback && (
+                      <span className="block mt-2 italic">
+                        "{selectedConversation.feedback}"
+                      </span>
+                    )}
+                  </p>
                 </div>
-              </form>
+              )}
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center text-gray-500">
