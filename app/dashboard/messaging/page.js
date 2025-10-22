@@ -19,6 +19,28 @@ export default function MessagingPage() {
 
   useEffect(() => {
     loadUserAndConversations();
+
+    // Subscribe to new conversations being created
+    const conversationsSubscription = supabase
+      .channel('all-conversations')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'conversations'
+        },
+        (payload) => {
+          console.log('🆕 New conversation created:', payload.new);
+          // Reload conversations to include the new one
+          loadUserAndConversations();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      conversationsSubscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -26,7 +48,7 @@ export default function MessagingPage() {
 
     // Subscribe to new messages
     const messagesSubscription = supabase
-      .channel('messages-changes')
+      .channel(`messages-${selectedConversation.id}`)
       .on(
         'postgres_changes',
         {
@@ -36,7 +58,7 @@ export default function MessagingPage() {
           filter: `conversation_id=eq.${selectedConversation.id}`
         },
         (payload) => {
-          console.log('New message received:', payload.new);
+          console.log('💬 New message received:', payload.new);
           setMessages(prev => [...prev, payload.new]);
           scrollToBottom();
 
@@ -45,7 +67,9 @@ export default function MessagingPage() {
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('📡 Messages subscription status:', status);
+      });
 
     // Subscribe to conversation updates
     const conversationSubscription = supabase
