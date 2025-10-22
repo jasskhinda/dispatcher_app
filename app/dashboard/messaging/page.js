@@ -81,11 +81,16 @@ export default function MessagingPage() {
     try {
       setLoading(true);
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        console.log('❌ No user found');
+      // Wait for session to be ready
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+        console.log('❌ No session found, waiting...');
+        // Retry after a short delay
+        setTimeout(loadUserAndConversations, 500);
         return;
       }
+
+      const user = session.user;
       setUser(user);
       console.log('✅ User authenticated:', user.email);
 
