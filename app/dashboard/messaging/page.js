@@ -107,10 +107,7 @@ export default function MessagingPage() {
           *,
           facilities (
             id,
-            name,
-            email,
-            phone,
-            address
+            name
           )
         `)
         .order('last_message_at', { ascending: false });
@@ -158,7 +155,23 @@ export default function MessagingPage() {
   const selectConversation = async (conversation) => {
     try {
       setSelectedConversation(conversation);
-      setFacilityDetails(conversation.facilities);
+
+      // Load facility contact details from profiles table
+      const { data: facilityProfileData } = await supabase
+        .from('profiles')
+        .select('email, phone, full_name, address')
+        .eq('facility_id', conversation.facility_id)
+        .eq('role', 'facility')
+        .limit(1)
+        .single();
+
+      setFacilityDetails({
+        ...conversation.facilities,
+        email: facilityProfileData?.email,
+        phone: facilityProfileData?.phone,
+        address: facilityProfileData?.address,
+        contact_name: facilityProfileData?.full_name
+      });
 
       // Load messages for this conversation
       const { data: messagesData, error: messagesError } = await supabase
