@@ -155,13 +155,21 @@ export default function Header() {
           >
             CLIENTS
           </Link>
-          <Link 
-            href="/map" 
+          <Link
+            href="/map"
             className={`text-sm font-bold text-black hover:text-[#7CCFD0] transition-colors pb-1 ${
               activeRoute.includes('/map') ? 'text-[#7CCFD0] border-b-2 border-[#7CCFD0]' : ''
             }`}
           >
             MAP
+          </Link>
+          <Link
+            href="/dashboard/messaging"
+            className={`text-sm font-bold text-black hover:text-[#7CCFD0] transition-colors pb-1 ${
+              activeRoute.includes('/messaging') ? 'text-[#7CCFD0] border-b-2 border-[#7CCFD0]' : ''
+            }`}
+          >
+            MESSAGING
           </Link>
         </div>
         
