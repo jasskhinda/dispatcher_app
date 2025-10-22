@@ -96,15 +96,31 @@ export default function MessagingPage() {
             email,
             phone,
             address
-          ),
-          assigned_dispatcher:assigned_dispatcher_id (
-            full_name,
-            email
           )
         `)
         .order('last_message_at', { ascending: false });
 
-      if (convError) throw convError;
+      if (convError) {
+        console.error('Error loading conversations:', convError);
+        throw convError;
+      }
+
+      // Load assigned dispatcher info separately if needed
+      if (conversationsData) {
+        for (const conv of conversationsData) {
+          if (conv.assigned_dispatcher_id) {
+            const { data: dispatcherData } = await supabase
+              .from('profiles')
+              .select('full_name, email')
+              .eq('id', conv.assigned_dispatcher_id)
+              .single();
+
+            if (dispatcherData) {
+              conv.assigned_dispatcher = dispatcherData;
+            }
+          }
+        }
+      }
 
       setConversations(conversationsData || []);
 
