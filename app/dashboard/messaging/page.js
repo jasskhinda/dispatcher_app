@@ -32,8 +32,8 @@ export default function MessagingPage() {
         },
         (payload) => {
           console.log('🆕 New conversation created:', payload.new);
-          // Reload conversations to include the new one
-          loadUserAndConversations();
+          // Add new conversation to the list without reloading everything
+          setConversations(prev => [payload.new, ...prev]);
         }
       )
       .subscribe();
@@ -268,6 +268,54 @@ export default function MessagingPage() {
     }
   };
 
+  const handleEndConversation = async () => {
+    if (!selectedConversation) return;
+
+    const confirmed = window.confirm('Are you sure you want to end this conversation? This will mark it as resolved.');
+    if (!confirmed) return;
+
+    try {
+      const { error } = await supabase
+        .from('conversations')
+        .update({
+          status: 'resolved',
+          resolved_at: new Date().toISOString()
+        })
+        .eq('id', selectedConversation.id);
+
+      if (error) throw error;
+
+      // Send automated end message
+      await supabase.from('messages').insert({
+        conversation_id: selectedConversation.id,
+        sender_id: user.id,
+        sender_type: 'dispatcher',
+        message_text: '✅ This conversation has been marked as resolved. If you need further assistance, please start a new conversation.',
+        read_by_facility: false,
+        read_by_dispatcher: true
+      });
+
+      // Update local state
+      setSelectedConversation(prev => ({
+        ...prev,
+        status: 'resolved',
+        resolved_at: new Date().toISOString()
+      }));
+
+      // Update in conversations list
+      setConversations(prev =>
+        prev.map(conv =>
+          conv.id === selectedConversation.id
+            ? { ...conv, status: 'resolved', resolved_at: new Date().toISOString() }
+            : conv
+        )
+      );
+    } catch (error) {
+      console.error('Error ending conversation:', error);
+      alert('Failed to end conversation');
+    }
+  };
+
   const markMessageAsRead = async (messageId) => {
     try {
       await supabase
@@ -453,15 +501,25 @@ export default function MessagingPage() {
                       )}
                     </div>
                   </div>
-                  {!selectedConversation.assigned_dispatcher_id && selectedConversation.status !== 'resolved' && (
-                    <button
-                      onClick={handleJoinConversation}
-                      disabled={joining}
-                      className="px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition font-medium"
-                    >
-                      {joining ? 'Joining...' : 'Join Conversation'}
-                    </button>
-                  )}
+                  <div className="flex gap-2">
+                    {!selectedConversation.assigned_dispatcher_id && selectedConversation.status !== 'resolved' && (
+                      <button
+                        onClick={handleJoinConversation}
+                        disabled={joining}
+                        className="px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition font-medium"
+                      >
+                        {joining ? 'Joining...' : 'Join Conversation'}
+                      </button>
+                    )}
+                    {selectedConversation.assigned_dispatcher_id && selectedConversation.status === 'active' && (
+                      <button
+                        onClick={handleEndConversation}
+                        className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition font-medium"
+                      >
+                        End Chat
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
