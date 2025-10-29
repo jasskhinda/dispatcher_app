@@ -1725,7 +1725,34 @@ export default function FacilityMonthlyInvoicePage() {
                                                         CHECK RECEIVED
                                                     </button>
                                                 )}
-                                                
+
+                                                {/* Multiple options for IN TRANSIT status (check already mailed) */}
+                                                {paymentStatus.status === 'CHECK PAYMENT - IN TRANSIT' && (
+                                                    <>
+                                                        <button
+                                                            onClick={() => handleCheckVerification('check_received')}
+                                                            disabled={updatingPaymentStatus}
+                                                            className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center"
+                                                        >
+                                                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                            </svg>
+                                                            RECEIVED & DEPOSITED
+                                                        </button>
+
+                                                        <button
+                                                            onClick={() => handleCheckVerification('mark_not_received')}
+                                                            disabled={updatingPaymentStatus}
+                                                            className="bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center"
+                                                        >
+                                                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                                            </svg>
+                                                            NOT RECEIVED
+                                                        </button>
+                                                    </>
+                                                )}
+
                                                 {/* Multiple options for ALREADY SENT status */}
                                                 {paymentStatus.status === 'CHECK PAYMENT - ALREADY SENT' && (
                                                     <>

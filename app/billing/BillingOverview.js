@@ -12,6 +12,8 @@ export default function BillingOverview({ user }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [actionMessage, setActionMessage] = useState('');
+    const [showCheckVerificationModal, setShowCheckVerificationModal] = useState(false);
+    const [selectedCheckPayment, setSelectedCheckPayment] = useState(null);
     const supabase = createClientComponentClient();
 
     useEffect(() => {
@@ -52,7 +54,7 @@ export default function BillingOverview({ user }) {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                     invoice_id: invoiceId,
                     action,
                     notes
@@ -66,7 +68,7 @@ export default function BillingOverview({ user }) {
 
             const result = await response.json();
             setActionMessage(result.message);
-            
+
             // Refresh facility invoices
             const facilityResponse = await fetch('/api/facility-invoices');
             if (facilityResponse.ok) {
@@ -74,11 +76,52 @@ export default function BillingOverview({ user }) {
                 setFacilityInvoices(facilityData.invoices || []);
                 setFacilitySummary(facilityData.summary || {});
             }
-            
+
             // Clear message after 5 seconds
             setTimeout(() => setActionMessage(''), 5000);
         } catch (err) {
             console.error('Error updating facility invoice:', err);
+            setError(err.message);
+        }
+    }
+
+    function openCheckVerificationModal(invoice) {
+        setSelectedCheckPayment(invoice);
+        setShowCheckVerificationModal(true);
+    }
+
+    async function verifyCheckPayment(action) {
+        if (!selectedCheckPayment) return;
+
+        try {
+            const response = await fetch('/api/dispatcher/verify-check-payment', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    invoice_id: selectedCheckPayment.id,
+                    action: action, // 'received' or 'has_issues'
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to verify check payment');
+            }
+
+            const result = await response.json();
+            setActionMessage(result.message);
+            setShowCheckVerificationModal(false);
+            setSelectedCheckPayment(null);
+
+            // Refresh facility invoices
+            fetchAllInvoices();
+
+            // Clear message after 5 seconds
+            setTimeout(() => setActionMessage(''), 5000);
+        } catch (err) {
+            console.error('Error verifying check payment:', err);
             setError(err.message);
         }
     }
@@ -343,6 +386,15 @@ export default function BillingOverview({ user }) {
                                                                 </button>
                                                             </>
                                                         )}
+                                                        {(invoice.payment_status?.includes('CHECK PAYMENT') &&
+                                                          !invoice.payment_status?.includes('PAID WITH CHECK')) && (
+                                                            <button
+                                                                onClick={() => openCheckVerificationModal(invoice)}
+                                                                className="text-yellow-600 hover:text-yellow-900 bg-yellow-50 hover:bg-yellow-100 px-2 py-1 rounded text-xs font-semibold"
+                                                            >
+                                                                📝 Verify Check
+                                                            </button>
+                                                        )}
                                                         <button className="text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded text-xs">
                                                             View
                                                         </button>
@@ -363,6 +415,132 @@ export default function BillingOverview({ user }) {
                     )}
                 </div>
             </div>
+
+            {/* Check Payment Verification Modal */}
+            {showCheckVerificationModal && selectedCheckPayment && (
+                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                    <div className="relative mx-auto p-8 border w-full max-w-2xl shadow-lg rounded-lg bg-white">
+                        <div className="space-y-6">
+                            {/* Header */}
+                            <div className="border-b border-yellow-200 bg-yellow-50 -m-8 mb-6 p-6 rounded-t-lg">
+                                <div className="flex items-center space-x-3">
+                                    <span className="text-4xl">🏦</span>
+                                    <div>
+                                        <h3 className="text-2xl font-bold text-gray-900">
+                                            Final Payment Verification
+                                        </h3>
+                                        <p className="text-sm text-gray-600 mt-1">
+                                            Check received & deposited confirmation
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Invoice Details */}
+                            <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <p className="text-xs text-gray-600 uppercase">Invoice Number</p>
+                                        <p className="text-lg font-semibold text-gray-900">{selectedCheckPayment.invoice_number}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-600 uppercase">Amount</p>
+                                        <p className="text-lg font-semibold text-gray-900">{formatCurrency(selectedCheckPayment.total_amount)}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-600 uppercase">Facility</p>
+                                        <p className="text-sm font-medium text-gray-900">{selectedCheckPayment.facilities?.name}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-600 uppercase">Current Status</p>
+                                        <p className="text-sm font-medium text-yellow-700">{selectedCheckPayment.payment_status}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Warning Box */}
+                            <div className="bg-red-50 border-2 border-red-500 rounded-lg p-4">
+                                <h4 className="text-lg font-bold text-red-900 mb-2">⚠️ FINAL CONFIRMATION REQUIRED</h4>
+                                <p className="text-sm text-red-800 mb-2">
+                                    <strong>IRREVERSIBLE:</strong> This action will IMMEDIATELY mark the invoice as FULLY PAID and notify
+                                    the facility that payment processing is complete.
+                                </p>
+                                <ul className="text-sm text-red-800 space-y-1 list-disc ml-5">
+                                    <li>No further verification steps required</li>
+                                    <li>Invoice will show as "Payment Completed Successfully"</li>
+                                    <li>All trips will be marked as paid</li>
+                                    <li><strong>Action cannot be reversed</strong></li>
+                                </ul>
+                            </div>
+
+                            {/* Verification Checklist */}
+                            <div className="border-2 border-gray-300 rounded-lg p-4">
+                                <h4 className="text-lg font-bold text-gray-900 mb-3">
+                                    Final Verification Checklist - ALL MUST BE COMPLETED:
+                                </h4>
+                                <div className="space-y-2">
+                                    <div className="flex items-start space-x-2">
+                                        <span className="text-green-600 font-bold">✓</span>
+                                        <span className="text-sm text-gray-700">Physical check received and verified in office</span>
+                                    </div>
+                                    <div className="flex items-start space-x-2">
+                                        <span className="text-green-600 font-bold">✓</span>
+                                        <span className="text-sm text-gray-700">Check amount verified: {formatCurrency(selectedCheckPayment.total_amount)}</span>
+                                    </div>
+                                    <div className="flex items-start space-x-2">
+                                        <span className="text-green-600 font-bold">✓</span>
+                                        <span className="text-sm text-gray-700">Check authenticity confirmed (signatures, dates, routing)</span>
+                                    </div>
+                                    <div className="flex items-start space-x-2">
+                                        <span className="text-green-600 font-bold">✓</span>
+                                        <span className="text-sm text-gray-700">Check DEPOSITED into company bank account</span>
+                                    </div>
+                                    <div className="flex items-start space-x-2">
+                                        <span className="text-green-600 font-bold">✓</span>
+                                        <span className="text-sm text-gray-700">Bank deposit confirmation received</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Confirmation Text */}
+                            <div className="bg-gray-50 border border-gray-300 rounded-lg p-4">
+                                <p className="text-sm text-gray-800">
+                                    <strong>CONFIRM:</strong> Check has been RECEIVED and DEPOSITED into company bank account?
+                                </p>
+                                <p className="text-xs text-gray-600 mt-2">
+                                    This is the FINAL STEP in check payment processing. Please ensure the funds are fully deposited
+                                    because this action <strong>CANNOT BE UNDONE</strong> and will mark the invoice as completely paid.
+                                </p>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex space-x-4 pt-4">
+                                <button
+                                    onClick={() => verifyCheckPayment('received')}
+                                    className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition-colors"
+                                >
+                                    ✅ Yes, Check Received & Deposited
+                                </button>
+                                <button
+                                    onClick={() => verifyCheckPayment('has_issues')}
+                                    className="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-6 rounded-lg transition-colors"
+                                >
+                                    ⚠️ Mark as Having Issues
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setShowCheckVerificationModal(false);
+                                        setSelectedCheckPayment(null);
+                                    }}
+                                    className="px-6 py-3 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold rounded-lg transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
