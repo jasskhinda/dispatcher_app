@@ -180,6 +180,13 @@ export default function MessagingPage() {
     try {
       setSelectedConversation(conversation);
 
+      // Load facility details from facilities table
+      const { data: facilityData } = await supabase
+        .from('facilities')
+        .select('id, name, address, phone')
+        .eq('id', conversation.facility_id)
+        .single();
+
       // Load facility contact details from profiles table
       const { data: facilityProfileData } = await supabase
         .from('profiles')
@@ -190,10 +197,11 @@ export default function MessagingPage() {
         .single();
 
       setFacilityDetails({
-        ...conversation.facilities,
+        id: facilityData?.id,
+        name: facilityData?.name || conversation.facilities?.name || 'Unknown Facility',
+        address: facilityData?.address || facilityProfileData?.address,
+        phone: facilityData?.phone || facilityProfileData?.phone,
         email: facilityProfileData?.email,
-        phone: facilityProfileData?.phone,
-        address: facilityProfileData?.address,
         contact_name: facilityProfileData?.full_name
       });
 
