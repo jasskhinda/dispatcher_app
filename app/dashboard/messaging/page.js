@@ -13,6 +13,7 @@ export default function MessagingPage() {
   const [sending, setSending] = useState(false);
   const [joining, setJoining] = useState(false);
   const [user, setUser] = useState(null);
+  const [error, setError] = useState(null);
   const messagesEndRef = useRef(null);
 
   const supabase = createClientComponentClient();
@@ -98,7 +99,7 @@ export default function MessagingPage() {
     };
   }, [selectedConversation]);
 
-  const loadUserAndConversations = async () => {
+  const loadUserAndConversations = async (retryCount = 0) => {
     try {
       setLoading(true);
 
@@ -106,9 +107,16 @@ export default function MessagingPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) {
         console.log('❌ No session found, waiting...');
-        // Retry after a short delay
-        setTimeout(loadUserAndConversations, 500);
-        return;
+        // Retry up to 5 times
+        if (retryCount < 5) {
+          setTimeout(() => loadUserAndConversations(retryCount + 1), 500);
+          return;
+        } else {
+          console.error('❌ Failed to get session after 5 retries');
+          setError('Unable to authenticate. Please try refreshing the page.');
+          setLoading(false);
+          return;
+        }
       }
 
       const user = session.user;
@@ -323,6 +331,28 @@ export default function MessagingPage() {
       alert('Failed to end conversation');
     }
   };
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <p className="text-6xl mb-4">⚠️</p>
+          <p className="text-lg text-gray-900 mb-2">Oops! Something went wrong</p>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button
+            onClick={() => {
+              setError(null);
+              loadUserAndConversations();
+            }}
+            className="px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const markMessageAsRead = async (messageId) => {
     try {
