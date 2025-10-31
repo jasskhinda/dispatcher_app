@@ -391,6 +391,28 @@ export default function MessagingPage() {
 
       if (error) throw error;
 
+      // Send push notification to facility
+      try {
+        await fetch('/api/notifications/send-facility-push', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            facilityId: selectedConversation.facility_id,
+            title: '💬 New Message from Dispatcher',
+            body: newMessage.trim().substring(0, 100) + (newMessage.trim().length > 100 ? '...' : ''),
+            data: {
+              type: 'message',
+              conversationId: selectedConversation.id,
+              messagePreview: newMessage.trim().substring(0, 50)
+            }
+          })
+        });
+        console.log('📨 Push notification sent to facility');
+      } catch (pushError) {
+        console.error('⚠️ Failed to send push notification (non-critical):', pushError);
+        // Don't fail the message send if push fails
+      }
+
       setNewMessage('');
       setTimeout(scrollToBottom, 100);
     } catch (error) {
