@@ -56,7 +56,16 @@ export default function Login() {
       }
       
       console.log('Login successful, session:', data.session ? 'exists' : 'none');
-      
+
+      // Wait a moment to ensure cookies are fully written
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Refresh the router to ensure cookies are set properly
+      router.refresh();
+
+      // Wait for refresh to complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       // Let the middleware handle the redirect
       router.push('/dashboard');
     } catch (err) {
