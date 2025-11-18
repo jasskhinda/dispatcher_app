@@ -28,7 +28,13 @@ export async function middleware(req) {
       console.log("MIDDLEWARE: Allowing debug endpoint access");
       return res;
     }
-    
+
+    // Allow Maps API endpoints (for mobile app autocomplete and distance calculations)
+    if (req.nextUrl.pathname.startsWith('/api/maps/')) {
+      console.log("MIDDLEWARE: Allowing Maps API access");
+      return res;
+    }
+
     console.log("MIDDLEWARE: API route accessed without session - returning 401");
     return NextResponse.json(
       { error: 'Authentication required' },
