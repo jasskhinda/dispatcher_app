@@ -2,6 +2,33 @@ import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 
+// Helper function to send push notifications
+async function sendPushNotification(tripId, action, source) {
+  try {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_DISPATCHER_APP_URL || 'https://dispatch.compassionatecaretransportation.com'}/api/notifications/send-dispatcher-push`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        tripId,
+        action,
+        source: source || 'dispatcher_app',
+      }),
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      console.log('✅ Push notifications sent:', result);
+    } else {
+      console.error('❌ Failed to send push notifications:', await response.text());
+    }
+  } catch (error) {
+    console.error('❌ Error sending push notifications:', error);
+    // Don't fail the operation if push fails
+  }
+}
+
 export async function POST(request) {
   const requestId = Math.random().toString(36).substring(7);
   console.log(`🚀 Trip actions API called [${requestId}] at ${new Date().toISOString()}`);
@@ -230,7 +257,12 @@ async function handleApprove(supabase, trip, requestId) {
     }
 
     console.log(`✅ Trip approved [${requestId}]: ${updatedTrip.id}`);
-    
+
+    // Send push notification to other dispatchers
+    sendPushNotification(updatedTrip.id, 'approved', trip.managed_client_id ? 'facility_app' : 'booking_app').catch(err =>
+      console.error('Push notification failed:', err)
+    );
+
     return NextResponse.json({
       success: true,
       trip: updatedTrip,
@@ -270,7 +302,12 @@ async function handleReject(supabase, trip, reason, requestId) {
     }
 
     console.log(`✅ Trip rejected [${requestId}]: ${updatedTrip.id}`);
-    
+
+    // Send push notification to other dispatchers
+    sendPushNotification(updatedTrip.id, 'cancelled', trip.managed_client_id ? 'facility_app' : 'booking_app').catch(err =>
+      console.error('Push notification failed:', err)
+    );
+
     return NextResponse.json({
       success: true,
       trip: updatedTrip,
@@ -349,7 +386,12 @@ async function handleComplete(supabase, trip, requestId) {
     }
 
     console.log(`✅ Trip completed [${requestId}]: ${updatedTrip.id}`);
-    
+
+    // Send push notification to other dispatchers
+    sendPushNotification(updatedTrip.id, 'completed', trip.managed_client_id ? 'facility_app' : 'booking_app').catch(err =>
+      console.error('Push notification failed:', err)
+    );
+
     return NextResponse.json({
       success: true,
       trip: updatedTrip,
