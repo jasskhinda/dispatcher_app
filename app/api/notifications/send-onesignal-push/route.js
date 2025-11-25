@@ -14,7 +14,7 @@ async function sendOneSignalNotification(userIds, title, body, data = {}) {
   const message = {
     app_id: ONESIGNAL_APP_ID,
     include_aliases: {
-      external_id: userIds,
+      external_id: userIds, // Array of user IDs that logged in via OneSignal.login()
     },
     target_channel: 'push',
     headings: { en: title },
@@ -47,46 +47,15 @@ async function sendOneSignalNotification(userIds, title, body, data = {}) {
     return result;
   } catch (error) {
     console.error('❌ Error sending OneSignal notification:', error);
-    return { error: error.message };
-  }
-}
-
-// Send push notification via Expo Push API (fallback for older clients)
-async function sendExpoPushNotification(expoPushToken, title, body, data = {}) {
-  const message = {
-    to: expoPushToken,
-    sound: 'default',
-    title: title,
-    body: body,
-    data: data,
-    priority: 'high',
-  };
-
-  try {
-    const response = await fetch('https://exp.host/--/api/v2/push/send', {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Accept-Encoding': 'gzip, deflate',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(message),
-    });
-
-    const result = await response.json();
-    console.log('Expo Push notification sent:', result);
-    return result;
-  } catch (error) {
-    console.error('Error sending Expo push notification:', error);
     throw error;
   }
 }
 
-// Get all dispatcher user IDs (for OneSignal)
+// Get all dispatcher user IDs
 async function getDispatcherUserIds() {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id')
+    .select('id, first_name, last_name')
     .in('role', ['dispatcher', 'admin']);
 
   if (error) {
@@ -97,28 +66,22 @@ async function getDispatcherUserIds() {
   return data.map(d => d.id);
 }
 
-// Get all dispatcher push tokens (for Expo fallback)
-async function getDispatcherPushTokens() {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('expo_push_token, first_name, last_name')
-    .in('role', ['dispatcher', 'admin'])
-    .eq('push_notifications_enabled', true)
-    .not('expo_push_token', 'is', null);
-
-  if (error) {
-    console.error('Error fetching dispatcher tokens:', error);
-    return [];
-  }
-
-  return data;
-}
-
 export async function POST(request) {
   try {
     const { tripId, action, tripDetails, source } = await request.json();
 
-    console.log('📱 Sending dispatcher notifications:', { tripId, action, source });
+    console.log('📱 Sending OneSignal dispatcher notifications:', { tripId, action, source });
+
+    // Get all dispatcher user IDs
+    const dispatcherIds = await getDispatcherUserIds();
+
+    if (dispatcherIds.length === 0) {
+      console.log('No dispatchers found');
+      return NextResponse.json(
+        { success: true, message: 'No dispatchers to notify' },
+        { status: 200 }
+      );
+    }
 
     // Create notification title and body based on action
     let title, body;
@@ -167,64 +130,54 @@ export async function POST(request) {
         body = `Trip status changed`;
     }
 
-    const notificationData = {
-      type: 'trip',
-      tripId: tripId,
-      action: action,
-      source: source || 'unknown',
-      timestamp: new Date().toISOString(),
-    };
+    // Send notification via OneSignal to all dispatchers
+    const result = await sendOneSignalNotification(
+      dispatcherIds,
+      title,
+      body,
+      {
+        type: 'trip',
+        tripId: tripId,
+        action: action,
+        source: source || 'unknown',
+        timestamp: new Date().toISOString(),
+      }
+    );
 
-    // 1. Send via OneSignal (primary method for dispatcher_mobile)
-    const dispatcherIds = await getDispatcherUserIds();
-    let oneSignalResult = null;
+    // Also insert notification into database for in-app display
+    const notificationInserts = dispatcherIds.map(userId => ({
+      user_id: userId,
+      title: title,
+      body: body,
+      app_type: 'dispatcher',
+      data: {
+        type: 'trip',
+        tripId: tripId,
+        action: action,
+        source: source || 'unknown',
+      },
+      read: false,
+      created_at: new Date().toISOString(),
+    }));
 
-    if (dispatcherIds.length > 0) {
-      oneSignalResult = await sendOneSignalNotification(
-        dispatcherIds,
-        title,
-        body,
-        notificationData
-      );
-      console.log('✅ OneSignal notifications sent to', dispatcherIds.length, 'dispatchers');
-    }
+    const { error: insertError } = await supabase
+      .from('notifications')
+      .insert(notificationInserts);
 
-    // 2. Also send via Expo Push (for backward compatibility)
-    const dispatchers = await getDispatcherPushTokens();
-    let expoSuccessful = 0;
-    let expoFailed = 0;
-
-    if (dispatchers.length > 0) {
-      const expoPromises = dispatchers.map(dispatcher =>
-        sendExpoPushNotification(
-          dispatcher.expo_push_token,
-          title,
-          body,
-          notificationData
-        )
-      );
-
-      const expoResults = await Promise.allSettled(expoPromises);
-      expoSuccessful = expoResults.filter(r => r.status === 'fulfilled').length;
-      expoFailed = expoResults.filter(r => r.status === 'rejected').length;
-      console.log(`✅ Expo Push: ${expoSuccessful} sent, ${expoFailed} failed`);
+    if (insertError) {
+      console.error('❌ Error saving notifications to database:', insertError);
+    } else {
+      console.log('✅ Notifications saved to database');
     }
 
     return NextResponse.json({
       success: true,
-      oneSignal: {
-        dispatchersNotified: dispatcherIds.length,
-        result: oneSignalResult,
-      },
-      expo: {
-        sent: expoSuccessful,
-        failed: expoFailed,
-        total: dispatchers.length,
-      },
+      oneSignalResult: result,
+      dispatchersNotified: dispatcherIds.length,
     });
 
   } catch (error) {
-    console.error('Error in send-dispatcher-push:', error);
+    console.error('Error in send-onesignal-push:', error);
     return NextResponse.json(
       { error: 'Failed to send notifications', details: error.message },
       { status: 500 }
