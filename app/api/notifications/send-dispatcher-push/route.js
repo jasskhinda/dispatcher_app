@@ -6,8 +6,8 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // OneSignal credentials for dispatcher app
-const ONESIGNAL_APP_ID = 'ff9262e5-fe8a-4b14-827f-d67232a4c688';
-const ONESIGNAL_REST_API_KEY = process.env.ONESIGNAL_REST_API_KEY || 'os_v2_app_76jgfzp6rjfrjat72zzdfjggrckntqcjxdcu5mn3ovsn5rcxkaf77pyvdzg2a7wxhnzdxqaat2kolgqvngrebm4jqvv54l2di4bku4y';
+const ONESIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID || 'ff9262e5-fe8a-4b14-827f-d67232a4c688';
+const ONESIGNAL_REST_API_KEY = process.env.ONESIGNAL_REST_API_KEY;
 
 // Send push notification via OneSignal API
 async function sendOneSignalNotification(userIds, title, body, data = {}) {
