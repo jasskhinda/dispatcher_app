@@ -11,7 +11,8 @@ const ONESIGNAL_REST_API_KEY = process.env.ONESIGNAL_REST_API_KEY;
 
 // Send push notification via OneSignal API
 async function sendOneSignalNotification(userIds, title, body, data = {}) {
-  const message = {
+  // First try with external_id targeting (for users who have logged in via OneSignal.login())
+  const targetedMessage = {
     app_id: ONESIGNAL_APP_ID,
     include_aliases: {
       external_id: userIds,
@@ -34,14 +35,39 @@ async function sendOneSignalNotification(userIds, title, body, data = {}) {
         'Content-Type': 'application/json',
         'Authorization': `Key ${ONESIGNAL_REST_API_KEY}`,
       },
-      body: JSON.stringify(message),
+      body: JSON.stringify(targetedMessage),
     });
 
     const result = await response.json();
-    console.log('📨 OneSignal response:', result);
+    console.log('📨 OneSignal targeted response:', result);
 
-    if (result.errors) {
-      console.error('❌ OneSignal errors:', result.errors);
+    // If all aliases are invalid, fallback to sending to all subscribed users
+    if (result.errors?.invalid_aliases) {
+      console.log('⚠️ Invalid aliases detected, falling back to All segment');
+
+      const broadcastMessage = {
+        app_id: ONESIGNAL_APP_ID,
+        included_segments: ['All'],
+        headings: { en: title },
+        contents: { en: body },
+        data: data,
+        android_channel_id: 'default',
+        priority: 10,
+      };
+
+      const broadcastResponse = await fetch('https://api.onesignal.com/notifications', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Authorization': `Key ${ONESIGNAL_REST_API_KEY}`,
+        },
+        body: JSON.stringify(broadcastMessage),
+      });
+
+      const broadcastResult = await broadcastResponse.json();
+      console.log('📨 OneSignal broadcast response:', broadcastResult);
+      return { ...broadcastResult, fallback: true };
     }
 
     return result;
