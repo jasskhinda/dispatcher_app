@@ -201,8 +201,33 @@ export async function POST(request) {
       timestamp: new Date().toISOString(),
     };
 
-    // 1. Send via OneSignal (primary method for dispatcher_mobile)
+    // 1. Get all dispatcher user IDs
     const dispatcherIds = await getDispatcherUserIds();
+
+    // 2. Save notifications to database for each dispatcher (for in-app notification list)
+    if (dispatcherIds.length > 0) {
+      const notificationRecords = dispatcherIds.map(userId => ({
+        user_id: userId,
+        app_type: 'dispatcher',
+        notification_type: 'trip',
+        title: title,
+        body: body,
+        data: notificationData,
+        read: false,
+      }));
+
+      const { error: dbError } = await supabase
+        .from('notifications')
+        .insert(notificationRecords);
+
+      if (dbError) {
+        console.error('Error saving notifications to database:', dbError);
+      } else {
+        console.log('✅ Saved notifications to database for', dispatcherIds.length, 'dispatchers');
+      }
+    }
+
+    // 3. Send via OneSignal (primary method for dispatcher_mobile)
     let oneSignalResult = null;
 
     if (dispatcherIds.length > 0) {
@@ -215,7 +240,7 @@ export async function POST(request) {
       console.log('✅ OneSignal notifications sent to', dispatcherIds.length, 'dispatchers');
     }
 
-    // 2. Also send via Expo Push (for backward compatibility)
+    // 4. Also send via Expo Push (for backward compatibility)
     const dispatchers = await getDispatcherPushTokens();
     let expoSuccessful = 0;
     let expoFailed = 0;
