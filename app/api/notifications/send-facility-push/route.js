@@ -1,6 +1,17 @@
 import { NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { createClient } from '@supabase/supabase-js';
+
+// Create Supabase client lazily to avoid build-time errors
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  );
+}
+
+// OneSignal credentials for facility app
+const ONESIGNAL_FACILITY_APP_ID = process.env.ONESIGNAL_FACILITY_APP_ID || '142adebf-6670-4617-b4f7-1087b795ed8a';
+const ONESIGNAL_FACILITY_REST_API_KEY = process.env.ONESIGNAL_FACILITY_REST_API_KEY;
 
 /**
  * Send Push Notification to Facility Users
@@ -8,8 +19,9 @@ import { cookies } from 'next/headers';
  * Called when dispatcher sends a message or updates trip status
  */
 export async function POST(request) {
+  const supabase = getSupabase();
+
   try {
-    const supabase = createRouteHandlerClient({ cookies });
     const body = await request.json();
 
     const {
@@ -29,6 +41,78 @@ export async function POST(request) {
       );
     }
 
+    const notificationData = {
+      ...data,
+      facilityId,
+      timestamp: new Date().toISOString(),
+    };
+
+    // 1. Save notification to database for facility users
+    await saveNotificationToDatabase(supabase, facilityId, userId, title, notificationBody, data);
+
+    // 2. Send via OneSignal
+    let oneSignalResult = null;
+
+    if (ONESIGNAL_FACILITY_REST_API_KEY) {
+      // Build the OneSignal message
+      // If userId is provided, target that specific user
+      // Otherwise, target all users with app_type=facility tag
+      let oneSignalMessage;
+
+      if (userId) {
+        // Target specific user by external_id
+        oneSignalMessage = {
+          app_id: ONESIGNAL_FACILITY_APP_ID,
+          include_aliases: {
+            external_id: [userId]
+          },
+          target_channel: 'push',
+          headings: { en: title },
+          contents: { en: notificationBody },
+          data: notificationData,
+          priority: 10,
+          ios_sound: 'default',
+        };
+      } else {
+        // Target all facility users for this facility using tags
+        oneSignalMessage = {
+          app_id: ONESIGNAL_FACILITY_APP_ID,
+          filters: [
+            { field: 'tag', key: 'facility_id', relation: '=', value: facilityId }
+          ],
+          headings: { en: title },
+          contents: { en: notificationBody },
+          data: notificationData,
+          priority: 10,
+          ios_sound: 'default',
+        };
+      }
+
+      try {
+        console.log('📤 Sending OneSignal notification to facility:', facilityId);
+
+        const response = await fetch('https://api.onesignal.com/notifications', {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Authorization': `Key ${ONESIGNAL_FACILITY_REST_API_KEY}`,
+          },
+          body: JSON.stringify(oneSignalMessage),
+        });
+
+        oneSignalResult = await response.json();
+        console.log('📨 OneSignal response:', oneSignalResult);
+      } catch (error) {
+        console.error('❌ Error sending OneSignal notification:', error);
+      }
+    } else {
+      console.log('⚠️ ONESIGNAL_FACILITY_REST_API_KEY not configured');
+    }
+
+    // 3. Also try Expo Push as fallback if user has a push token
+    let expoPushSent = false;
+
     // Get push tokens for the facility users
     let query = supabase
       .from('facility_push_tokens')
@@ -41,90 +125,54 @@ export async function POST(request) {
 
     const { data: tokens, error: tokenError } = await query;
 
-    if (tokenError) {
-      console.error('❌ Error fetching push tokens:', tokenError);
-      return NextResponse.json(
-        { error: 'Failed to fetch push tokens' },
-        { status: 500 }
+    if (!tokenError && tokens && tokens.length > 0) {
+      // Filter for valid Expo tokens
+      const validTokens = tokens.filter(t =>
+        t.push_token &&
+        t.push_token !== 'LOCAL_NOTIFICATIONS_ONLY' &&
+        t.push_token.startsWith('ExponentPushToken[')
       );
-    }
 
-    if (!tokens || tokens.length === 0) {
-      console.log('⚠️ No push tokens found for facility:', facilityId);
-      // Still save to database even if no push tokens
-      await saveNotificationToDatabase(supabase, facilityId, userId, title, notificationBody, data);
-      return NextResponse.json(
-        { message: 'No push tokens found, saved to database only', sent: 0 },
-        { status: 200 }
-      );
-    }
+      if (validTokens.length > 0) {
+        console.log(`📱 Also sending to ${validTokens.length} Expo push token(s) as fallback`);
 
-    console.log(`📱 Found ${tokens.length} push token(s)`);
+        const messages = validTokens.map(token => ({
+          to: token.push_token,
+          sound: 'default',
+          title: title,
+          body: notificationBody,
+          data: notificationData,
+          priority: 'high',
+          channelId: 'default',
+          badge: 1,
+        }));
 
-    // Filter out LOCAL_NOTIFICATIONS_ONLY tokens
-    const validTokens = tokens.filter(t =>
-      t.push_token &&
-      t.push_token !== 'LOCAL_NOTIFICATIONS_ONLY' &&
-      t.push_token.startsWith('ExponentPushToken[')
-    );
+        try {
+          const expoPushResponse = await fetch('https://exp.host/--/api/v2/push/send', {
+            method: 'POST',
+            headers: {
+              'Accept': 'application/json',
+              'Accept-Encoding': 'gzip, deflate',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(messages),
+          });
 
-    if (validTokens.length === 0) {
-      console.log('⚠️ No valid Expo push tokens, saving to database only');
-      await saveNotificationToDatabase(supabase, facilityId, userId, title, notificationBody, data);
-      return NextResponse.json(
-        { message: 'No valid Expo push tokens, saved to database', sent: 0 },
-        { status: 200 }
-      );
-    }
-
-    console.log(`✅ Sending to ${validTokens.length} valid token(s)`);
-
-    // Prepare push notification messages
-    const messages = validTokens.map(token => ({
-      to: token.push_token,
-      sound: 'default',
-      title: title,
-      body: notificationBody,
-      data: {
-        ...data,
-        facilityId,
-      },
-      priority: 'high',
-      channelId: 'default',
-      badge: 1,
-    }));
-
-    // Send to Expo Push API
-    const expoPushResponse = await fetch('https://exp.host/--/api/v2/push/send', {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Accept-Encoding': 'gzip, deflate',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(messages),
-    });
-
-    if (!expoPushResponse.ok) {
-      throw new Error(`Expo Push API returned ${expoPushResponse.status}`);
-    }
-
-    const expoPushResult = await expoPushResponse.json();
-    console.log('📨 Expo Push API response:', expoPushResult);
-
-    // Save notification to database for each user
-    await saveNotificationToDatabase(supabase, facilityId, userId, title, notificationBody, data, validTokens);
-
-    // Check for errors in Expo response
-    const errors = expoPushResult.data?.filter(result => result.status === 'error') || [];
-    if (errors.length > 0) {
-      console.error('❌ Some push notifications failed:', errors);
+          if (expoPushResponse.ok) {
+            const expoPushResult = await expoPushResponse.json();
+            console.log('📨 Expo Push API response:', expoPushResult);
+            expoPushSent = true;
+          }
+        } catch (error) {
+          console.error('❌ Error sending Expo push notification:', error);
+        }
+      }
     }
 
     return NextResponse.json({
       success: true,
-      sent: validTokens.length,
-      results: expoPushResult.data,
+      oneSignal: oneSignalResult,
+      expoPush: expoPushSent,
     });
 
   } catch (error) {
@@ -136,14 +184,12 @@ export async function POST(request) {
   }
 }
 
-async function saveNotificationToDatabase(supabase, facilityId, userId, title, body, data, tokens = null) {
+async function saveNotificationToDatabase(supabase, facilityId, userId, title, body, data) {
   try {
     let userIds = [];
 
     if (userId) {
       userIds = [userId];
-    } else if (tokens && tokens.length > 0) {
-      userIds = tokens.map(t => t.user_id);
     } else {
       // Get all users for the facility
       const { data: profiles } = await supabase

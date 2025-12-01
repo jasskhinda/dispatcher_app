@@ -62,6 +62,40 @@ async function sendFacilityPushNotification(facilityId, title, body, data = {}) 
   }
 }
 
+// Helper function to send push notifications to booking app users
+async function sendBookingPushNotification(userId, tripId, action, title = null, body = null, data = {}) {
+  try {
+    if (!userId) {
+      console.log('⚠️ No userId provided, skipping booking notification');
+      return;
+    }
+
+    const response = await fetch(`${process.env.NEXT_PUBLIC_DISPATCHER_APP_URL || 'https://dispatch.compassionatecaretransportation.com'}/api/notifications/send-booking-push`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        userId,
+        tripId,
+        action,
+        title,
+        body,
+        data,
+      }),
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      console.log('✅ Booking push notification sent:', result);
+    } else {
+      console.error('❌ Failed to send booking push notification:', await response.text());
+    }
+  } catch (error) {
+    console.error('❌ Error sending booking push notification:', error);
+  }
+}
+
 // Helper function to enrich trip data with client and facility info
 async function enrichTripData(trip, supabase) {
   const enrichedTrip = { ...trip };
@@ -142,6 +176,11 @@ export async function POST(request) {
       }, { status: 404 });
     }
     console.log('✅ Trip found:', trip.id, 'Status:', trip.status);
+    console.log('📋 Trip details for notifications:', {
+      user_id: trip.user_id,
+      facility_id: trip.facility_id,
+      managed_client_id: trip.managed_client_id,
+    });
 
     // Handle actions
     if (action === 'complete') {
@@ -186,6 +225,13 @@ export async function POST(request) {
           `${clientName}'s trip has been completed successfully`,
           { tripId: updatedTrip.id, action: 'completed' }
         ).catch(err => console.error('Facility push notification failed:', err));
+      } else if (trip.user_id) {
+        // Send push notification to booking app user (if booking trip)
+        sendBookingPushNotification(
+          trip.user_id,
+          updatedTrip.id,
+          'completed'
+        ).catch(err => console.error('Booking push notification failed:', err));
       }
 
       return NextResponse.json({
@@ -238,6 +284,13 @@ export async function POST(request) {
           `${clientName}'s trip has been approved and confirmed`,
           { tripId: updatedTrip.id, action: 'approved' }
         ).catch(err => console.error('Facility push notification failed:', err));
+      } else if (trip.user_id) {
+        // Send push notification to booking app user (if booking trip)
+        sendBookingPushNotification(
+          trip.user_id,
+          updatedTrip.id,
+          'approved'
+        ).catch(err => console.error('Booking push notification failed:', err));
       }
 
       return NextResponse.json({
@@ -291,6 +344,15 @@ export async function POST(request) {
           `${clientName}'s trip has been cancelled${reason ? `: ${reason}` : ''}`,
           { tripId: updatedTrip.id, action: 'cancelled', reason }
         ).catch(err => console.error('Facility push notification failed:', err));
+      } else if (trip.user_id) {
+        // Send push notification to booking app user (if booking trip)
+        sendBookingPushNotification(
+          trip.user_id,
+          updatedTrip.id,
+          'cancelled',
+          '❌ Trip Cancelled',
+          `Your trip has been cancelled${reason ? `: ${reason}` : ''}`
+        ).catch(err => console.error('Booking push notification failed:', err));
       }
 
       return NextResponse.json({
