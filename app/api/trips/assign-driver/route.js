@@ -2,6 +2,33 @@ import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 
+// Helper function to send push notifications
+async function sendPushNotification(tripId, action, source, tripDetails = {}) {
+  try {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_DISPATCHER_APP_URL || 'https://dispatch.compassionatecaretransportation.com'}/api/notifications/send-dispatcher-push`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        tripId,
+        action,
+        source: source || 'dispatcher_app',
+        tripDetails,
+      }),
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      console.log('✅ Push notifications sent:', result);
+    } else {
+      console.error('❌ Failed to send push notifications:', await response.text());
+    }
+  } catch (error) {
+    console.error('❌ Error sending push notifications:', error);
+  }
+}
+
 export async function POST(request) {
   const requestId = Math.random().toString(36).substring(7);
   console.log(`🚀 Driver assignment API called [${requestId}] at ${new Date().toISOString()}`);
@@ -165,8 +192,14 @@ export async function POST(request) {
     // Note: Driver status will be updated to 'on_trip' when they accept the trip
 
     console.log(`✅ Successfully assigned trip [${requestId}]: ${tripId} to driver ${driverId}`);
-    
-    return NextResponse.json({ 
+
+    // Send push notification
+    sendPushNotification(updatedTrip.id, 'driver_assigned', trip.managed_client_id ? 'facility_app' : 'booking_app', {
+      pickup_address: trip.pickup_address,
+      driver_name: `${driver.first_name} ${driver.last_name}`,
+    }).catch(err => console.error('Push notification failed:', err));
+
+    return NextResponse.json({
       success: true,
       message: `Trip successfully assigned to ${driver.first_name} ${driver.last_name}`,
       data: {

@@ -3,6 +3,33 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 const { notifyTripApproved, notifyTripCompleted, notifyTripCancelled } = require('@/lib/notifications');
 
+// Helper function to send push notifications
+async function sendPushNotification(tripId, action, source, tripDetails = {}) {
+  try {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_DISPATCHER_APP_URL || 'https://dispatch.compassionatecaretransportation.com'}/api/notifications/send-dispatcher-push`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        tripId,
+        action,
+        source: source || 'dispatcher_app',
+        tripDetails,
+      }),
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      console.log('✅ Push notifications sent:', result);
+    } else {
+      console.error('❌ Failed to send push notifications:', await response.text());
+    }
+  } catch (error) {
+    console.error('❌ Error sending push notifications:', error);
+  }
+}
+
 // Helper function to enrich trip data with client and facility info
 async function enrichTripData(trip, supabase) {
   const enrichedTrip = { ...trip };
@@ -111,6 +138,11 @@ export async function POST(request) {
         console.error('Error sending completion notifications:', err)
       );
 
+      // Send push notification
+      sendPushNotification(updatedTrip.id, 'completed', trip.managed_client_id ? 'facility_app' : 'booking_app', {
+        pickup_address: trip.pickup_address,
+      }).catch(err => console.error('Push notification failed:', err));
+
       return NextResponse.json({
         success: true,
         trip: updatedTrip,
@@ -144,6 +176,11 @@ export async function POST(request) {
       await notifyTripApproved(updatedTrip, enrichedTrip).catch(err =>
         console.error('Error sending approval notifications:', err)
       );
+
+      // Send push notification
+      sendPushNotification(updatedTrip.id, 'approved', trip.managed_client_id ? 'facility_app' : 'booking_app', {
+        pickup_address: trip.pickup_address,
+      }).catch(err => console.error('Push notification failed:', err));
 
       return NextResponse.json({
         success: true,
@@ -179,6 +216,11 @@ export async function POST(request) {
       await notifyTripCancelled(updatedTrip, enrichedTrip, reason).catch(err =>
         console.error('Error sending cancellation notifications:', err)
       );
+
+      // Send push notification
+      sendPushNotification(updatedTrip.id, 'cancelled', trip.managed_client_id ? 'facility_app' : 'booking_app', {
+        pickup_address: trip.pickup_address,
+      }).catch(err => console.error('Push notification failed:', err));
 
       return NextResponse.json({
         success: true,
