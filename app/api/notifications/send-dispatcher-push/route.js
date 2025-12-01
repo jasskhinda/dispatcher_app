@@ -159,13 +159,18 @@ export async function POST(request) {
         body = `A trip has been updated`;
         break;
 
+      case 'message':
+        title = '💬 New Message';
+        body = `${tripDetails?.facility_name || 'A facility'}: ${tripDetails?.message_preview || 'New message'}`;
+        break;
+
       default:
         title = '📋 Trip Notification';
         body = `Trip status changed`;
     }
 
     const notificationData = {
-      type: 'trip',
+      type: action === 'message' ? 'message' : 'trip',
       tripId: tripId,
       action: action,
       source: source || 'unknown',
@@ -180,7 +185,7 @@ export async function POST(request) {
       const notificationRecords = dispatcherIds.map(userId => ({
         user_id: userId,
         app_type: 'dispatcher',
-        notification_type: 'trip',
+        notification_type: action === 'message' ? 'message' : 'trip',
         title: title,
         body: body,
         data: notificationData,
