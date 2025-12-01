@@ -21,8 +21,8 @@ async function sendOneSignalNotification(userIds, title, body, data = {}) {
     headings: { en: title },
     contents: { en: body },
     data: data,
-    android_channel_id: 'default',
     priority: 10,
+    ios_sound: 'default',
   };
 
   try {
