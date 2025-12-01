@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 
-// Helper function to send push notifications
+// Helper function to send push notifications to dispatchers
 async function sendPushNotification(tripId, action, source) {
   try {
     const response = await fetch(`${process.env.NEXT_PUBLIC_DISPATCHER_APP_URL || 'https://dispatch.compassionatecaretransportation.com'}/api/notifications/send-dispatcher-push`, {
@@ -19,13 +19,45 @@ async function sendPushNotification(tripId, action, source) {
 
     if (response.ok) {
       const result = await response.json();
-      console.log('✅ Push notifications sent:', result);
+      console.log('✅ Dispatcher push notifications sent:', result);
     } else {
-      console.error('❌ Failed to send push notifications:', await response.text());
+      console.error('❌ Failed to send dispatcher push notifications:', await response.text());
     }
   } catch (error) {
-    console.error('❌ Error sending push notifications:', error);
+    console.error('❌ Error sending dispatcher push notifications:', error);
     // Don't fail the operation if push fails
+  }
+}
+
+// Helper function to send push notifications to facility users
+async function sendFacilityPushNotification(facilityId, title, body, data = {}) {
+  try {
+    if (!facilityId) {
+      console.log('⚠️ No facilityId provided, skipping facility notification');
+      return;
+    }
+
+    const response = await fetch(`${process.env.NEXT_PUBLIC_DISPATCHER_APP_URL || 'https://dispatch.compassionatecaretransportation.com'}/api/notifications/send-facility-push`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        facilityId,
+        title,
+        body,
+        data,
+      }),
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      console.log('✅ Facility push notification sent:', result);
+    } else {
+      console.error('❌ Failed to send facility push notification:', await response.text());
+    }
+  } catch (error) {
+    console.error('❌ Error sending facility push notification:', error);
   }
 }
 
@@ -263,6 +295,16 @@ async function handleApprove(supabase, trip, requestId) {
       console.error('Push notification failed:', err)
     );
 
+    // Send push notification to facility users (if facility trip)
+    if (trip.facility_id) {
+      sendFacilityPushNotification(
+        trip.facility_id,
+        '✅ Trip Approved',
+        'Your trip has been approved and confirmed',
+        { tripId: updatedTrip.id, action: 'approved' }
+      ).catch(err => console.error('Facility push notification failed:', err));
+    }
+
     return NextResponse.json({
       success: true,
       trip: updatedTrip,
@@ -307,6 +349,16 @@ async function handleReject(supabase, trip, reason, requestId) {
     sendPushNotification(updatedTrip.id, 'cancelled', trip.managed_client_id ? 'facility_app' : 'booking_app').catch(err =>
       console.error('Push notification failed:', err)
     );
+
+    // Send push notification to facility users (if facility trip)
+    if (trip.facility_id) {
+      sendFacilityPushNotification(
+        trip.facility_id,
+        '❌ Trip Rejected',
+        `Your trip has been rejected${rejectionReason ? `: ${rejectionReason}` : ''}`,
+        { tripId: updatedTrip.id, action: 'rejected', reason: rejectionReason }
+      ).catch(err => console.error('Facility push notification failed:', err));
+    }
 
     return NextResponse.json({
       success: true,
@@ -391,6 +443,16 @@ async function handleComplete(supabase, trip, requestId) {
     sendPushNotification(updatedTrip.id, 'completed', trip.managed_client_id ? 'facility_app' : 'booking_app').catch(err =>
       console.error('Push notification failed:', err)
     );
+
+    // Send push notification to facility users (if facility trip)
+    if (trip.facility_id) {
+      sendFacilityPushNotification(
+        trip.facility_id,
+        '✅ Trip Completed',
+        'The trip has been completed successfully',
+        { tripId: updatedTrip.id, action: 'completed' }
+      ).catch(err => console.error('Facility push notification failed:', err));
+    }
 
     return NextResponse.json({
       success: true,
