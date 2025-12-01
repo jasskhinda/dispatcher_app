@@ -35,6 +35,12 @@ export async function middleware(req) {
       return res;
     }
 
+    // Allow notification push endpoints (for inter-service communication from facility_app)
+    if (req.nextUrl.pathname.startsWith('/api/notifications/')) {
+      console.log("MIDDLEWARE: Allowing Notifications API access");
+      return res;
+    }
+
     console.log("MIDDLEWARE: API route accessed without session - returning 401");
     return NextResponse.json(
       { error: 'Authentication required' },
