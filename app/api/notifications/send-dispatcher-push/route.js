@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+// Create Supabase client lazily to avoid build-time errors
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  );
+}
 
 // OneSignal credentials for dispatcher app
 const ONESIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID || 'ff9262e5-fe8a-4b14-827f-d67232a4c688';
@@ -80,7 +84,7 @@ async function sendExpoPushNotification(expoPushToken, title, body, data = {}) {
 }
 
 // Get all dispatcher user IDs (for OneSignal)
-async function getDispatcherUserIds() {
+async function getDispatcherUserIds(supabase) {
   const { data, error } = await supabase
     .from('profiles')
     .select('id')
@@ -95,7 +99,7 @@ async function getDispatcherUserIds() {
 }
 
 // Get all dispatcher push tokens (for Expo fallback)
-async function getDispatcherPushTokens() {
+async function getDispatcherPushTokens(supabase) {
   const { data, error } = await supabase
     .from('profiles')
     .select('expo_push_token, first_name, last_name')
@@ -112,6 +116,8 @@ async function getDispatcherPushTokens() {
 }
 
 export async function POST(request) {
+  const supabase = getSupabase();
+
   try {
     const { tripId, action, tripDetails, source } = await request.json();
 
@@ -178,7 +184,7 @@ export async function POST(request) {
     };
 
     // 1. Get all dispatcher user IDs
-    const dispatcherIds = await getDispatcherUserIds();
+    const dispatcherIds = await getDispatcherUserIds(supabase);
 
     // 2. Save notifications to database for each dispatcher (for in-app notification list)
     if (dispatcherIds.length > 0) {
@@ -217,7 +223,7 @@ export async function POST(request) {
     }
 
     // 4. Also send via Expo Push (for backward compatibility)
-    const dispatchers = await getDispatcherPushTokens();
+    const dispatchers = await getDispatcherPushTokens(supabase);
     let expoSuccessful = 0;
     let expoFailed = 0;
 
