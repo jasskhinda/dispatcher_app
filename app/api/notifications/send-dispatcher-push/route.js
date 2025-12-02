@@ -181,6 +181,20 @@ export async function POST(request) {
           : 'Driver has started a trip';
         break;
 
+      case 'arrived_at_pickup':
+        title = '📍 Driver Arrived at Pickup';
+        body = tripDetails?.pickup_address
+          ? `Driver arrived at ${tripDetails.pickup_address.split(',')[0]}`
+          : 'Driver has arrived at pickup location';
+        break;
+
+      case 'ride_started':
+        title = '🚗 Passenger Picked Up';
+        body = tripDetails?.destination_address
+          ? `Driver is heading to ${tripDetails.destination_address.split(',')[0]}`
+          : 'Driver has picked up the passenger and started the ride';
+        break;
+
       case 'updated':
         title = '✏️ Trip Updated';
         body = `A trip has been updated`;
