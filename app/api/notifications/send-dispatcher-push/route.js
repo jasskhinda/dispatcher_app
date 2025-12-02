@@ -149,6 +149,13 @@ export async function POST(request) {
         body = `A trip has been completed`;
         break;
 
+      case 'trip_completed':
+        title = '✅ Trip Completed by Driver';
+        body = tripDetails?.pickup_address
+          ? `Driver completed trip from ${tripDetails.pickup_address.split(',')[0]}`
+          : 'Driver has completed a trip';
+        break;
+
       case 'cancelled':
       case 'canceled':
         title = '❌ Trip Cancelled';
@@ -158,6 +165,20 @@ export async function POST(request) {
       case 'driver_assigned':
         title = '👤 Driver Assigned';
         body = `Driver has been assigned to a trip`;
+        break;
+
+      case 'driver_accepted':
+        title = '✅ Driver Accepted Trip';
+        body = tripDetails?.pickup_address
+          ? `Driver accepted trip to ${tripDetails.pickup_address.split(',')[0]}`
+          : 'Driver has accepted a trip';
+        break;
+
+      case 'trip_started':
+        title = '🚗 Trip Started';
+        body = tripDetails?.pickup_address
+          ? `Driver started trip from ${tripDetails.pickup_address.split(',')[0]}`
+          : 'Driver has started a trip';
         break;
 
       case 'updated':

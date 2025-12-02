@@ -61,6 +61,38 @@ async function sendFacilityPushNotification(facilityId, title, body, data = {}) 
   }
 }
 
+// Helper function to send push notifications to drivers
+async function sendDriverPushNotification(driverId, tripId, action, data = {}) {
+  try {
+    if (!driverId) {
+      console.log('⚠️ No driverId provided, skipping driver notification');
+      return;
+    }
+
+    const response = await fetch(`${process.env.NEXT_PUBLIC_DISPATCHER_APP_URL || 'https://dispatch.compassionatecaretransportation.com'}/api/notifications/send-driver-push`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        driverId,
+        tripId,
+        action,
+        data,
+      }),
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      console.log('✅ Driver push notification sent:', result);
+    } else {
+      console.error('❌ Failed to send driver push notification:', await response.text());
+    }
+  } catch (error) {
+    console.error('❌ Error sending driver push notification:', error);
+  }
+}
+
 export async function POST(request) {
   const requestId = Math.random().toString(36).substring(7);
   console.log(`🚀 Driver assignment API called [${requestId}] at ${new Date().toISOString()}`);
@@ -240,6 +272,18 @@ export async function POST(request) {
         { tripId: updatedTrip.id, action: 'driver_assigned', driverName: `${driver.first_name} ${driver.last_name}` }
       ).catch(err => console.error('Facility push notification failed:', err));
     }
+
+    // Send push notification to the assigned driver
+    sendDriverPushNotification(
+      driverId,
+      updatedTrip.id,
+      'trip_assigned',
+      {
+        pickupAddress: trip.pickup_address,
+        dropoffAddress: trip.dropoff_address,
+        pickupTime: trip.pickup_time,
+      }
+    ).catch(err => console.error('Driver push notification failed:', err));
 
     return NextResponse.json({
       success: true,
